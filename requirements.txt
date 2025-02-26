@@ -1,0 +1,4 @@
+sionna>=0.19.1
+tensorflow
+numpy
+matplotlib
