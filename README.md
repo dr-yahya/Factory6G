@@ -265,22 +265,8 @@ Simulation results comparing perfect vs imperfect CSI are available in `notebook
 - **Imperfect CSI**: Requires higher Eb/No (≈ 7-9 dB) for similar performance
 - Performance gap highlights the importance of accurate channel estimation
 
+See `docs/Channel_Esimation_Enhancment_Result_Comparision.md` for the latest LS vs Neural channel estimation comparison (plots and tables).
+
 ## References
 
-Research papers and documentation are stored in the `references/` directory:
-- Channel estimation papers
-- Sionna framework documentation
-- 3GPP standards and specifications
-
-## Contributing
-
-This is a research project. For questions or contributions, please refer to the project maintainers.
-
-## License
-
-[Add your license information here]
-
-## Authors
-
-[Add author information here]
-
+Research papers and documentation are stored in the `

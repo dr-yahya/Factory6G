@@ -241,3 +241,5 @@ python main.py \
     --no-plot
 ```
 
+See also: `docs/Channel_Esimation_Enhancment_Result_Comparision.md` for the latest comparison plots and numerical summary.
+
