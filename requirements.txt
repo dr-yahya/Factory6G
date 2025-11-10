@@ -1,0 +1,15 @@
+# Core dependencies for Factory6G project
+tensorflow>=2.10.0
+sionna>=0.15.0
+numpy>=1.21.0
+matplotlib>=3.5.0
+tqdm>=4.62.0
+
+# Optional: for Jupyter notebooks
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Optional: for development
+pytest>=7.0.0
+black>=22.0.0
+
