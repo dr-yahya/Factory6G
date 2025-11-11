@@ -1,0 +1,21 @@
+{
+  "scenario": "umi",
+  "ebno_db": [
+    0.0,
+    3.0,
+    6.0,
+    9.0
+  ],
+  "perfect_csi": [
+    false
+  ],
+  "ber": [
+    null
+  ],
+  "bler": [
+    null
+  ],
+  "duration": 4.23627495765686,
+  "config": null,
+  "estimator": "ls_temporal"
+}

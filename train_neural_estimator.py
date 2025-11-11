@@ -1,5 +1,51 @@
 #!/usr/bin/env python3
-"""Train the neural channel estimator used in the physical-layer model."""
+"""Train the neural channel estimator used in the physical-layer model.
+
+This script trains a neural network-based channel estimator that refines
+least squares (LS) channel estimates. The neural estimator learns to reduce
+estimation error by exploiting channel statistics and noise characteristics.
+
+Theory:
+    Neural Channel Estimation Training:
+    
+    1. Dataset Generation:
+       - Generate channel realizations using 3GPP TR 38.901 channel model
+       - Transmit signals through channel with various Eb/No values
+       - Compute LS estimates: Ĥ_LS = LS_Estimator(Y, X_pilot)
+       - Extract true channels: H_true (from channel model)
+       - Create training pairs: (Ĥ_LS, H_true)
+       
+    2. Training Process:
+       - Input: LS estimates Ĥ_LS (real and imaginary parts)
+       - Target: True channels H_true (real and imaginary parts)
+       - Loss: MSE between predicted and true channels
+       - Optimizer: Adam with learning rate scheduling
+       - Regularization: Optional dropout, weight decay
+       
+    3. Training Objective:
+       min_θ E[|H_true - f_θ(Ĥ_LS)|²]
+       
+       where f_θ is the neural network parameterized by θ.
+       
+    4. Data Augmentation:
+       - Vary Eb/No values during training (ebno_min to ebno_max)
+       - Generate diverse channel realizations (different topologies)
+       - Expose model to various noise levels and channel conditions
+       
+    5. Validation:
+       - Split data into training and validation sets
+       - Monitor validation loss to prevent overfitting
+       - Early stopping if validation loss stops improving
+       
+    6. Model Evaluation:
+       - Test on held-out test set
+       - Compare with LS estimator baseline
+       - Measure improvement in estimation error
+
+References:
+    - Wen et al., "Deep Learning for Massive MIMO Channel State Acquisition"
+    - Soltani et al., "Deep Learning-Based Channel Estimation"
+"""
 
 from __future__ import annotations
 
@@ -57,20 +103,76 @@ def generate_batch(
     batch_size: int,
     ebno_db: float,
 ) -> Tuple[tf.Tensor, tf.Tensor]:
+    """
+    Generate a batch of training data for neural channel estimator.
+    
+    Creates training examples by:
+    1. Generating random channel realizations
+    2. Transmitting signals through the channel
+    3. Computing LS channel estimates
+    4. Extracting true channel responses
+    
+    Theory:
+        Training data generation:
+        
+        1. Channel Realization:
+           - Generate random UT positions and orientations
+           - Compute channel response H_true using 3GPP TR 38.901 model
+           - Channel varies with topology (distance, angles, etc.)
+           
+        2. Signal Transmission:
+           - Generate random information bits
+           - Encode, modulate, and map to resource grid
+           - Transmit through channel: Y = H·X + N
+           - Add AWGN noise with variance σ² = N₀
+           
+        3. LS Estimation:
+           - Estimate channel from received pilots: Ĥ_LS = Y_pilot / X_pilot
+           - LS estimate is noisy: Ĥ_LS = H_true + ε, where ε ~ CN(0, σ²_LS)
+           
+        4. Training Pair:
+           - Input (features): Ĥ_LS (LS estimate)
+           - Target (labels): H_true (true channel)
+           - Goal: Learn mapping f: Ĥ_LS → H_true to reduce estimation error
+        
+    Args:
+        transmitter: Transmitter component for generating signals
+        channel: Channel model for generating channel realizations
+        receiver: Receiver component (contains LS channel estimator)
+        resource_grid: OFDM resource grid defining time-frequency structure
+        batch_size: Number of channel realizations per batch
+        ebno_db: Eb/No value in dB for this batch
+            Varying Eb/No during training improves generalization
+            
+    Returns:
+        Tuple of:
+        - features: LS channel estimates [batch_size, ..., 2]
+            Last dimension is [Re(Ĥ_LS), Im(Ĥ_LS)]
+        - targets: True channel responses [batch_size, ..., 2]
+            Last dimension is [Re(H_true), Im(H_true)]
+    """
+    # Generate new channel topology for this batch
     channel.set_topology(batch_size)
+    
+    # Compute noise variance from Eb/No
     noise_var = ebnodb2no(
         tf.constant(ebno_db, dtype=tf.float32),
         transmitter.config.num_bits_per_symbol,
         transmitter.config.coderate,
         resource_grid,
     )
+    
+    # Transmit signals through channel
     x_rg, _ = transmitter.call(batch_size)
     y, h_true = channel(x_rg, noise_var)
 
-    # Baseline LS estimate
+    # Compute LS channel estimate
     h_ls, _ = receiver._channel_estimator(y, noise_var)
+    
+    # Process true channel (remove nulled subcarriers to match LS estimate)
     h_true_proc = receiver._remove_nulled_subcarriers(h_true)
 
+    # Prepare training data: stack real and imaginary parts
     features = stack_complex(tf.math.real(h_ls), tf.math.imag(h_ls))
     targets = stack_complex(tf.math.real(h_true_proc), tf.math.imag(h_true_proc))
     return features, targets
@@ -108,9 +210,62 @@ def prepare_dataset(
 # ---------------------------------------------------------------------------
 
 def train_neural_estimator(args: argparse.Namespace) -> Path:
+    """
+    Train the neural channel estimator.
+    
+    Performs end-to-end training of the neural channel estimator by:
+    1. Generating training dataset (LS estimates and true channels)
+    2. Building neural network model
+    3. Training with MSE loss and Adam optimizer
+    4. Saving trained weights to file
+    
+    Theory:
+        Training Process:
+        
+        1. Dataset Preparation:
+           - Generate diverse channel realizations
+           - Vary Eb/No values (ebno_min to ebno_max)
+           - Create (Ĥ_LS, H_true) training pairs
+           
+        2. Model Training:
+           - Loss function: L(θ) = E[|H_true - f_θ(Ĥ_LS)|²]
+           - Optimizer: Adam with learning rate α
+           - Update rule: θ ← θ - α·∇_θ L(θ)
+           - Batch training: Process multiple examples simultaneously
+           
+        3. Validation:
+           - Split data: (1 - validation_split) for training, validation_split for validation
+           - Monitor validation loss to detect overfitting
+           - Early stopping: Stop if validation loss stops improving
+           
+        4. Model Evaluation:
+           - Test on held-out test set
+           - Measure estimation error reduction vs LS baseline
+           - Compare performance across different Eb/No values
+        
+    Args:
+        args: Command-line arguments containing training configuration:
+            - scenario: Channel scenario ("umi", "uma", "rma")
+            - num_batches: Number of batches to generate
+            - batch_size: Channel realizations per batch
+            - ebno_min, ebno_max: Eb/No range for training
+            - hidden_units: Neural network architecture
+            - learning_rate: Adam optimizer learning rate
+            - epochs: Number of training epochs
+            - train_batch_size: Batch size for neural network training
+            - validation_split: Fraction of data for validation
+            - output: Path to save trained weights
+            
+    Returns:
+        Path to saved weights file
+    """
+    # Initialize system configuration
     config = SystemConfig(scenario=args.scenario)
+    
+    # Build system components
     transmitter, channel, receiver, resource_grid = build_system(config)
 
+    # Generate training dataset
     features, targets = prepare_dataset(
         transmitter,
         channel,
@@ -121,27 +276,31 @@ def train_neural_estimator(args: argparse.Namespace) -> Path:
         ebno_range=(args.ebno_min, args.ebno_max),
     )
 
+    # Create neural channel estimator
     estimator = NeuralChannelEstimator(
         config,
         resource_grid,
         hidden_units=args.hidden_units,
     )
 
+    # Compile model with optimizer and loss function
     estimator.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
-        loss=tf.keras.losses.MeanSquaredError(),
-        metrics=[tf.keras.metrics.MeanSquaredError()],
+        loss=tf.keras.losses.MeanSquaredError(),  # MSE loss for regression
+        metrics=[tf.keras.metrics.MeanSquaredError()],  # Track MSE during training
     )
 
+    # Train the model
     estimator.fit(
         features,
         targets,
-        batch_size=args.train_batch_size,
-        epochs=args.epochs,
-        validation_split=args.validation_split,
-        verbose=1,
+        batch_size=args.train_batch_size,  # Batch size for neural network training
+        epochs=args.epochs,  # Number of training epochs
+        validation_split=args.validation_split,  # Fraction of data for validation
+        verbose=1,  # Print training progress
     )
 
+    # Save trained weights
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     estimator.save_weights(output_path)
