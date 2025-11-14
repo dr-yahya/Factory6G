@@ -41,11 +41,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-# Project specific
-results/*.png
-results/*.pdf
-results/*.csv
-*.log
 
 # TensorFlow
 *.pb

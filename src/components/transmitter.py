@@ -222,6 +222,8 @@ class Transmitter:
                 Shape: [batch_size, num_tx, num_streams_per_tx, num_ofdm_symbols, fft_size]
             - b: Original information bits (for BER/BLER calculation)
                 Shape: [batch_size, num_tx, num_streams_per_tx, num_info_bits]
+            - x: QAM symbols prior to resource-grid mapping (for EVM diagnostics)
+                Shape: [batch_size, num_tx, num_streams_per_tx, num_data_symbols]
         """
         # Generate information bits
         # Shape: [batch_size, num_tx, num_streams_per_tx, num_info_bits]
@@ -264,7 +266,7 @@ class Transmitter:
             ut_power = tf_ops.reshape(ut_power, [1, self.config.num_tx, 1, 1, 1])
             x_rg = x_rg * tf_ops.sqrt(ut_power)
         
-        return x_rg, b  # Return both resource grid and original bits
+        return x_rg, b, x  # include QAM symbols for diagnostics
     
     def __call__(self, batch_size: int) -> tuple:
         """

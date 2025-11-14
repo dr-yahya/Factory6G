@@ -208,17 +208,9 @@ class Model:
         """
         self._channel.set_topology(batch_size)
     
-    @tf.function
-    def call(self, batch_size: int, ebno_db: float) -> tuple:
+    def run_batch(self, batch_size: int, ebno_db: float, include_details: bool = True) -> dict:
         """
-        Simulate transmission through the complete system.
-        
-        Args:
-            batch_size: Batch size for simulation
-            ebno_db: Energy per bit to noise ratio in dB
-            
-        Returns:
-            Tuple of (transmitted bits, received bits)
+        Run a batch through the end-to-end link and optionally collect diagnostics.
         """
         # Generate new topology
         self.new_topology(batch_size)
@@ -245,17 +237,46 @@ class Model:
         )
         
         # Transmitter: Generate bits and map to resource grid
-        x_rg, b = self._transmitter.call(batch_size)
+        x_rg, b, x_symbols = self._transmitter.call(batch_size)
         
         # Channel: Apply channel and noise
         y, h = self._channel(x_rg, no)
         
         # Receiver: Estimate channel, equalize, demap, and decode
         if self.perfect_csi:
-            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
+            h_hat = self._receiver._remove_nulled_subcarriers(h)
+            err_var = tf.zeros_like(h_hat, dtype=h_hat.dtype)
+            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
         else:
             h_hat, err_var = self._receiver.estimate_channel(y, no)
-            b_hat = self._receiver(y, h_hat, err_var, no)
+            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
+        
+        llr = self._receiver.demap(x_hat, no_eff)
+        b_hat, decoder_iter = self._receiver.decode(llr)
+        
+        if not include_details:
+            return {
+                "bits": b,
+                "bits_hat": b_hat,
+            }
+        
+        return {
+            "bits": b.numpy(),
+            "bits_hat": b_hat.numpy(),
+            "qam": x_symbols.numpy(),
+            "qam_hat": x_hat.numpy(),
+            "no_eff": no_eff.numpy(),
+            "channel": h.numpy(),
+            "channel_hat": h_hat.numpy(),
+            "err_var": err_var.numpy() if isinstance(err_var, tf.Tensor) else err_var,
+            "decoder_iterations": decoder_iter.numpy(),
+            "noise_variance": no.numpy() if isinstance(no, tf.Tensor) else no,
+        }
+    
+    def call(self, batch_size: int, ebno_db: float) -> tuple:
+        """Compatibility wrapper returning only transmitted and decoded bits."""
+        res = self.run_batch(batch_size, ebno_db, include_details=False)
+        return res["bits"], res["bits_hat"]
         
         return b, b_hat
     

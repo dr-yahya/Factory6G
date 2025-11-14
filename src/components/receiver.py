@@ -177,8 +177,8 @@ class Receiver:
         # APP demapper: converts symbols to log-likelihood ratios
         self._demapper = Demapper("app", "qam", config.num_bits_per_symbol)
         
-        # LDPC decoder: iterative belief propagation decoder
-        self._decoder = LDPC5GDecoder(encoder)
+        # LDPC decoder: iterative belief propagation decoder (return iterations for diagnostics)
+        self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
     
     def estimate_channel(self, y: tf.Tensor, noise_var: tf.Tensor) -> tuple:
         """
@@ -323,7 +323,7 @@ class Receiver:
         """
         return self._demapper(x_hat, no_eff)
     
-    def decode(self, llr: tf.Tensor) -> tf.Tensor:
+    def decode(self, llr: tf.Tensor) -> tuple:
         """
         Decode LLRs to information bits using LDPC decoder.
         
@@ -364,7 +364,20 @@ class Receiver:
             Shape: [batch_size, num_tx, num_streams, num_info_bits]
             Values are 0 or 1 (hard decisions)
         """
-        return self._decoder(llr)
+        decoder_out = self._decoder(llr)
+        if isinstance(decoder_out, tuple):
+            if len(decoder_out) == 3:
+                decoded, _, num_iter = decoder_out
+            elif len(decoder_out) == 2:
+                decoded, num_iter = decoder_out
+            else:
+                decoded = decoder_out[0]
+                num_iter = decoder_out[-1]
+        else:
+            decoded = decoder_out
+            num_iter = tf.zeros_like(decoded[..., 0], dtype=tf.float32)
+        num_iter = tf.cast(num_iter, tf.float32)
+        return decoded, num_iter
     
     def call(self, y: tf.Tensor, h_hat: tf.Tensor, err_var: tf.Tensor,
              noise_var: tf.Tensor) -> tf.Tensor:
@@ -414,7 +427,7 @@ class Receiver:
         llr = self.demap(x_hat, no_eff)
         
         # Decode
-        b_hat = self.decode(llr)
+        b_hat, _ = self.decode(llr)
         
         return b_hat
     
