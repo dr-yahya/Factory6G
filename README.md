@@ -157,13 +157,13 @@ pip install tensorflow-gpu
    - Runs BER/BLER simulations across different Eb/No values
    - Compares perfect vs imperfect CSI performance
 
-3. **Neural Estimator Training** (`train_neural_estimator.py`):
+3. **Neural Estimator Training** (`scripts/train_neural_estimator.py`):
    ```bash
    # Quick training run (CPU friendly)
-   python train_neural_estimator.py --num-batches 30 --batch-size 8 --epochs 2
+python scripts/train_neural_estimator.py --num-batches 30 --batch-size 8 --epochs 2
 
    # Custom output path (ensures .weights.h5 suffix)
-   python train_neural_estimator.py --output artifacts/my_estimator.weights.h5
+python scripts/train_neural_estimator.py --output artifacts/my_estimator.weights.h5
    ```
 
 4. **End-to-End Training** (`src/models/e2e_channel_estimation.py`):
@@ -266,6 +266,12 @@ Simulation results comparing perfect vs imperfect CSI are available in `notebook
 - Performance gap highlights the importance of accurate channel estimation
 
 See `docs/Channel_Esimation_Enhancment_Result_Comparision.md` for the latest LS vs Neural channel estimation comparison (plots and tables).
+
+### Simulation Output Layout
+
+- Per-run artifacts live under `results/runs/run_<timestamp>__<scenario_and_estimator>/` and contain `metrics.json` plus any generated plots for that configuration.
+- Profiled experiment runs are grouped under `results/profiles/<profile_name>/runs/run_<timestamp>__<configuration>/` with the same file layout.
+- Repository-wide comparison figures (aggregated across multiple runs) remain in `results/plots/`.
 
 ## References
 

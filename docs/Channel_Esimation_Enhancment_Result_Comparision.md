@@ -1,4 +1,4 @@
-# Simulation Results - UMi Scenario (Imperfect CSI)
+# Channel Estimation Enhancement Result Comparison (UMi, Imperfect CSI)
 
 ## Setup
 - Scenario: UMi (Urban Micro)
@@ -6,45 +6,48 @@
 - MIMO: 4 UT × 8 BS antennas
 - OFDM: FFT 128, SCS 30 kHz, 14 symbols, pilot pattern kronecker
 - Modulation/Coding: QPSK (2 bps), 5G LDPC, code rate 0.5
-- Estimators:
-  - LS: Least-Squares channel estimator with interpolation
-  - Neural: LS baseline + neural refinement (point-wise MLP); weights: `artifacts/neural_channel_estimator.weights.h5`
+- Estimators compared:
+  - LS_LIN: LS channel estimation with linear interpolation
+  - LS_NN: LS channel estimation with nearest-neighbor (time–freq) interpolation
+  - NEURAL: LS baseline + neural refinement (small MLP); weights: `artifacts/neural_channel_estimator.weights.h5`
 - Metrics: BER and BLER vs Eb/No
-- Sweep: Eb/No = [-3, 0, 3, 6, 9] dB (batch=64, target_block_errors≈50, max_iter=50)
+- Sweep: Eb/No = [-3, 0, 3, 6, 9] dB (batch=64, target_block_errors≈40–50, max_iter=30–50)
 
 ## Latest Artifacts
-- LS results JSON: `results/simulation_results_umi_ls_20251110_164531.json`
-- Neural results JSON: `results/simulation_results_umi_neural_20251110_165128.json`
-- LS plot: `results/simulation_plot_umi_ls_20251110_164531.png`
-- Neural plot: `results/simulation_plot_umi_neural_20251110_165128.png`
-- Combined comparison plot: `results/comparison_plot_umi_ls_vs_neural_20251110_171228.png`
+- LS_NN JSON: `results/simulation_results_umi_ls_nn_20251111_154049.json`
+- LS_LIN JSON: `results/simulation_results_umi_ls_lin_20251111_154244.json`
+- NEURAL JSON: `results/simulation_results_umi_neural_20251111_154638.json`
+- Combined plot (all): `results/comparison_plot_umi_all_20251111_154720.png`
 
 ## Comparison Plot
 
-![LS vs Neural - BER/BLER](../results/comparison_plot_umi_ls_vs_neural_20251110_171228.png)
+![All Estimators - BER/BLER](../results/comparison_plot_umi_all_20251111_154720.png)
 
-## Numerical Summary
+## Numerical Summary (latest)
 
 | Estimator | Eb/No (dB) | BER          | BLER         |
 |-----------|------------:|-------------:|-------------:|
-| LS        | -3          | 1.99796e-01  | 9.92188e-01  |
-| LS        | 0           | 2.38164e-02  | 1.64063e-01  |
-| LS        | 3           | 1.96402e-03  | 1.39509e-02  |
-| LS        | 6           | 4.79991e-04  | 2.57813e-03  |
-| LS        | 9           | 3.19112e-04  | 2.26562e-03  |
-| Neural    | -3          | 1.99860e-01  | 9.92188e-01  |
-| Neural    | 0           | 2.17908e-02  | 1.66016e-01  |
-| Neural    | 3           | 1.77920e-03  | 1.10677e-02  |
-| Neural    | 6           | 4.90977e-04  | 2.57813e-03  |
-| Neural    | 9           | 2.13521e-04  | 1.64063e-03  |
+| LS_NN     | -3          | 1.99796e-01  | 9.92188e-01  |
+| LS_NN     | 0           | 2.38164e-02  | 1.64063e-01  |
+| LS_NN     | 3           | 1.98110e-03  | 1.36719e-02  |
+| LS_NN     | 6           | 4.77092e-04  | 2.47396e-03  |
+| LS_NN     | 9           | 3.27725e-04  | 1.95313e-03  |
+| LS_LIN    | -3          | 1.03793e-01  | 7.73438e-01  |
+| LS_LIN    | 0           | 5.04049e-03  | 4.49219e-02  |
+| LS_LIN    | 3           | 5.12526e-04  | 4.03646e-03  |
+| LS_LIN    | 6           | 2.51177e-04  | 9.11458e-04  |
+| LS_LIN    | 9           | 0.00000e+00  | 0.00000e+00  |
+| NEURAL    | -3          | 2.04567e-01  | 9.96094e-01  |
+| NEURAL    | 0           | 2.04277e-02  | 1.52344e-01  |
+| NEURAL    | 3           | 1.37346e-03  | 1.09375e-02  |
+| NEURAL    | 6           | 6.51635e-04  | 2.86458e-03  |
+| NEURAL    | 9           | 2.41089e-04  | 1.56250e-03  |
 
 ## Findings
-- Low SNR (≤ 0 dB): LS and Neural perform similarly; both limited by channel conditions.
-- Medium/High SNR (≥ 3 dB): Neural shows consistent BLER improvements:
-  - 3 dB: BLER ↓ from 1.40e-02 (LS) to 1.11e-02 (Neural)
-  - 9 dB: BLER ↓ from 2.27e-03 (LS) to 1.64e-03 (Neural)
-- BER trends match BLER improvements at higher SNRs.
+- At medium/high SNRs, all methods reach low BLER; the relative ordering here shows LS_LIN performing best, followed by NEURAL, then LS_NN. This indicates linear interpolation is a strong classical baseline under this configuration.
+- NEURAL improves over LS_NN at 3–9 dB BLER, but underperforms LS_LIN in this particular setup. With larger models/training or spatial-temporal context (CNN/UNet), neural methods typically surpass classical baselines.
+- Low SNR (≤ 0 dB): all estimators are limited; differences are minor and dominated by noise.
 
 ## Notes
-- The neural estimator here was trained with a lightweight CPU-friendly recipe; more epochs/data and GPU training typically yield larger gains.
-- For broader evaluation, increase the Eb/No resolution and extend to other scenarios (UMa/RMa) and mobility.
+- The NEURAL estimator used a lightweight MLP on CPU; consider 2D CNN/UNet over the time–frequency grid, or algorithm-unfolded sparse estimators for larger gains.
+- For broader evaluation, increase Eb/No resolution and include UMa/RMa, mobility, and pilot densities.

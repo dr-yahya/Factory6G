@@ -223,10 +223,10 @@ Before running simulations with the neural estimator, train and save weights:
 
 ```bash
 # Lightweight CPU-friendly training run
-python train_neural_estimator.py --num-batches 30 --batch-size 8 --epochs 2
+python scripts/train_neural_estimator.py --num-batches 30 --batch-size 8 --epochs 2
 
 # Custom output path (must end with .weights.h5)
-python train_neural_estimator.py --output artifacts/custom_neural_estimator.weights.h5
+python scripts/train_neural_estimator.py --output artifacts/custom_neural_estimator.weights.h5
 ```
 
 ### Comparing LS and Neural Estimators

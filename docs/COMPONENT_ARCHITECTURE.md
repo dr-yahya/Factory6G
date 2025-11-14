@@ -137,7 +137,7 @@ Received Signal → Channel Estimation → Equalization → Demapping → Decodi
 - `NeuralChannelEstimator`: Wraps the LS estimator and applies a point-wise neural network to the real/imaginary parts of the estimate.
 
 **Training**:
-- Use `train_neural_estimator.py` to generate supervised pairs `(h_ls, h_true)` and fit the neural network.
+- Use `scripts/train_neural_estimator.py` to generate supervised pairs `(h_ls, h_true)` and fit the neural network.
 - Saved weights can be loaded in `Model(estimator_type="neural", estimator_weights=...)`.
 
 **Benefits**:
