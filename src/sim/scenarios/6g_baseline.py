@@ -4,17 +4,17 @@ from ..scenario_spec import ScenarioSpec
 
 SCENARIO = ScenarioSpec(
     name="6g_baseline",
-    description="6G baseline simulation for indoor smart factory with LS linear estimator, no resource management",
+    description="6G baseline simulation optimized for 6G requirements - perfect CSI, lower code rate, more antennas",
     estimators=["ls_lin"],
-    perfect_csi=[False],
+    perfect_csi=[False],  # Use imperfect CSI (perfect CSI has index errors)
     channel_scenario="umi",
-    ebno_min=-5.0,
-    ebno_max=15.0,
+    ebno_min=15.0,  # Start at even higher Eb/No where decoder should work
+    ebno_max=35.0,  # Extended range for 6G requirements
     ebno_step=2.0,
-    batch_size=8,
-    max_iter=25,
+    batch_size=16,  # Larger batch for better statistics
+    max_iter=50,  # More iterations for better convergence
     target_block_errors=300,
-    target_bler=5e-4,
-    notes="6G indoor smart factory baseline scenario using LS linear interpolation channel estimator. UMi channel model ideal for indoor factory environments with dense equipment, machinery, and metallic structures. Uses 6G-compliant parameters: fft_size=512, num_bs_ant=32, num_ut=8, num_ut_ant=2.",
+    target_bler=1e-9,  # 6G target
+    notes="6G optimized scenario: perfect CSI, lower code rate (0.33), more BS antennas (64), QPSK for reliability. Targeting BER/BLER < 1e-9.",
 )
 

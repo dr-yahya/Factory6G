@@ -181,7 +181,8 @@ class Receiver:
         # LDPC decoder: use 6G decoder if encoder is 6G, otherwise use 5G decoder
         # Check if encoder is LDPC6GEncoder
         if isinstance(encoder, LDPC6GEncoder):
-            self._decoder = LDPC6GDecoder(encoder)
+            # Explicitly set return_num_iter=True and num_iter=50 for proper iteration tracking
+            self._decoder = LDPC6GDecoder(encoder, num_iter=50, hard_out=True, return_num_iter=True)
         else:
             # Fallback to 5G decoder for compatibility
             self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)

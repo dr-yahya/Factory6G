@@ -185,13 +185,13 @@ class SystemConfig:
     pilot_ofdm_symbol_indices: List[int] = None
     
     # MIMO Configuration
-    num_bs_ant: int = 32  # Updated to max params: 6G massive MIMO range 32-4096
+    num_bs_ant: int = 32  # Keep default to avoid stream management issues
     num_ut: int = 8  # Updated to max params: 6G range 8-256
     num_ut_ant: int = 2  # Updated to max params: 6G range 2-8
     
     # Modulation and Coding
-    num_bits_per_symbol: int = 2  # QPSK
-    coderate: float = 0.5
+    num_bits_per_symbol: int = 2  # QPSK - most reliable for low BER
+    coderate: float = 0.5  # Standard code rate - 0.4 may cause issues
     
     # Channel Model
     scenario: str = "umi"  # UMi, UMa, RMa
