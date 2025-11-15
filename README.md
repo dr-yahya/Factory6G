@@ -21,16 +21,34 @@ Factory6G/
 │   └── models/            # Complete system models
 │       ├── __init__.py
 │       ├── model.py      # Main 5G/6G OFDM MIMO system model
-│       └── e2e_channel_estimation.py  # End-to-end neural channel estimation
+│       └── resource_manager.py  # Resource management for scheduling and power control
 ├── notebooks/             # Jupyter notebooks for experiments
-│   ├── main..ipynb       # Main BER/BLER simulation notebook
 │   ├── notes.ipynb       # Research notes on 6G parameters
 │   └── results_5G.ipynb  # 5G simulation results
+├── scripts/              # Utility scripts
+│   ├── run_6g_simulation.py  # Main 6G simulation script
+│   ├── compare_estimators.py  # Compare channel estimators
+│   ├── train_neural_estimator.py  # Train neural channel estimator
+│   ├── find_min_6g_params.py  # Parameter optimization
+│   ├── create_baseline_results.py  # Generate baseline results
+│   └── gpu/              # GPU setup and troubleshooting scripts
+│       ├── check_gpu.py
+│       ├── fix_gpu.py
+│       ├── fix_wsl_gpu.py
+│       └── monitor_gpu_install.py
 ├── references/           # Research papers and documentation
 │   ├── Channel Estimation/
 │   └── Sionna/
 ├── results/              # Output results and plots
-├── docs/                # Additional documentation
+├── docs/                # Documentation (organized by category)
+│   ├── README.md        # Documentation index
+│   ├── QUICK_START.md   # Quick start guide
+│   ├── COMPONENT_ARCHITECTURE.md  # System architecture
+│   ├── metrics/         # Metrics documentation
+│   ├── gpu/             # GPU setup & troubleshooting
+│   ├── implementation/  # Implementation details
+│   ├── results/         # Results & analysis
+│   └── project/         # Project management
 └── README.md            # This file
 ```
 
@@ -80,7 +98,7 @@ This modular design enables:
 - Modulation: QPSK (2 bits/symbol)
 - Code Rate: 0.5
 
-### 2. End-to-End Neural Channel Estimation (`src/models/e2e_channel_estimation.py`)
+### 2. Neural Channel Estimation Training (`scripts/train_neural_estimator.py`)
 
 - Differentiable end-to-end model
 - Neural network-based channel estimator
@@ -151,7 +169,7 @@ pip install tensorflow-gpu
    python main.py --help
    ```
 
-2. **Jupyter Notebook** (`notebooks/main..ipynb`):
+2. **Jupyter Notebook** (`notebooks/notes.ipynb`):
    - Interactive simulation notebook
    - Useful for experimentation and analysis
    - Runs BER/BLER simulations across different Eb/No values
@@ -166,9 +184,9 @@ python scripts/train_neural_estimator.py --num-batches 30 --batch-size 8 --epoch
 python scripts/train_neural_estimator.py --output artifacts/my_estimator.weights.h5
    ```
 
-4. **End-to-End Training** (`src/models/e2e_channel_estimation.py`):
+4. **Neural Channel Estimator Training** (`scripts/train_neural_estimator.py`):
    ```bash
-   python src/models/e2e_channel_estimation.py
+   python scripts/train_neural_estimator.py
    ```
 
 ### Example: Using the Model Class
@@ -265,7 +283,7 @@ Simulation results comparing perfect vs imperfect CSI are available in `notebook
 - **Imperfect CSI**: Requires higher Eb/No (≈ 7-9 dB) for similar performance
 - Performance gap highlights the importance of accurate channel estimation
 
-See `docs/Channel_Esimation_Enhancment_Result_Comparision.md` for the latest LS vs Neural channel estimation comparison (plots and tables).
+See `docs/results/01_channel_estimation_comparison.md` for the latest LS vs Neural channel estimation comparison (plots and tables).
 
 ### Simulation Output Layout
 

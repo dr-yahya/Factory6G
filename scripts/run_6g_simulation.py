@@ -2,7 +2,7 @@
 """
 Run simulation with 6G-compliant parameters.
 
-This script loads the 6G-compliant parameters from max_params_config.json
+This script loads the 6G-compliant parameters from min_6g_params_config.json
 and runs a full BER/BLER simulation with memory management.
 Produces matrices and plots for each metric, organized per run.
 """
@@ -12,6 +12,7 @@ import json
 import gc
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -28,210 +29,15 @@ from src.utils.memory_manager import (
     get_optimal_batch_size,
     MemoryMonitor
 )
-from main import run_simulation, configure_env
-
-
-def save_metric_matrices_and_plots(results: dict, run_dir: Path):
-    """
-    Save matrices (numpy arrays) and plots for each metric, organized per run.
-    
-    Args:
-        results: Simulation results dictionary
-        run_dir: Directory to save results for this run
-    """
-    run_dir.mkdir(parents=True, exist_ok=True)
-    matrices_dir = run_dir / "matrices"
-    plots_dir = run_dir / "plots"
-    matrices_dir.mkdir(exist_ok=True)
-    plots_dir.mkdir(exist_ok=True)
-    
-    runs = results.get("runs", [])
-    
-    # Metrics to process
-    per_stream_metrics = ["ber", "bler", "throughput_bits", "decoder_iter_avg", "sinr_db", 
-                          "snr_db", "channel_capacity", "outage_probability"]
-    overall_metrics = ["ber", "bler", "nmse_db", "evm_percent", "sinr_db", "snr_db",
-                       "decoder_iter_avg", "throughput_bits", "spectral_efficiency", "fairness_jain",
-                       "channel_capacity", "outage_probability", "air_interface_latency_ms", "energy_per_bit_pj"]
-    
-    # Collect data for each metric across all runs and Eb/No points
-    for run_idx, run in enumerate(runs):
-        csi_str = "perfect" if run.get("perfect_csi") else "imperfect"
-        metrics_list = run.get("metrics", [])
-        
-        if not metrics_list:
-            continue
-        
-        # Extract Eb/No values
-        ebno_values = [m["ebno_db"] for m in metrics_list]
-        
-        # Process per-stream metrics (matrices: [num_ebno, num_streams])
-        for metric_name in per_stream_metrics:
-            metric_data = []
-            for metric_entry in metrics_list:
-                per_stream = metric_entry.get("per_stream", {})
-                data = per_stream.get(metric_name)
-                if data is not None:
-                    metric_data.append(np.array(data))
-                else:
-                    # Fill with NaN if missing - find num_streams from first valid entry
-                    prev_data = next((m.get("per_stream", {}).get(metric_name) for m in metrics_list if m.get("per_stream", {}).get(metric_name) is not None), None)
-                    if prev_data is not None:
-                        num_streams = len(prev_data)
-                        metric_data.append(np.full(num_streams, np.nan))
-                    else:
-                        continue
-            
-            if metric_data:
-                # Stack into matrix: [num_ebno, num_streams]
-                matrix = np.stack(metric_data)
-                matrix_file = matrices_dir / f"{metric_name}_per_stream_{csi_str}_run{run_idx}.npy"
-                np.save(matrix_file, matrix)
-                print(f"  ✓ Saved matrix: {matrix_file.name} (shape: {matrix.shape})")
-                
-                # Create plot
-                fig, ax = plt.subplots(figsize=(10, 6))
-                for stream_idx in range(matrix.shape[1]):
-                    ax.plot(ebno_values, matrix[:, stream_idx], 
-                           marker='o', label=f'Stream {stream_idx}', linewidth=2)
-                ax.set_xlabel(r"$E_b/N_0$ (dB)", fontsize=12)
-                ylabel = metric_name.upper().replace('_', ' ')
-                # Add units to ylabel for specific metrics
-                if metric_name == "sinr_db" or metric_name == "snr_db":
-                    ylabel += " (dB)"
-                elif metric_name == "channel_capacity":
-                    ylabel += " (bits/s/Hz)"
-                elif metric_name == "outage_probability":
-                    ylabel += " (probability)"
-                ax.set_ylabel(ylabel, fontsize=12)
-                ax.set_title(f"{ylabel} per Stream - {csi_str.upper()} CSI", fontsize=14)
-                ax.legend(ncol=2, fontsize=9)
-                ax.grid(True, alpha=0.3)
-                if metric_name in ["ber", "bler", "outage_probability"]:
-                    ax.set_yscale('log')
-                plt.tight_layout()
-                plot_file = plots_dir / f"{metric_name}_per_stream_{csi_str}_run{run_idx}.png"
-                plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-                plt.close()
-                print(f"  ✓ Saved plot: {plot_file.name}")
-        
-        # Process overall metrics (vectors: [num_ebno])
-        for metric_name in overall_metrics:
-            metric_values = []
-            for metric_entry in metrics_list:
-                overall = metric_entry.get("overall", {})
-                value = overall.get(metric_name)
-                metric_values.append(value if value is not None else np.nan)
-            
-            if metric_values:
-                vector = np.array(metric_values)
-                vector_file = matrices_dir / f"{metric_name}_overall_{csi_str}_run{run_idx}.npy"
-                np.save(vector_file, vector)
-                print(f"  ✓ Saved vector: {vector_file.name} (shape: {vector.shape})")
-                
-                # Create plot
-                fig, ax = plt.subplots(figsize=(10, 6))
-                ax.plot(ebno_values, vector, marker='o', linewidth=2, markersize=8, color='blue')
-                ax.set_xlabel(r"$E_b/N_0$ (dB)", fontsize=12)
-                ylabel = metric_name.upper().replace('_', ' ')
-                # Add units to ylabel for specific metrics
-                if metric_name == "sinr_db" or metric_name == "snr_db":
-                    ylabel += " (dB)"
-                elif metric_name == "channel_capacity":
-                    ylabel += " (bits/s/Hz)"
-                elif metric_name == "outage_probability":
-                    ylabel += " (probability)"
-                elif metric_name == "air_interface_latency_ms":
-                    ylabel += " (ms)"
-                elif metric_name == "energy_per_bit_pj":
-                    ylabel += " (pJ)"
-                elif metric_name == "spectral_efficiency":
-                    ylabel += " (bits/s/Hz)"
-                ax.set_ylabel(ylabel, fontsize=12)
-                ax.set_title(f"{ylabel} - {csi_str.upper()} CSI", fontsize=14)
-                ax.grid(True, alpha=0.3)
-                if metric_name in ["ber", "bler", "outage_probability"]:
-                    ax.set_yscale('log')
-                # Add 6G target line for critical metrics
-                if metric_name == "air_interface_latency_ms":
-                    ax.axhline(y=0.1, color='r', linestyle='--', linewidth=2, label='6G Target (< 0.1 ms)')
-                    ax.legend(fontsize=10)
-                elif metric_name == "energy_per_bit_pj":
-                    ax.axhline(y=1.0, color='r', linestyle='--', linewidth=2, label='6G Target (1 pJ/bit)')
-                    ax.legend(fontsize=10)
-                elif metric_name == "outage_probability":
-                    ax.axhline(y=1e-6, color='r', linestyle='--', linewidth=2, label='6G Target (< 1e-6)')
-                    ax.legend(fontsize=10)
-                plt.tight_layout()
-                plot_file = plots_dir / f"{metric_name}_overall_{csi_str}_run{run_idx}.png"
-                plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-                plt.close()
-                print(f"  ✓ Saved plot: {plot_file.name}")
-    
-    # Create comparison plots (both CSI conditions on same plot)
-    for metric_name in overall_metrics:
-        fig, ax = plt.subplots(figsize=(10, 6))
-        has_data = False
-        for run_idx, run in enumerate(runs):
-            csi_str = "Perfect" if run.get("perfect_csi") else "Imperfect"
-            metrics_list = run.get("metrics", [])
-            if not metrics_list:
-                continue
-            
-            ebno_values = [m["ebno_db"] for m in metrics_list]
-            metric_values = []
-            for metric_entry in metrics_list:
-                overall = metric_entry.get("overall", {})
-                value = overall.get(metric_name)
-                metric_values.append(value if value is not None else np.nan)
-            
-            if metric_values and not all(np.isnan(metric_values)):
-                ax.plot(ebno_values, metric_values, marker='o', linewidth=2, 
-                       markersize=8, label=f"{csi_str} CSI")
-                has_data = True
-        
-        if has_data:
-            ax.set_xlabel(r"$E_b/N_0$ (dB)", fontsize=12)
-            ylabel = metric_name.upper().replace('_', ' ')
-            # Add units to ylabel
-            if metric_name == "sinr_db" or metric_name == "snr_db":
-                ylabel += " (dB)"
-            elif metric_name == "channel_capacity":
-                ylabel += " (bits/s/Hz)"
-            elif metric_name == "outage_probability":
-                ylabel += " (probability)"
-            elif metric_name == "air_interface_latency_ms":
-                ylabel += " (ms)"
-            elif metric_name == "energy_per_bit_pj":
-                ylabel += " (pJ)"
-            elif metric_name == "spectral_efficiency":
-                ylabel += " (bits/s/Hz)"
-            ax.set_ylabel(ylabel, fontsize=12)
-            ax.set_title(f"{ylabel} Comparison", fontsize=14)
-            ax.legend(fontsize=11)
-            ax.grid(True, alpha=0.3)
-            if metric_name in ["ber", "bler", "outage_probability"]:
-                ax.set_yscale('log')
-            # Add 6G target line for critical metrics
-            if metric_name == "air_interface_latency_ms":
-                ax.axhline(y=0.1, color='r', linestyle='--', linewidth=2, label='6G Target (< 0.1 ms)')
-                ax.legend(fontsize=10)
-            elif metric_name == "energy_per_bit_pj":
-                ax.axhline(y=1.0, color='r', linestyle='--', linewidth=2, label='6G Target (1 pJ/bit)')
-                ax.legend(fontsize=10)
-            elif metric_name == "outage_probability":
-                ax.axhline(y=1e-6, color='r', linestyle='--', linewidth=2, label='6G Target (< 1e-6)')
-                ax.legend(fontsize=10)
-            plt.tight_layout()
-            plot_file = plots_dir / f"{metric_name}_comparison.png"
-            plt.savefig(plot_file, dpi=300, bbox_inches='tight')
-            plt.close()
-            print(f"  ✓ Saved comparison plot: {plot_file.name}")
+from src.sim.runner import run_simulation
+from src.sim.results import load_baseline_results
+from src.sim.plotting import save_metric_matrices_and_plots
+from src.utils.env import configure_env
 
 
 def main():
     # Load 6G-compliant parameters
-    config_path = project_root / "results" / "max_params_config.json"
+    config_path = project_root / "results" / "min_6g_params_config.json"
     with open(config_path, 'r') as f:
         params = json.load(f)
     
@@ -263,8 +69,8 @@ def main():
         print("  1. Install TensorFlow with CUDA support:")
         print("     pip install --upgrade tensorflow[and-cuda]")
         print("  2. Or install matching CUDA/cuDNN versions manually")
-        print("  3. Run GPU check: python scripts/check_gpu.py")
-        print("  4. See docs/GPU_SETUP.md for detailed instructions")
+        print("  3. Run GPU check: python scripts/gpu/check_gpu.py")
+        print("  4. See docs/gpu/01_setup.md for detailed instructions")
         print()
         print("  Continuing with CPU mode (slower but functional)...")
         print()
@@ -379,12 +185,19 @@ def main():
                 json.dump(results, f, indent=2)
             print(f"✓ Results JSON saved to: {results_file}")
             
-            # Save matrices and create plots for each metric
+            # Load baseline results for comparison
             print()
+            print("=" * 80)
+            print("Loading baseline results for comparison...")
+            print("=" * 80)
+            baseline_results = load_baseline_results(project_root=project_root)
+            print()
+            
+            # Save matrices and create plots for each metric
             print("=" * 80)
             print("Saving metric matrices and plots...")
             print("=" * 80)
-            save_metric_matrices_and_plots(results, run_dir)
+            save_metric_matrices_and_plots(results, run_dir, baseline_results)
             
         finally:
             # Clean up memory after simulation

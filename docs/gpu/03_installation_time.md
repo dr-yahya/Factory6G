@@ -114,7 +114,7 @@ pip install tensorflow==2.20.0
 
 Once complete, verify GPU:
 ```bash
-python scripts/check_gpu.py
+python scripts/gpu/check_gpu.py
 ```
 
 You should see:

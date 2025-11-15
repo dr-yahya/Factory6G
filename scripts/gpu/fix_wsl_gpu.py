@@ -16,14 +16,14 @@ def main():
     print("=" * 70)
     print()
     
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     venv_path = project_root / ".venv" / "lib" / "python3.10" / "site-packages"
     
     # Check if NVIDIA libraries are installed
     nvidia_path = venv_path / "nvidia"
     if not nvidia_path.exists():
         print("✗ NVIDIA libraries not found!")
-        print("  Run: python scripts/fix_gpu.py --yes")
+        print("  Run: python scripts/gpu/fix_gpu.py --yes")
         return False
     
     print("✓ NVIDIA libraries found")
@@ -42,7 +42,8 @@ def main():
         print("  This might be a version compatibility issue")
     
     # Create a wrapper script that sets up environment correctly
-    wrapper_script = project_root / "scripts" / "run_with_gpu.sh"
+    wrapper_script = project_root / "scripts" / "gpu" / "run_with_gpu.sh"
+    wrapper_script.parent.mkdir(parents=True, exist_ok=True)
     
     wrapper_content = f"""#!/bin/bash
 # GPU-enabled wrapper script for WSL
@@ -62,10 +63,10 @@ exec "$@"
     
     os.chmod(wrapper_script, 0o755)
     
-    print("✓ Created GPU wrapper script: scripts/run_with_gpu.sh")
+    print("✓ Created GPU wrapper script: scripts/gpu/run_with_gpu.sh")
     print()
     print("Usage:")
-    print("  bash scripts/run_with_gpu.sh python scripts/run_6g_simulation.py")
+    print("  bash scripts/gpu/run_with_gpu.sh python scripts/run_6g_simulation.py")
     print()
     
     # Also update the memory manager to use this

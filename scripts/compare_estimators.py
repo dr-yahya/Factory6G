@@ -47,7 +47,8 @@ from typing import Dict, List, Optional, Any
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from main import run_simulation, configure_env, setup_gpu
+from src.sim.runner import run_simulation
+from src.utils.env import configure_env, setup_gpu
 
 
 # Available channel estimation methods

@@ -85,7 +85,7 @@ def main():
     print()
     
     # Get paths
-    project_root = Path(__file__).parent.parent
+    project_root = Path(__file__).parent.parent.parent
     venv_path = project_root / ".venv" / "lib" / "python3.10" / "site-packages"
     tensorflow_path = venv_path / "tensorflow"
     nvidia_path = venv_path / "nvidia"
@@ -220,7 +220,7 @@ def main():
         print("=" * 80)
         print()
         print("To check if installation completed, run:")
-        print("  python scripts/check_gpu.py")
+        print("  python scripts/gpu/check_gpu.py")
         print()
 
 if __name__ == "__main__":

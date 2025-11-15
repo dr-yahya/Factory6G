@@ -61,7 +61,7 @@ python scripts/run_6g_simulation.py
 5. **Test GPU Detection**:
    ```bash
    source .venv/bin/activate
-   python scripts/check_gpu.py
+   python scripts/gpu/check_gpu.py
    ```
 
 ### Option 3: Use Docker with GPU Support

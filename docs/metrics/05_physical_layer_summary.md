@@ -172,7 +172,7 @@
 
 ## References
 
-- Full documentation: `docs/6G_PHYSICAL_LAYER_METRICS.md`
+- Full documentation: `docs/metrics/03_physical_layer.md`
 - IMT-2030 Requirements: ITU-R M.2083
 - 3GPP Physical Layer: TS 38.211, TS 38.212, TR 38.901
 

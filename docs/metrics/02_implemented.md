@@ -182,7 +182,7 @@ The implementation is complete and ready for use. When running actual simulation
 
 ## References
 
-- Full metrics documentation: `docs/6G_PHYSICAL_LAYER_METRICS.md`
-- Quick reference: `docs/PHYSICAL_LAYER_METRICS_SUMMARY.md`
+- Full metrics documentation: `docs/metrics/03_physical_layer.md`
+- Quick reference: `docs/metrics/05_physical_layer_summary.md`
 - Baseline results: `results/baseline_6g_simulation/`
 

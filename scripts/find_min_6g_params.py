@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Find maximum simulation parameters for channel estimation before system breaks.
+Find minimum 6G simulation parameters for channel estimation.
 
-This script incrementally increases simulation parameters (batch_size, fft_size,
-num_bs_ant, num_ut, etc.) until the system runs out of memory or crashes,
-then saves the last working configuration.
+This script starts with high 6G-compliant parameters and decrementally reduces them
+until finding the minimum viable parameters that still work correctly,
+then saves the configuration.
 
 Usage:
-    python scripts/find_max_params.py
+    python scripts/find_min_6g_params.py
 """
 
 import os
@@ -23,16 +23,10 @@ from typing import Dict, Any, Optional, Union
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.utils.env import configure_env
+
 # Configure environment before importing TensorFlow
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-
-
-def configure_env(force_cpu: bool, gpu_num: Optional[int]):
-    """Configure environment variables BEFORE importing TensorFlow/Sionna."""
-    if force_cpu:
-        os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-    elif gpu_num is not None and os.getenv("CUDA_VISIBLE_DEVICES") is None:
-        os.environ["CUDA_VISIBLE_DEVICES"] = f"{gpu_num}"
 
 
 def test_configuration(
@@ -138,47 +132,47 @@ def test_configuration(
         return False, error_msg
 
 
-def find_max_params(
-    start_batch_size: int = 8,
-    start_fft_size: int = 512,
-    start_num_bs_ant: int = 16,
-    start_num_ut: int = 4,
-    start_num_ut_ant: int = 1,
-    start_num_ofdm_symbols: int = 14,
-    increment_strategy: str = "balanced",
+def find_min_6g_params(
+    start_batch_size: int = 64,
+    start_fft_size: int = 16384,
+    start_num_bs_ant: int = 4096,
+    start_num_ut: int = 256,
+    start_num_ut_ant: int = 8,
+    start_num_ofdm_symbols: int = 28,
+    decrement_strategy: str = "balanced",
     timeout_seconds: int = 30,
 ) -> Dict[str, Any]:
     """
-    Find maximum parameters by incrementally increasing them.
+    Find minimum 6G parameters by decrementally reducing them.
     
     Args:
-        start_*: Starting values for each parameter
-        increment_strategy: "balanced" (increase all) or "individual" (one at a time)
+        start_*: Starting (high) values for each parameter (6G maximums)
+        decrement_strategy: "balanced" (decrease all) or "individual" (one at a time)
         timeout_seconds: Maximum time per test
     
     Returns:
-        Dictionary with max_params and test_history
+        Dictionary with min_6g_params and test_history
     """
     print("=" * 80)
-    print("Finding Maximum Simulation Parameters (6G 3GPP Compliant)")
+    print("Finding Minimum 6G Simulation Parameters (6G 3GPP Compliant)")
     print("=" * 80)
-    print(f"Starting parameters (6G standards):")
+    print(f"Starting parameters (6G maximums):")
     print(f"  batch_size: {start_batch_size}")
     print(f"  fft_size: {start_fft_size} (6G: 512-16384)")
     print(f"  num_bs_ant: {start_num_bs_ant} (6G massive MIMO: 32-4096)")
     print(f"  num_ut: {start_num_ut} (6G: 8-256)")
     print(f"  num_ut_ant: {start_num_ut_ant} (6G: 2-8)")
     print(f"  num_ofdm_symbols: {start_num_ofdm_symbols} (3GPP standard: 14)")
-    print(f"Increment strategy: {increment_strategy}")
+    print(f"Decrement strategy: {decrement_strategy}")
     print("=" * 80)
     
-    # Current working parameters (ensure FFT is power of 2 and >= 512)
-    if start_fft_size < 512:
-        start_fft_size = 512
+    # Current parameters (ensure FFT is power of 2 and within 6G bounds)
+    if start_fft_size > 16384:
+        start_fft_size = 16384
     # Round to nearest power of 2
     log_val = np.log2(start_fft_size)
-    start_fft_size = 2 ** int(np.ceil(log_val))
-    start_fft_size = max(start_fft_size, 512)  # Ensure 6G minimum
+    start_fft_size = 2 ** int(np.floor(log_val))
+    start_fft_size = min(start_fft_size, 16384)  # Ensure 6G maximum
     
     current = {
         "batch_size": start_batch_size,
@@ -189,26 +183,26 @@ def find_max_params(
         "num_ofdm_symbols": start_num_ofdm_symbols,
     }
     
-    # Last known working parameters
+    # Last known working parameters (starts as current)
     last_working = current.copy()
     
     # Test history
     history = []
     
-    # Increment multipliers (conservative for 6G large parameters)
-    if increment_strategy == "balanced":
-        # Increase all parameters proportionally (smaller increments for 6G)
-        multipliers = {
-            "batch_size": 1.25,  # Smaller increments for 6G
-            "fft_size": 1.26,  # ~1.26^3 ≈ 2 (doubles every 3 steps)
+    # Decrement divisors (conservative for 6G large parameters)
+    if decrement_strategy == "balanced":
+        # Decrease all parameters proportionally
+        divisors = {
+            "batch_size": 1.25,  # Divide by 1.25
+            "fft_size": 1.26,  # ~1.26^3 ≈ 2 (halves every 3 steps)
             "num_bs_ant": 1.26,
             "num_ut": 1.26,
             "num_ut_ant": 1.26,
-            "num_ofdm_symbols": 1.15,  # Smaller increments for symbols
+            "num_ofdm_symbols": 1.15,  # Smaller decrements for symbols
         }
     else:  # individual
         # Test one parameter at a time
-        multipliers = {
+        divisors = {
             "batch_size": 1.5,
             "fft_size": 1.414,  # sqrt(2)
             "num_bs_ant": 1.414,
@@ -274,86 +268,94 @@ def find_max_params(
             print(f"  ✓ SUCCESS")
             last_working = current.copy()
             
-            # Increment parameters (with 6G 3GPP bounds)
-            if increment_strategy == "balanced":
-                # Increase all parameters
-                print(f"  [INCREMENT] Increasing all parameters:")
+            # Decrement parameters (with 6G 3GPP minimum bounds)
+            if decrement_strategy == "balanced":
+                # Decrease all parameters
+                print(f"  [DECREMENT] Decreasing all parameters:")
                 for key in current:
                     old_val = current[key]
-                    new_val = int(current[key] * multipliers[key])
+                    new_val = int(current[key] / divisors[key])
                     
-                    # Apply 6G 3GPP bounds
+                    # Apply 6G 3GPP minimum bounds
                     if key == "fft_size":
                         # 6G: 512-16384, must be power of 2
-                        new_val = min(new_val, 16384)
-                        # Round to nearest power of 2 (always round up to next power of 2)
+                        new_val = max(new_val, 512)
+                        # Round down to nearest power of 2
                         if new_val < 512:
                             new_val = 512  # 6G minimum
                         else:
-                            # Round up to next power of 2
+                            # Round down to previous power of 2
                             log_val = np.log2(new_val)
-                            new_val = 2 ** int(np.ceil(log_val))
+                            new_val = 2 ** int(np.floor(log_val))
                             # Ensure it's at least 512
                             new_val = max(new_val, 512)
                     elif key == "num_bs_ant":
-                        # 6G massive MIMO: up to 4096
-                        new_val = min(new_val, 4096)
+                        # 6G massive MIMO: minimum 32
+                        new_val = max(new_val, 32)
                     elif key == "num_ut":
-                        # 6G: reasonable upper bound
-                        new_val = min(new_val, 256)
+                        # 6G: minimum 8
+                        new_val = max(new_val, 8)
                     elif key == "num_ut_ant":
-                        # 6G: typically 2-8
-                        new_val = min(new_val, 8)
+                        # 6G: minimum 2
+                        new_val = max(new_val, 2)
                     elif key == "num_ofdm_symbols":
-                        # 3GPP: typically 14, but can go higher
-                        new_val = min(new_val, 28)
+                        # 3GPP: minimum 14
+                        new_val = max(new_val, 14)
                     
                     current[key] = new_val
-                    print(f"    {key}: {old_val} -> {current[key]} (×{multipliers[key]:.3f})")
+                    print(f"    {key}: {old_val} -> {current[key]} (÷{divisors[key]:.3f})")
+                    
+                    # Check if we've hit minimum bounds
+                    if old_val == new_val:
+                        print(f"      [MIN BOUND] {key} reached 6G minimum")
             else:
                 # Individual strategy: cycle through parameters
                 param_order = ["batch_size", "fft_size", "num_bs_ant", "num_ut", "num_ut_ant", "num_ofdm_symbols"]
                 param_idx = (iteration - 1) % len(param_order)
                 param_name = param_order[param_idx]
                 old_val = current[param_name]
-                new_val = int(current[param_name] * multipliers[param_name])
+                new_val = int(current[param_name] / divisors[param_name])
                 
                 # Apply 6G constraints for individual strategy too
                 if param_name == "fft_size":
-                    new_val = min(new_val, 16384)
+                    new_val = max(new_val, 512)
                     if new_val < 512:
                         new_val = 512
                     else:
                         log_val = np.log2(new_val)
-                        new_val = 2 ** int(np.ceil(log_val))
+                        new_val = 2 ** int(np.floor(log_val))
                         new_val = max(new_val, 512)
                 elif param_name == "num_bs_ant":
-                    new_val = min(new_val, 4096)
+                    new_val = max(new_val, 32)
                 elif param_name == "num_ut":
-                    new_val = min(new_val, 256)
+                    new_val = max(new_val, 8)
                 elif param_name == "num_ut_ant":
-                    new_val = min(new_val, 8)
+                    new_val = max(new_val, 2)
                 elif param_name == "num_ofdm_symbols":
-                    new_val = min(new_val, 28)
+                    new_val = max(new_val, 14)
                 
                 current[param_name] = new_val
-                print(f"  [INCREMENT] Increasing {param_name}: {old_val} -> {current[param_name]} (×{multipliers[param_name]:.3f})")
+                print(f"  [DECREMENT] Decreasing {param_name}: {old_val} -> {current[param_name]} (÷{divisors[param_name]:.3f})")
+                
+                # Check if we've hit minimum bounds
+                if old_val == new_val:
+                    print(f"      [MIN BOUND] {param_name} reached 6G minimum")
         else:
             print(f"  ✗ FAILED: {error_msg}")
-            print(f"  [STATUS] Last working config saved, will attempt binary search...")
+            print(f"  [STATUS] Last working config is the minimum, will attempt binary search...")
             
             # If we're using balanced strategy and it failed, try binary search
-            if increment_strategy == "balanced":
+            if decrement_strategy == "balanced":
                 # Binary search between last_working and current
-                print(f"\n  [BINARY SEARCH] Finding limit between working and failing config...")
-                low = {k: float(v) for k, v in last_working.items()}
-                high = {k: float(v) for k, v in current.items()}
+                print(f"\n  [BINARY SEARCH] Finding minimum between working and failing config...")
+                low = {k: float(v) for k, v in current.items()}  # current failed, so it's lower
+                high = {k: float(v) for k, v in last_working.items()}  # last_working succeeded, so it's higher
                 
                 # Binary search for each parameter
                 print(f"  [BINARY SEARCH] Testing individual parameters...")
                 for key in current:
                     print(f"  [BINARY SEARCH] Parameter: {key}")
-                    # Find max value for this parameter
+                    # Find min value for this parameter
                     low_val = low[key]
                     high_val = high[key]
                     print(f"    Range: {low_val} -> {high_val}")
@@ -371,7 +373,7 @@ def find_max_params(
                                 mid_val_int = 512
                             else:
                                 log_val = np.log2(mid_val_int)
-                                mid_val_int = 2 ** int(np.ceil(log_val))
+                                mid_val_int = 2 ** int(np.floor(log_val))
                                 mid_val_int = max(mid_val_int, 512)
                             test_params[key] = mid_val_int
                         else:
@@ -391,25 +393,37 @@ def find_max_params(
                         
                         if test_success:
                             print(f"      ✓ PASSED")
-                            low_val = test_params[key]
+                            high_val = test_params[key]
                             last_working[key] = test_params[key]
                         else:
                             print(f"      ✗ FAILED: {test_error}")
-                            high_val = test_params[key]
+                            low_val = test_params[key]
                     
-                    # Final value is the last working one
-                    last_working[key] = int(low_val)
-                    print(f"    Final value for {key}: {last_working[key]}")
+                    # Final value is the last working one (minimum)
+                    last_working[key] = int(high_val)
+                    print(f"    Final minimum value for {key}: {last_working[key]}")
                 
                 break  # Exit main loop after binary search
             else:
-                # Individual strategy: this parameter failed, move to next
+                # Individual strategy: this parameter failed, we found minimum for previous
                 break
+        
+        # Check if all parameters are at minimum bounds
+        all_at_minimum = (
+            current['fft_size'] == 512 and
+            current['num_bs_ant'] == 32 and
+            current['num_ut'] == 8 and
+            current['num_ut_ant'] == 2 and
+            current['num_ofdm_symbols'] == 14
+        )
+        if all_at_minimum and success:
+            print(f"\n  [MINIMUM REACHED] All parameters at 6G minimum bounds")
+            break
     
     print("\n" + "=" * 80)
     print("FINAL RESULTS")
     print("=" * 80)
-    print("Last working configuration:")
+    print("Minimum working configuration:")
     for key, value in last_working.items():
         print(f"  {key}: {value}")
     
@@ -425,7 +439,7 @@ def find_max_params(
     print(f"  Estimated memory: {final_memory:.2f} GB")
     
     return {
-        "max_params": last_working,
+        "min_6g_params": last_working,
         "test_history": history,
         "final_memory_gb": final_memory,
     }
@@ -442,58 +456,58 @@ def save_results(results: Dict[str, Any], output_file: str):
     print(f"\n✓ Results saved to: {output_path}")
     
     # Also save a simple config file
-    config_file = output_path.parent / "max_params_config.json"
+    config_file = output_path.parent / "min_6g_params_config.json"
     with open(config_file, 'w') as f:
-        json.dump(results["max_params"], f, indent=2)
+        json.dump(results["min_6g_params"], f, indent=2)
     print(f"✓ Config saved to: {config_file}")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Find maximum simulation parameters before system breaks"
+        description="Find minimum 6G simulation parameters"
     )
     parser.add_argument(
         '--start-batch-size',
         type=int,
-        default=8,
-        help='Starting batch size (default: 8 for 6G, conservative)'
+        default=64,
+        help='Starting batch size (default: 64, high value for 6G)'
     )
     parser.add_argument(
         '--start-fft-size',
         type=int,
-        default=512,
-        help='Starting FFT size (default: 512 for 6G minimum, 3GPP: 512-16384, must be power of 2)'
+        default=16384,
+        help='Starting FFT size (default: 16384 for 6G maximum, 3GPP: 512-16384, must be power of 2)'
     )
     parser.add_argument(
         '--start-num-bs-ant',
         type=int,
-        default=16,
-        help='Starting number of BS antennas (default: 16, will increase to 32+ for 6G massive MIMO)'
+        default=4096,
+        help='Starting number of BS antennas (default: 4096, 6G massive MIMO maximum)'
     )
     parser.add_argument(
         '--start-num-ut',
         type=int,
-        default=4,
-        help='Starting number of UTs (default: 4, will increase to 8+ for 6G)'
+        default=256,
+        help='Starting number of UTs (default: 256, 6G maximum)'
     )
     parser.add_argument(
         '--start-num-ut-ant',
         type=int,
-        default=1,
-        help='Starting number of UT antennas (default: 1, will increase to 2+ for 6G)'
+        default=8,
+        help='Starting number of UT antennas (default: 8, 6G maximum)'
     )
     parser.add_argument(
         '--start-num-ofdm-symbols',
         type=int,
-        default=14,
-        help='Starting number of OFDM symbols (default: 14, 3GPP standard)'
+        default=28,
+        help='Starting number of OFDM symbols (default: 28, higher than 3GPP standard 14)'
     )
     parser.add_argument(
         '--strategy',
         type=str,
         default='balanced',
         choices=['balanced', 'individual'],
-        help='Increment strategy: balanced (all params) or individual (one at a time)'
+        help='Decrement strategy: balanced (all params) or individual (one at a time)'
     )
     parser.add_argument(
         '--timeout',
@@ -515,8 +529,8 @@ def main():
     parser.add_argument(
         '--output',
         type=str,
-        default='results/max_params.json',
-        help='Output file path (default: results/max_params.json)'
+        default='results/min_6g_params.json',
+        help='Output file path (default: results/min_6g_params.json)'
     )
     
     args = parser.parse_args()
@@ -541,14 +555,14 @@ def main():
     
     # Run parameter finding
     try:
-        results = find_max_params(
+        results = find_min_6g_params(
             start_batch_size=args.start_batch_size,
             start_fft_size=args.start_fft_size,
             start_num_bs_ant=args.start_num_bs_ant,
             start_num_ut=args.start_num_ut,
             start_num_ut_ant=args.start_num_ut_ant,
             start_num_ofdm_symbols=args.start_num_ofdm_symbols,
-            increment_strategy=args.strategy,
+            decrement_strategy=args.strategy,
             timeout_seconds=args.timeout,
         )
         
@@ -556,7 +570,7 @@ def main():
         save_results(results, args.output)
         
         print("\n" + "=" * 80)
-        print("SUCCESS: Maximum parameters found and saved")
+        print("SUCCESS: Minimum 6G parameters found and saved")
         print("=" * 80)
         
     except KeyboardInterrupt:

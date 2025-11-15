@@ -88,7 +88,7 @@ This automatically installs matching CUDA and cuDNN versions.
 Run the GPU check script:
 
 ```bash
-python scripts/check_gpu.py
+python scripts/gpu/check_gpu.py
 ```
 
 Expected output:
@@ -105,7 +105,7 @@ If you just want to try the automatic fix:
 pip install --upgrade tensorflow[and-cuda]
 
 # Verify
-python scripts/check_gpu.py
+python scripts/gpu/check_gpu.py
 ```
 
 ## Current Status

@@ -1,5 +1,5 @@
 {
-  "max_params": {
+  "min_6g_params": {
     "batch_size": 9,
     "fft_size": 1024,
     "num_bs_ant": 19,
@@ -39,3 +39,4 @@
   ],
   "final_memory_gb": 0.15655517578125
 }
+

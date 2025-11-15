@@ -139,7 +139,7 @@
 
 ## References
 
-- Full documentation: `docs/6G_SIMULATION_METRICS.md`
+- Full documentation: `docs/metrics/04_comprehensive_list.md`
 - IMT-2030 Requirements: ITU-R M.2083
 - 3GPP Standards: TS 38.211, TR 38.901
 

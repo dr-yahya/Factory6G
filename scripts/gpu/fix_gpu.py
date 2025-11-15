@@ -73,7 +73,7 @@ def main():
             print("⚠ GPU still not detected. Please check:")
             print("  1. NVIDIA driver is installed: nvidia-smi")
             print("  2. CUDA libraries are accessible")
-            print("  3. Run: python scripts/check_gpu.py for diagnostics")
+            print("  3. Run: python scripts/gpu/check_gpu.py for diagnostics")
             
     except subprocess.CalledProcessError as e:
         print(f"✗ Installation failed:")

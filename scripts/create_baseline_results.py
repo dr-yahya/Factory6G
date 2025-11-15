@@ -44,7 +44,7 @@ def create_baseline_results():
     print(f"Baseline directory: {baseline_dir}")
     print()
     
-    # Simulation parameters (from max_params_config.json)
+    # Simulation parameters (from min_6g_params_config.json)
     ebno_db_range = np.arange(-5.0, 11.0, 2.0)  # -5, -3, -1, 1, 3, 5, 7, 9 dB
     num_ebno = len(ebno_db_range)
     num_streams = 16  # 8 UTs * 2 antennas = 16 streams
