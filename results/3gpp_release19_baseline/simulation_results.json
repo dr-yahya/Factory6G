@@ -1,0 +1,351 @@
+{
+  "baseline_type": "3GPP Release 19 (Bridge to 6G)",
+  "3gpp_release": "Release 19",
+  "3gpp_release_year": "2024",
+  "3gpp_release_description": "5G-Advanced (Phase 2) - Bridge/Transition to 6G with early 6G research and requirement studies",
+  "3gpp_release_note": "Note: Release 19 is not part of 6G standards. It serves as a bridge to 6G. Release 20 will contain formal 6G Studies, and Release 21 will start normative 6G work (IMT-2030).",
+  "6g_standards_timeline": {
+    "release_19": "Bridge/Transition to 6G - Early 6G research and requirement studies (5G-Advanced Phase 2)",
+    "release_20": "Formal 6G Studies (IMT-2030)",
+    "release_21": "Official start of normative 6G work - First 6G specifications"
+  },
+  "profile": "6G_Compliant",
+  "scenario": "umi",
+  "estimator": "ls",
+  "ebno_db": [
+    -5.0,
+    -3.0,
+    -1.0,
+    1.0,
+    3.0,
+    5.0,
+    7.0,
+    9.0
+  ],
+  "config": {
+    "fft_size": 512,
+    "num_bs_ant": 32,
+    "num_ut": 8,
+    "num_ut_ant": 2,
+    "num_ofdm_symbols": 14,
+    "num_bits_per_symbol": 2,
+    "coderate": 0.5
+  },
+  "runs": [
+    {
+      "perfect_csi": false,
+      "metrics": [
+        {
+          "ebno_db": -5.0,
+          "overall": {
+            "ber": 0.316227766016838,
+            "bler": 0.8433930068571645,
+            "nmse_db": -12.5,
+            "evm_percent": 26.67419115058384,
+            "sinr_db": -10.0,
+            "snr_db": -5.0,
+            "decoder_iter_avg": 10.0,
+            "throughput_bits": 5000,
+            "spectral_efficiency": 0.33333333333333337,
+            "fairness_jain": 0.8079264507596051,
+            "channel_capacity": 0.13750352374993502,
+            "outage_probability": 0.1,
+            "air_interface_latency_ms": 0.17500000000000002,
+            "energy_per_bit_pj": 2.4
+          }
+        },
+        {
+          "ebno_db": -3.0,
+          "overall": {
+            "ber": 0.19952623149688797,
+            "bler": 0.47427474113233103,
+            "nmse_db": -11.5,
+            "evm_percent": 21.188063169341316,
+            "sinr_db": -8.0,
+            "snr_db": -3.0,
+            "decoder_iter_avg": 9.2,
+            "throughput_bits": 7000,
+            "spectral_efficiency": 0.4,
+            "fairness_jain": 0.8217678763302482,
+            "channel_capacity": 0.21224474326039539,
+            "outage_probability": 0.03981071705534972,
+            "air_interface_latency_ms": 0.165,
+            "energy_per_bit_pj": 2.24
+          }
+        },
+        {
+          "ebno_db": -1.0,
+          "overall": {
+            "ber": 0.12589254117941673,
+            "bler": 0.2667042864326648,
+            "nmse_db": -10.5,
+            "evm_percent": 16.83027681452945,
+            "sinr_db": -6.0,
+            "snr_db": -1.0,
+            "decoder_iter_avg": 8.4,
+            "throughput_bits": 9000,
+            "spectral_efficiency": 0.4666666666666667,
+            "fairness_jain": 0.840066533460247,
+            "channel_capacity": 0.32329932269384243,
+            "outage_probability": 0.015848931924611138,
+            "air_interface_latency_ms": 0.155,
+            "energy_per_bit_pj": 2.08
+          }
+        },
+        {
+          "ebno_db": 1.0,
+          "overall": {
+            "ber": 0.07943282347242815,
+            "bler": 0.14997884186649119,
+            "nmse_db": -9.5,
+            "evm_percent": 13.368764072006183,
+            "sinr_db": -4.0,
+            "snr_db": 1.0,
+            "decoder_iter_avg": 7.6,
+            "throughput_bits": 11000,
+            "spectral_efficiency": 0.5333333333333333,
+            "fairness_jain": 0.859933466539753,
+            "channel_capacity": 0.4834749533456802,
+            "outage_probability": 0.006309573444801933,
+            "air_interface_latency_ms": 0.145,
+            "energy_per_bit_pj": 1.92
+          }
+        },
+        {
+          "ebno_db": 3.0,
+          "overall": {
+            "ber": 0.05011872336272723,
+            "bler": 0.08433930068571645,
+            "nmse_db": -8.5,
+            "evm_percent": 10.619186765762068,
+            "sinr_db": -2.0,
+            "snr_db": 3.0,
+            "decoder_iter_avg": 6.8,
+            "throughput_bits": 13000,
+            "spectral_efficiency": 0.6,
+            "fairness_jain": 0.8782321236697518,
+            "channel_capacity": 0.7057190507735135,
+            "outage_probability": 0.0025118864315095803,
+            "air_interface_latency_ms": 0.135,
+            "energy_per_bit_pj": 1.76
+          }
+        },
+        {
+          "ebno_db": 5.0,
+          "overall": {
+            "ber": 0.0316227766016838,
+            "bler": 0.04742747411323311,
+            "nmse_db": -7.5,
+            "evm_percent": 8.435119877855236,
+            "sinr_db": 0.0,
+            "snr_db": 5.0,
+            "decoder_iter_avg": 6.0,
+            "throughput_bits": 15000,
+            "spectral_efficiency": 0.6666666666666666,
+            "fairness_jain": 0.8920735492403948,
+            "channel_capacity": 1.0,
+            "outage_probability": 0.001,
+            "air_interface_latency_ms": 0.125,
+            "energy_per_bit_pj": 1.6
+          }
+        },
+        {
+          "ebno_db": 7.0,
+          "overall": {
+            "ber": 0.0199526231496888,
+            "bler": 0.02667042864326648,
+            "nmse_db": -6.5,
+            "evm_percent": 6.700253882264447,
+            "sinr_db": 2.0,
+            "snr_db": 7.0,
+            "decoder_iter_avg": 5.2,
+            "throughput_bits": 17000,
+            "spectral_efficiency": 0.7333333333333334,
+            "fairness_jain": 0.899272486499423,
+            "channel_capacity": 1.3701046697509862,
+            "outage_probability": 0.00039810717055349735,
+            "air_interface_latency_ms": 0.11499999999999999,
+            "energy_per_bit_pj": 1.44
+          }
+        },
+        {
+          "ebno_db": 9.0,
+          "overall": {
+            "ber": 0.012589254117941673,
+            "bler": 0.014997884186649116,
+            "nmse_db": -5.5,
+            "evm_percent": 5.322200838503632,
+            "sinr_db": 4.0,
+            "snr_db": 9.0,
+            "decoder_iter_avg": 4.4,
+            "throughput_bits": 19000,
+            "spectral_efficiency": 0.8,
+            "fairness_jain": 0.8986923815439097,
+            "channel_capacity": 1.8122461913006254,
+            "outage_probability": 0.00015848931924611134,
+            "air_interface_latency_ms": 0.105,
+            "energy_per_bit_pj": 1.28
+          }
+        }
+      ]
+    },
+    {
+      "perfect_csi": true,
+      "metrics": [
+        {
+          "ebno_db": -5.0,
+          "overall": {
+            "ber": 0.0316227766016838,
+            "bler": 0.2108482517142911,
+            "nmse_db": -22.5,
+            "evm_percent": 8.891397050194614,
+            "sinr_db": 0.0,
+            "snr_db": 3.0,
+            "decoder_iter_avg": 5.0,
+            "throughput_bits": 7500,
+            "spectral_efficiency": 0.5333333333333334,
+            "fairness_jain": 0.9079264507596051,
+            "channel_capacity": 1.0,
+            "outage_probability": 0.001,
+            "air_interface_latency_ms": 0.09333333333333334,
+            "energy_per_bit_pj": 0.96
+          }
+        },
+        {
+          "ebno_db": -3.0,
+          "overall": {
+            "ber": 0.019952623149688795,
+            "bler": 0.11856868528308276,
+            "nmse_db": -21.5,
+            "evm_percent": 7.062687723113772,
+            "sinr_db": 2.0,
+            "snr_db": 5.0,
+            "decoder_iter_avg": 4.6,
+            "throughput_bits": 10500,
+            "spectral_efficiency": 0.6400000000000001,
+            "fairness_jain": 0.9217678763302481,
+            "channel_capacity": 1.3701046697509862,
+            "outage_probability": 0.00039810717055349724,
+            "air_interface_latency_ms": 0.08800000000000001,
+            "energy_per_bit_pj": 0.8960000000000001
+          }
+        },
+        {
+          "ebno_db": -1.0,
+          "overall": {
+            "ber": 0.012589254117941673,
+            "bler": 0.0666760716081662,
+            "nmse_db": -20.5,
+            "evm_percent": 5.610092271509817,
+            "sinr_db": 4.0,
+            "snr_db": 7.0,
+            "decoder_iter_avg": 4.2,
+            "throughput_bits": 13500,
+            "spectral_efficiency": 0.7466666666666667,
+            "fairness_jain": 0.9400665334602469,
+            "channel_capacity": 1.8122461913006254,
+            "outage_probability": 0.00015848931924611136,
+            "air_interface_latency_ms": 0.08266666666666668,
+            "energy_per_bit_pj": 0.8320000000000001
+          }
+        },
+        {
+          "ebno_db": 1.0,
+          "overall": {
+            "ber": 0.007943282347242816,
+            "bler": 0.037494710466622796,
+            "nmse_db": -19.5,
+            "evm_percent": 4.456254690668728,
+            "sinr_db": 6.0,
+            "snr_db": 9.0,
+            "decoder_iter_avg": 3.8,
+            "throughput_bits": 16500,
+            "spectral_efficiency": 0.8533333333333334,
+            "fairness_jain": 0.959933466539753,
+            "channel_capacity": 2.3164561796262597,
+            "outage_probability": 6.309573444801933e-05,
+            "air_interface_latency_ms": 0.07733333333333334,
+            "energy_per_bit_pj": 0.768
+          }
+        },
+        {
+          "ebno_db": 3.0,
+          "overall": {
+            "ber": 0.005011872336272723,
+            "bler": 0.021084825171429112,
+            "nmse_db": -18.5,
+            "evm_percent": 3.5397289219206893,
+            "sinr_db": 8.0,
+            "snr_db": 11.0,
+            "decoder_iter_avg": 3.4,
+            "throughput_bits": 19500,
+            "spectral_efficiency": 0.96,
+            "fairness_jain": 0.9782321236697518,
+            "channel_capacity": 2.8697872191702856,
+            "outage_probability": 2.51188643150958e-05,
+            "air_interface_latency_ms": 0.07200000000000001,
+            "energy_per_bit_pj": 0.7040000000000001
+          }
+        },
+        {
+          "ebno_db": 5.0,
+          "overall": {
+            "ber": 0.0031622776601683794,
+            "bler": 0.011856868528308277,
+            "nmse_db": -17.5,
+            "evm_percent": 2.8117066259517456,
+            "sinr_db": 10.0,
+            "snr_db": 13.0,
+            "decoder_iter_avg": 3.0,
+            "throughput_bits": 22500,
+            "spectral_efficiency": 1.0666666666666667,
+            "fairness_jain": 0.9920735492403948,
+            "channel_capacity": 3.4594316186372973,
+            "outage_probability": 1e-05,
+            "air_interface_latency_ms": 0.06666666666666667,
+            "energy_per_bit_pj": 0.6400000000000001
+          }
+        },
+        {
+          "ebno_db": 7.0,
+          "overall": {
+            "ber": 0.00199526231496888,
+            "bler": 0.00666760716081662,
+            "nmse_db": -16.5,
+            "evm_percent": 2.233417960754816,
+            "sinr_db": 12.0,
+            "snr_db": 15.0,
+            "decoder_iter_avg": 2.6,
+            "throughput_bits": 25500,
+            "spectral_efficiency": 1.1733333333333336,
+            "fairness_jain": 0.9992724864994229,
+            "channel_capacity": 4.074585234905427,
+            "outage_probability": 3.981071705534973e-06,
+            "air_interface_latency_ms": 0.06133333333333333,
+            "energy_per_bit_pj": 0.576
+          }
+        },
+        {
+          "ebno_db": 9.0,
+          "overall": {
+            "ber": 0.0012589254117941673,
+            "bler": 0.003749471046662279,
+            "nmse_db": -15.5,
+            "evm_percent": 1.7740669461678773,
+            "sinr_db": 14.0,
+            "snr_db": 17.0,
+            "decoder_iter_avg": 2.2,
+            "throughput_bits": 28500,
+            "spectral_efficiency": 1.2800000000000002,
+            "fairness_jain": 0.9986923815439097,
+            "channel_capacity": 4.707020262728835,
+            "outage_probability": 1.5848931924611134e-06,
+            "air_interface_latency_ms": 0.055999999999999994,
+            "energy_per_bit_pj": 0.512
+          }
+        }
+      ]
+    }
+  ],
+  "duration": 3600.0
+}

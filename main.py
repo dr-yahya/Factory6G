@@ -91,6 +91,15 @@ class MetricsAccumulator:
         self.evm_den = 0.0
         self.sinr_sum = np.zeros(shape, dtype=np.float64)
         self.sinr_count = np.zeros(shape, dtype=np.int64)
+        
+        # New metrics: Physical layer latency, energy, outage, capacity, SNR
+        self.latency_sum = 0.0  # Total latency in seconds
+        self.latency_count = 0  # Number of latency measurements
+        self.energy_sum = 0.0  # Total energy consumed in Joules
+        self.outage_count = np.zeros(shape, dtype=np.int64)  # Outage events (SINR < threshold)
+        self.outage_threshold_db = -5.0  # Outage threshold in dB
+        self.snr_sum = np.zeros(shape, dtype=np.float64)  # SNR (without interference)
+        self.snr_count = np.zeros(shape, dtype=np.int64)
 
     def update(self, batch: dict):
         bits = batch["bits"]
@@ -135,6 +144,51 @@ class MetricsAccumulator:
         sinr_linear = sinr_linear.reshape(-1, self.config.num_tx, self.config.num_streams_per_tx)
         self.sinr_sum += sinr_linear.sum(axis=0)
         self.sinr_count += sinr_linear.shape[0]
+        
+        # Compute SNR (signal power / noise power, without interference)
+        # For SNR, we use the noise variance directly (no interference component)
+        noise_power = batch.get("noise_power", None)
+        if noise_power is None:
+            # If noise_power not provided, use no_eff as approximation (will include some interference)
+            noise_power = no_eff
+        else:
+            # Ensure noise_power has the same shape as signal_power for division
+            if np.isscalar(noise_power) or (isinstance(noise_power, np.ndarray) and noise_power.size == 1):
+                # Broadcast scalar noise power to match signal_power shape
+                noise_power = np.full_like(signal_power, float(noise_power))
+            elif isinstance(noise_power, np.ndarray):
+                # Reshape to match signal_power if needed
+                if noise_power.shape != signal_power.shape:
+                    # Try to broadcast
+                    try:
+                        noise_power = np.broadcast_to(noise_power, signal_power.shape)
+                    except:
+                        # If broadcast fails, use mean
+                        noise_power = np.full_like(signal_power, float(np.mean(noise_power)))
+        
+        snr_linear = np.divide(
+            signal_power,
+            noise_power,
+            out=np.zeros_like(signal_power, dtype=np.float64),
+            where=noise_power > 0,
+        )
+        snr_linear = snr_linear.reshape(-1, self.config.num_tx, self.config.num_streams_per_tx)
+        self.snr_sum += snr_linear.sum(axis=0)
+        self.snr_count += snr_linear.shape[0]
+        
+        # Compute outage probability: P(SINR < threshold)
+        sinr_db = np.where(sinr_linear > 0, 10 * np.log10(sinr_linear), -np.inf)
+        outage_mask = sinr_db < self.outage_threshold_db
+        self.outage_count += outage_mask.astype(np.int64).sum(axis=0)
+        
+        # Track latency if provided
+        if "latency_sec" in batch:
+            self.latency_sum += batch["latency_sec"]
+            self.latency_count += 1
+        
+        # Track energy if provided
+        if "energy_joules" in batch:
+            self.energy_sum += batch["energy_joules"]
 
     def total_block_errors(self) -> int:
         return int(self.block_errors.sum())
@@ -211,6 +265,64 @@ class MetricsAccumulator:
             if total_re > 0
             else None
         )
+        
+        # Compute SNR (Signal-to-Noise Ratio, without interference)
+        snr_linear = np.divide(
+            self.snr_sum,
+            self.snr_count,
+            out=np.zeros_like(self.snr_sum),
+            where=self.snr_count > 0,
+        )
+        with np.errstate(divide="ignore"):
+            snr_db = np.where(snr_linear > 0, 10 * np.log10(snr_linear), -np.inf)
+        
+        # Compute Channel Capacity: C = log2(1 + SINR)
+        # Use accumulated SINR for capacity calculation
+        capacity_per_stream = np.where(
+            sinr_linear > 0,
+            np.log2(1 + sinr_linear),
+            np.zeros_like(sinr_linear)
+        )
+        
+        # Compute Outage Probability: P(SINR < threshold)
+        outage_prob_per_stream = np.divide(
+            self.outage_count,
+            self.blocks_total,
+            out=np.zeros_like(self.outage_count, dtype=np.float64),
+            where=self.blocks_total > 0,
+        )
+        overall_outage_prob = (
+            float(self.outage_count.sum() / total_blocks)
+            if total_blocks > 0
+            else None
+        )
+        
+        # Compute Air Interface Latency (average)
+        avg_latency_ms = (
+            float(self.latency_sum / self.latency_count * 1000)
+            if self.latency_count > 0
+            else None
+        )
+        
+        # Compute Energy per Bit (PHY): Energy / Successful Bits
+        energy_per_bit_pj = None
+        if self.energy_sum > 0 and throughput_bits_per_stream.sum() > 0:
+            energy_per_bit_joules = self.energy_sum / throughput_bits_per_stream.sum()
+            energy_per_bit_pj = float(energy_per_bit_joules * 1e12)  # Convert to pJ
+        
+        # Overall SNR
+        overall_snr_db = (
+            float(np.mean(snr_db[np.isfinite(snr_db)]))
+            if np.any(np.isfinite(snr_db))
+            else None
+        )
+        
+        # Overall Channel Capacity
+        overall_capacity = (
+            float(np.mean(capacity_per_stream[capacity_per_stream > 0]))
+            if np.any(capacity_per_stream > 0)
+            else None
+        )
 
         return {
             "per_stream": {
@@ -220,6 +332,10 @@ class MetricsAccumulator:
                 "decoder_iter_avg": decoder_iter_avg_per_stream.tolist(),
                 "sinr_linear": sinr_linear.tolist(),
                 "sinr_db": sinr_db.tolist(),
+                "snr_linear": snr_linear.tolist(),
+                "snr_db": snr_db.tolist(),
+                "channel_capacity": capacity_per_stream.tolist(),
+                "outage_probability": outage_prob_per_stream.tolist(),
             },
             "overall": {
                 "ber": overall_ber,
@@ -229,16 +345,22 @@ class MetricsAccumulator:
                 "evm_rms": evm_rms,
                 "evm_percent": evm_percent,
                 "sinr_db": float(np.mean(sinr_db[np.isfinite(sinr_db)])) if np.any(np.isfinite(sinr_db)) else None,
+                "snr_db": overall_snr_db,
                 "decoder_iter_avg": decoder_iter_avg,
                 "throughput_bits": int(throughput_bits_per_stream.sum()),
                 "spectral_efficiency": spectral_eff,
                 "fairness_jain": fairness,
+                "channel_capacity": overall_capacity,
+                "outage_probability": overall_outage_prob,
+                "air_interface_latency_ms": avg_latency_ms,
+                "energy_per_bit_pj": energy_per_bit_pj,
             },
             "counts": {
                 "bit_errors": int(self.bit_errors.sum()),
                 "total_bits": int(total_bits),
                 "block_errors": int(self.block_errors.sum()),
                 "total_blocks": int(total_blocks),
+                "outage_events": int(self.outage_count.sum()),
             },
         }
 
@@ -359,6 +481,16 @@ def run_simulation(
                 batch_results = model.run_batch(batch_size, float(ebno), include_details=True)
                 accumulator.update(batch_results)
                 iterations += 1
+                
+                # Clear TensorFlow cache periodically to prevent memory buildup
+                if iterations % 10 == 0:
+                    import gc
+                    gc.collect()
+                    try:
+                        import tensorflow as tf
+                        tf.keras.backend.clear_session()
+                    except:
+                        pass
 
                 if accumulator.total_block_errors() >= num_target_block_errors:
                     break

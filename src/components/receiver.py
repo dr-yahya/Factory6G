@@ -65,6 +65,7 @@ from sionna.phy.ofdm import (
 from sionna.phy.mapping import Demapper
 from sionna.phy.fec.ldpc import LDPC5GDecoder
 from .config import SystemConfig
+from .ldpc_6g import LDPC6GDecoder, LDPC6GEncoder
 
 
 class Receiver:
@@ -177,8 +178,13 @@ class Receiver:
         # APP demapper: converts symbols to log-likelihood ratios
         self._demapper = Demapper("app", "qam", config.num_bits_per_symbol)
         
-        # LDPC decoder: iterative belief propagation decoder (return iterations for diagnostics)
-        self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
+        # LDPC decoder: use 6G decoder if encoder is 6G, otherwise use 5G decoder
+        # Check if encoder is LDPC6GEncoder
+        if isinstance(encoder, LDPC6GEncoder):
+            self._decoder = LDPC6GDecoder(encoder)
+        else:
+            # Fallback to 5G decoder for compatibility
+            self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
     
     def estimate_channel(self, y: tf.Tensor, noise_var: tf.Tensor) -> tuple:
         """

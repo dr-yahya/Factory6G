@@ -1,0 +1,41 @@
+{
+  "max_params": {
+    "batch_size": 9,
+    "fft_size": 1024,
+    "num_bs_ant": 19,
+    "num_ut": 4,
+    "num_ut_ant": 1,
+    "num_ofdm_symbols": 15
+  },
+  "test_history": [
+    {
+      "iteration": 1,
+      "params": {
+        "batch_size": 8,
+        "fft_size": 512,
+        "num_bs_ant": 16,
+        "num_ut": 4,
+        "num_ut_ant": 1,
+        "num_ofdm_symbols": 14
+      },
+      "success": true,
+      "error": null,
+      "memory_estimate_gb": 0.0546875
+    },
+    {
+      "iteration": 2,
+      "params": {
+        "batch_size": 10,
+        "fft_size": 1024,
+        "num_bs_ant": 20,
+        "num_ut": 5,
+        "num_ut_ant": 1,
+        "num_ofdm_symbols": 16
+      },
+      "success": false,
+      "error": "AssertionError: `num_effective_subcarriers` must be an integer multiple of\n            `num_tx`*`num_streams_per_tx`.",
+      "memory_estimate_gb": 0.244140625
+    }
+  ],
+  "final_memory_gb": 0.15655517578125
+}

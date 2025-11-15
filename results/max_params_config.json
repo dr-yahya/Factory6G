@@ -1,0 +1,16 @@
+{
+  "_comments": {
+    "batch_size": "Typical range: 1-128 (computational parameter, not 6G standard). Higher values improve throughput but increase memory usage. For 6G simulations, typically 4-32 depending on system resources.",
+    "fft_size": "6G standard range: 512-16384 (must be power of 2). 5G max: 4096, 6G extends to 8192-16384 for wider bandwidths. Typical values: 512, 1024, 2048, 4096, 8192. Larger values provide better frequency resolution but increase computational complexity.",
+    "num_bs_ant": "6G massive MIMO range: 32-4096 antennas. 5G deployments: 64-256, 6G XL-MIMO: 128-256, Giga-MIMO research: up to 4096. Typical smart factory deployments: 32-256. More antennas enable spatial multiplexing and beamforming.",
+    "num_ut": "6G standard range: 8-256 user terminals per cell. Limited by min(N_BS, N_UT_total) for spatial multiplexing. Smart factory scenarios: 8-64 UTs typical. 6G supports 10 million devices/km² (10x improvement over 5G).",
+    "num_ut_ant": "6G standard range: 2-8 antennas per user terminal. 5G mobile devices: 1-4 antennas, 6G IoT devices: 2-8 antennas. More antennas enable MIMO transmission but increase device complexity and power consumption.",
+    "num_ofdm_symbols": "3GPP standard: 14 symbols per slot (normal CP in 5G/6G). Extended CP: 12 symbols. Each symbol duration T_sym = 1/Δf + T_CP, where Δf is subcarrier spacing (15-960 kHz for 6G, up to 3840 kHz for sub-THz)."
+  },
+  "batch_size": 8,
+  "fft_size": 512,
+  "num_bs_ant": 32,
+  "num_ut": 8,
+  "num_ut_ant": 2,
+  "num_ofdm_symbols": 14
+}
