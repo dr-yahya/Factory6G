@@ -51,9 +51,9 @@ def load_baseline_results(baseline_path: Optional[Path] = None, project_root: Op
     if baseline_path is None:
         if project_root is None:
             # Try to infer from common locations
-            baseline_path = Path("results") / "3gpp_release19_baseline" / "simulation_results.json"
+            baseline_path = Path("results") / "3gpp_release20_baseline" / "simulation_results.json"
         else:
-            baseline_path = project_root / "results" / "3gpp_release19_baseline" / "simulation_results.json"
+            baseline_path = project_root / "results" / "3gpp_release20_baseline" / "simulation_results.json"
     
     if not baseline_path.exists():
         print(f"⚠ Baseline results not found at: {baseline_path}")

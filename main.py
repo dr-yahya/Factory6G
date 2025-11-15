@@ -43,31 +43,40 @@ Usage:
     python main.py [options]
 
 Examples:
-    # Run default simulation (UMi, perfect and imperfect CSI)
+    # Run default 6G simulation (6g_baseline profile)
     python main.py
 
-    # Run with specific scenario
-    python main.py --scenario uma
+    # Run specific 6G scenario profile
+    python main.py --scenario-profile 6g_baseline_perfect
+
+    # Run multiple 6G scenario profiles
+    python main.py --scenario-profile 6g_baseline 6g_static_rm
+
+    # Run with manual parameters (bypass scenario profiles)
+    python main.py --scenario-profile "" --scenario uma --estimator ls_lin
 
     # Run only perfect CSI
-    python main.py --perfect-csi-only
-
-    # Custom Eb/No range
-    python main.py --ebno-min -5 --ebno-max 15 --ebno-step 2
+    python main.py --scenario-profile 6g_baseline --perfect-csi-only
 """
 
 import os
 import sys
 import time
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
 from pathlib import Path
 from typing import Any, Optional
 
-# Add src to path
+# Add src to path before importing setup_venv
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
+
+# Virtual environment setup - must be done before other imports
+from src.utils.setup_venv import setup_venv
+setup_venv()
+
+# Now safe to import other modules
+import numpy as np
+import matplotlib.pyplot as plt
 from src.models.resource_manager import StaticResourceManager
 from src.sim.scenarios import SCENARIO_PRESETS, ScenarioSpec
 from src.sim.metrics import MetricsAccumulator
@@ -138,8 +147,8 @@ def main():
     parser.add_argument(
         '--scenario-profile',
         nargs='+',
-        default=None,
-        help=f"Run one or more predefined scenario presets ({', '.join(SCENARIO_PRESETS.keys())})."
+        default=['6g_baseline'],
+        help=f"Run one or more predefined scenario presets ({', '.join(SCENARIO_PRESETS.keys())}). Default: 6g_baseline"
     )
 
     parser.add_argument(
@@ -319,6 +328,12 @@ def main():
     tf.random.set_seed(args.seed)
     
     results_all = []
+
+    # Filter out empty strings from scenario_profile if provided
+    if args.scenario_profile:
+        args.scenario_profile = [p for p in args.scenario_profile if p and p.strip()]
+        if not args.scenario_profile:
+            args.scenario_profile = None
 
     if args.scenario_profile:
         profile_names = [name.lower() for name in args.scenario_profile]

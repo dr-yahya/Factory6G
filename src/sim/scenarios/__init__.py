@@ -1,3 +1,10 @@
+"""
+Scenario definitions for 6G indoor smart factory simulations.
+
+This package contains individual scenario files that define simulation
+configurations for indoor smart factory environments.
+"""
+
 from __future__ import annotations
 
 from typing import Dict
@@ -5,7 +12,10 @@ import importlib
 import pkgutil
 from pathlib import Path
 
-from .scenario_spec import ScenarioSpec
+from ..scenario_spec import ScenarioSpec
+
+# Re-export ScenarioSpec for convenience
+__all__ = ["ScenarioSpec", "SCENARIO_PRESETS"]
 
 
 def _load_scenarios() -> Dict[str, ScenarioSpec]:
@@ -19,7 +29,7 @@ def _load_scenarios() -> Dict[str, ScenarioSpec]:
         Dictionary mapping scenario names to ScenarioSpec objects.
     """
     scenarios = {}
-    scenarios_dir = Path(__file__).parent / "scenarios"
+    scenarios_dir = Path(__file__).parent
     
     # Import all modules in the scenarios directory
     for importer, modname, ispkg in pkgutil.iter_modules([str(scenarios_dir)]):
@@ -40,4 +50,3 @@ def _load_scenarios() -> Dict[str, ScenarioSpec]:
 # Load scenarios dynamically from the scenarios folder
 SCENARIO_PRESETS: Dict[str, ScenarioSpec] = _load_scenarios()
 
-__all__ = ["ScenarioSpec", "SCENARIO_PRESETS"]

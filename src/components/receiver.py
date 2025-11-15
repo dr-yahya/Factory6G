@@ -490,11 +490,13 @@ class Receiver:
             Decoded information bits
             Shape: [batch_size, num_tx, num_streams, num_info_bits]
         """
-        # Remove nulled subcarriers from channel (match resource grid structure)
+        # Remove nulled subcarriers from both received signal and channel
+        # (match resource grid structure)
+        y_processed = self._remove_nulled_subcarriers(y)
         h_hat = self._remove_nulled_subcarriers(h)
         
         # Perfect CSI: no channel estimation error
         err_var = 0.0
         
         # Process through receiver chain
-        return self.__call__(y, h_hat, err_var, noise_var)
+        return self.__call__(y_processed, h_hat, err_var, noise_var)
