@@ -242,7 +242,7 @@ src/
 └── models/
     ├── __init__.py
     ├── model.py             # Complete system (uses components)
-    └── e2e_channel_estimation.py  # Neural E2E model
+    └── resource_manager.py  # Resource management for scheduling and power control
 ```
 
 ## Migration Notes

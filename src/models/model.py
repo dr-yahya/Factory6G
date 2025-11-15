@@ -208,9 +208,17 @@ class Model:
         """
         self._channel.set_topology(batch_size)
     
-    def run_batch(self, batch_size: int, ebno_db: float, include_details: bool = True) -> dict:
+    @tf.function
+    def call(self, batch_size: int, ebno_db: float) -> tuple:
         """
-        Run a batch through the end-to-end link and optionally collect diagnostics.
+        Simulate transmission through the complete system.
+        
+        Args:
+            batch_size: Batch size for simulation
+            ebno_db: Energy per bit to noise ratio in dB
+            
+        Returns:
+            Tuple of (transmitted bits, received bits)
         """
         # Generate new topology
         self.new_topology(batch_size)
@@ -237,46 +245,17 @@ class Model:
         )
         
         # Transmitter: Generate bits and map to resource grid
-        x_rg, b, x_symbols = self._transmitter.call(batch_size)
+        x_rg, b = self._transmitter.call(batch_size)
         
         # Channel: Apply channel and noise
         y, h = self._channel(x_rg, no)
         
         # Receiver: Estimate channel, equalize, demap, and decode
         if self.perfect_csi:
-            h_hat = self._receiver._remove_nulled_subcarriers(h)
-            err_var = tf.zeros_like(h_hat, dtype=h_hat.dtype)
-            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
+            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
         else:
             h_hat, err_var = self._receiver.estimate_channel(y, no)
-            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
-        
-        llr = self._receiver.demap(x_hat, no_eff)
-        b_hat, decoder_iter = self._receiver.decode(llr)
-        
-        if not include_details:
-            return {
-                "bits": b,
-                "bits_hat": b_hat,
-            }
-        
-        return {
-            "bits": b.numpy(),
-            "bits_hat": b_hat.numpy(),
-            "qam": x_symbols.numpy(),
-            "qam_hat": x_hat.numpy(),
-            "no_eff": no_eff.numpy(),
-            "channel": h.numpy(),
-            "channel_hat": h_hat.numpy(),
-            "err_var": err_var.numpy() if isinstance(err_var, tf.Tensor) else err_var,
-            "decoder_iterations": decoder_iter.numpy(),
-            "noise_variance": no.numpy() if isinstance(no, tf.Tensor) else no,
-        }
-    
-    def call(self, batch_size: int, ebno_db: float) -> tuple:
-        """Compatibility wrapper returning only transmitted and decoded bits."""
-        res = self.run_batch(batch_size, ebno_db, include_details=False)
-        return res["bits"], res["bits_hat"]
+            b_hat = self._receiver(y, h_hat, err_var, no)
         
         return b, b_hat
     
@@ -299,3 +278,163 @@ class Model:
     def __call__(self, batch_size: int, ebno_db: float) -> tuple:
         """Alias to support Sionna sim_ber(mc_fun, ...) expectations."""
         return self.call(batch_size, ebno_db)
+    
+    def run_batch(self, batch_size: int, ebno_db: float, include_details: bool = True) -> dict:
+        """
+        Run a batch simulation and return detailed results.
+        
+        Args:
+            batch_size: Batch size for simulation
+            ebno_db: Energy per bit to noise ratio in dB
+            include_details: If True, return detailed metrics for analysis
+            
+        Returns:
+            Dictionary with simulation results including:
+            - bits: Transmitted bits [batch, num_tx, num_streams, num_bits]
+            - bits_hat: Received/decoded bits [batch, num_tx, num_streams, num_bits]
+            - decoder_iterations: Number of LDPC decoder iterations [batch, num_tx, num_streams]
+            - channel: True channel [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
+            - channel_hat: Estimated channel [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
+            - qam: Transmitted QAM symbols [batch, num_tx, num_streams, num_symbols]
+            - qam_hat: Equalized QAM symbols [batch, num_tx, num_streams, num_symbols]
+            - no_eff: Effective noise variance [batch, num_tx, num_streams, num_symbols]
+        """
+        import tensorflow as tf
+        import numpy as np
+        
+        # Generate new topology
+        self.new_topology(batch_size)
+        
+        # Query resource manager for per-batch directives
+        if self._resource_manager is not None:
+            from ..models.resource_manager import ResourceDirectives
+            directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
+                self.config, ebno_db, feedback=None
+            )
+            if directives.active_ut_mask is not None:
+                self.config.active_ut_mask = list(directives.active_ut_mask)
+            if directives.per_ut_power is not None:
+                self.config.per_ut_power = list(directives.per_ut_power)
+            if directives.pilot_reuse_factor is not None:
+                self.config.pilot_reuse_factor = int(directives.pilot_reuse_factor)
+        
+        # Calculate noise variance
+        no = ebnodb2no(
+            ebno_db,
+            self.config.num_bits_per_symbol,
+            self.config.coderate,
+            self._rg
+        )
+        
+        # Transmitter: Generate bits and map to resource grid
+        x_rg, b, x_qam = self._transmitter.call(batch_size)
+        
+        # Channel: Apply channel and noise
+        y, h = self._channel(x_rg, no)
+        
+        # Receiver processing
+        if self.perfect_csi:
+            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
+            h_hat = h
+            err_var = tf.zeros_like(h)
+        else:
+            h_hat, err_var = self._receiver.estimate_channel(y, no)
+            b_hat = self._receiver(y, h_hat, err_var, no)
+        
+        if include_details:
+            import time
+            
+            # Measure latency: start timing
+            t_start = time.time()
+            
+            # Get detailed information for metrics
+            # Equalize to get QAM symbols and effective noise
+            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
+            
+            # Get decoder iterations - decode again to get iterations
+            llr = self._receiver.demap(x_hat, no_eff)
+            _, decoder_iter = self._receiver.decode(llr)
+            
+            # Measure latency: end timing (encoding + transmission + decoding)
+            # Note: Encoding time is negligible, transmission time is OFDM symbol duration
+            # Decoding time is proportional to iterations
+            t_end = time.time()
+            latency_sec = t_end - t_start
+            
+            # Estimate OFDM symbol transmission time
+            subcarrier_spacing = self.config.subcarrier_spacing  # Hz
+            symbol_duration = 1.0 / subcarrier_spacing  # seconds
+            cyclic_prefix_ratio = self.config.cyclic_prefix_length / self.config.fft_size
+            total_symbol_duration = symbol_duration * (1 + cyclic_prefix_ratio)
+            frame_transmission_time = total_symbol_duration * self.config.num_ofdm_symbols
+            
+            # Add frame transmission time to latency
+            latency_sec += frame_transmission_time
+            
+            # Estimate energy consumption (physical layer)
+            # Energy = Power × Time
+            # Power estimates (typical values for 6G systems):
+            # - Encoding: ~10 mW per Mbps
+            # - RF Transmission: ~100-500 mW (depends on power control)
+            # - RF Reception: ~50-200 mW
+            # - Decoding: ~50 mW per Mbps (depends on iterations)
+            
+            # Estimate throughput for energy calculation
+            # Get num_info_bits from transmitter
+            num_info_bits = self._transmitter.num_info_bits
+            
+            # Encoding energy (baseband processing)
+            encoding_power_watts = 10e-3 * (num_info_bits / latency_sec) / 1e6  # 10 mW per Mbps
+            encoding_energy = encoding_power_watts * latency_sec * 0.1  # 10% of latency is encoding
+            
+            # RF transmission energy
+            tx_power_watts = 0.2  # 200 mW typical for smart factory devices
+            tx_energy = tx_power_watts * frame_transmission_time
+            
+            # RF reception energy
+            rx_power_watts = 0.1  # 100 mW typical
+            rx_energy = rx_power_watts * frame_transmission_time
+            
+            # Decoding energy (proportional to iterations)
+            avg_iterations = float(tf.reduce_mean(decoder_iter))
+            decoding_power_watts = 50e-3 * (num_info_bits / latency_sec) / 1e6 * (1 + avg_iterations / 10)
+            decoding_energy = decoding_power_watts * latency_sec * 0.3  # 30% of latency is decoding
+            
+            total_energy_joules = encoding_energy + tx_energy + rx_energy + decoding_energy
+            
+            # Get noise power for SNR calculation (without interference)
+            # For SNR, we use the pure noise variance (no interference)
+            # Convert to numpy scalar if tensor
+            if hasattr(no, 'numpy'):
+                noise_power = float(no.numpy()) if no.shape == () else no.numpy()
+            else:
+                noise_power = float(no) if np.isscalar(no) else np.array(no)
+            # Ensure it's a scalar for SNR calculation
+            if isinstance(noise_power, np.ndarray) and noise_power.size == 1:
+                noise_power = float(noise_power.item())
+            elif isinstance(noise_power, np.ndarray):
+                # If it's an array, use mean for SNR calculation
+                noise_power = float(np.mean(noise_power))
+            
+            # Use QAM symbols from transmitter (x_qam) - these are the transmitted symbols
+            # Convert to numpy for metrics accumulator
+            result = {
+                "bits": b.numpy(),
+                "bits_hat": b_hat.numpy(),
+                "decoder_iterations": decoder_iter.numpy(),
+                "channel": h.numpy(),
+                "channel_hat": h_hat.numpy(),
+                "qam": x_qam.numpy(),
+                "qam_hat": x_hat.numpy(),
+                "no_eff": no_eff.numpy(),
+                "noise_power": noise_power,
+                "latency_sec": latency_sec,
+                "energy_joules": total_energy_joules,
+            }
+        else:
+            result = {
+                "bits": b.numpy(),
+                "bits_hat": b_hat.numpy(),
+            }
+        
+        return result
