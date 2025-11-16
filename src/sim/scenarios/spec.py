@@ -27,3 +27,4 @@ class ScenarioSpec:
     estimator_weights: Optional[str] = None
     notes: Optional[str] = None
 
+

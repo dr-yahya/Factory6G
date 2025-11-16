@@ -36,7 +36,7 @@ We employ an **incremental parameter exploration** strategy with the following p
 
 ## Implementation
 
-### Script: `scripts/find_max_params.py`
+### Script: `scripts/find_min_6g_params.py`
 
 The parameter optimization script implements the following features:
 
@@ -120,21 +120,21 @@ Where:
 # Activate virtual environment
 source .venv/bin/activate
 
-# Run with default 6G parameters
-python scripts/find_max_params.py
+# Run with high 6G parameters (balanced decrement)
+python scripts/find_min_6g_params.py
 
 # With custom timeout
-python scripts/find_max_params.py --timeout 60
+python scripts/find_min_6g_params.py --timeout 60
 
 # Using individual strategy
-python scripts/find_max_params.py --strategy individual
+python scripts/find_min_6g_params.py --strategy individual
 ```
 
 ### Advanced Options
 
 ```bash
 # Custom starting parameters
-python scripts/find_max_params.py \
+python scripts/find_min_6g_params.py \
     --start-batch-size 16 \
     --start-fft-size 512 \
     --start-num-bs-ant 32 \
@@ -142,10 +142,10 @@ python scripts/find_max_params.py \
     --start-num-ut-ant 2
 
 # Force CPU execution
-python scripts/find_max_params.py --cpu
+python scripts/find_min_6g_params.py --cpu
 
 # Custom output location
-python scripts/find_max_params.py --output results/my_max_params.json
+python scripts/find_min_6g_params.py --output results/min_6g_params.json
 ```
 
 ### Command-Line Arguments
@@ -162,13 +162,13 @@ python scripts/find_max_params.py --output results/my_max_params.json
 | `--timeout` | 30 | Timeout per test (seconds) |
 | `--gpu` | 0 | GPU device number |
 | `--cpu` | False | Force CPU execution |
-| `--output` | results/max_params.json | Output file path |
+| `--output` | results/min_6g_params.json | Output file path |
 
 ## Output Files
 
 The script generates two output files:
 
-### 1. `results/max_params.json`
+### 1. `results/min_6g_params.json`
 
 Complete test history with all iterations:
 
@@ -196,7 +196,7 @@ Complete test history with all iterations:
 }
 ```
 
-### 2. `results/max_params_config.json`
+### 2. `results/min_6g_params_config.json`
 
 Simple configuration file with just the maximum parameters:
 
@@ -242,14 +242,14 @@ Common failure modes and their meanings:
 
 ### Using Results
 
-The maximum parameters found can be used in your simulations:
+The parameters found can be used in your simulations:
 
 ```python
 from src.components.config import SystemConfig
 
 # Load maximum parameters
 import json
-with open('results/max_params_config.json') as f:
+with open('results/min_6g_params_config.json') as f:
     max_params = json.load(f)
 
 # Create configuration
@@ -280,7 +280,7 @@ Watch system memory usage during runs. The script provides estimates, but actual
 For larger parameters, increase the timeout to allow simulations to complete:
 
 ```bash
-python scripts/find_max_params.py --timeout 120
+python scripts/find_min_6g_params.py --timeout 120
 ```
 
 ### 4. Use Appropriate Strategy
@@ -353,16 +353,16 @@ If maximum parameters seem conservative:
 
 ## Example Workflow
 
-1. **Initial Run**: Find baseline maximum parameters
+1. **Initial Run**: Find minimum 6G-compliant parameters
    ```bash
-   python scripts/find_max_params.py
+   python scripts/find_min_6g_params.py
    ```
 
-2. **Review Results**: Check `results/max_params.json` for test history
+2. **Review Results**: Check `results/min_6g_params.json` for test history
 
 3. **Refine if Needed**: If results seem low, try:
    ```bash
-   python scripts/find_max_params.py \
+   python scripts/find_min_6g_params.py \
        --start-batch-size 4 \
        --start-fft-size 128 \
        --timeout 60

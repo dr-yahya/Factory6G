@@ -202,7 +202,7 @@ TimeoutError: Simulation took too long
 
 ```python
 # Option 1: Increase timeout
-from scripts.find_max_params import test_configuration
+from scripts.find_min_6g_params import test_configuration
 success, error = test_configuration(
     batch_size=8,
     fft_size=512,

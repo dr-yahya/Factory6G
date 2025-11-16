@@ -46,11 +46,11 @@ Examples:
     # Run default 6G simulation (6g_baseline profile)
     python main.py
 
-    # Run specific 6G scenario profile
-    python main.py --scenario-profile 6g_baseline_perfect
+    # Run specific 6G scenario profile (AI estimator)
+    python main.py --scenario-profile 6g_ai_estimator
 
     # Run multiple 6G scenario profiles
-    python main.py --scenario-profile 6g_baseline 6g_static_rm
+    python main.py --scenario-profile 6g_baseline 6g_ai_estimator
 
     # Run with manual parameters (bypass scenario profiles)
     python main.py --scenario-profile "" --scenario uma --estimator ls_lin
@@ -66,15 +66,11 @@ import argparse
 from pathlib import Path
 from typing import Any, Optional
 
-# Add src to path before importing setup_venv
+# Add src to path before importing project modules
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-# Virtual environment setup - must be done before other imports
-from src.utils.setup_venv import setup_venv
-setup_venv()
-
-# Now safe to import other modules
+# Now safe to import other modules directly
 import numpy as np
 import matplotlib.pyplot as plt
 from src.models.resource_manager import StaticResourceManager
@@ -83,7 +79,7 @@ from src.sim.metrics import MetricsAccumulator
 from src.sim.runner import run_simulation
 from src.sim.plotting import plot_simulation_results
 from src.sim.results import save_simulation_results
-from src.utils.env import configure_env, setup_gpu
+from src.sim.env import configure_env, setup_gpu
 
 
 def print_results_summary(results: dict):
@@ -271,6 +267,29 @@ def main():
         default='results',
         help='Output directory for results (default: results)'
     )
+    parser.add_argument(
+        '--log-file',
+        type=str,
+        default=None,
+        help='Path to write a full log (captures stdout and stderr), e.g., results/run.log'
+    )
+    parser.add_argument(
+        '--log-level',
+        type=str,
+        default='INFO',
+        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+        help='Python logging level for console/file logs (default: INFO)'
+    )
+    parser.add_argument(
+        '--no-stderr-filter',
+        action='store_true',
+        help='Do not filter XLA allocator warnings (show full stderr)'
+    )
+    parser.add_argument(
+        '--tf-errors-only',
+        action='store_true',
+        help='Force TensorFlow/absl logs to ERROR level (suppress INFO/WARNING)'
+    )
     
     parser.add_argument(
         '--seed',
@@ -317,10 +336,89 @@ def main():
     # Configure environment BEFORE importing TensorFlow/Sionna
     configure_env(force_cpu=args.cpu, gpu_num=args.gpu)
 
+    # Optional: tee stdout/stderr to a file if requested
+    if args.log_file:
+        from pathlib import Path as _Path
+        class _Tee:
+            def __init__(self, original, fh):
+                self._orig = original
+                self._fh = fh
+            def write(self, data):
+                try:
+                    self._orig.write(data)
+                except Exception:
+                    pass
+                try:
+                    self._fh.write(data)
+                except Exception:
+                    pass
+            def flush(self):
+                try:
+                    self._orig.flush()
+                except Exception:
+                    pass
+                try:
+                    self._fh.flush()
+                except Exception:
+                    pass
+        _p = _Path(args.log_file)
+        _p.parent.mkdir(parents=True, exist_ok=True)
+        _fh = open(_p, 'a', buffering=1)
+        sys.stdout = _Tee(sys.stdout, _fh)
+        sys.stderr = _Tee(sys.stderr, _fh)
+
+    # Filter XLA allocator warnings from stderr (they come from C++ code)
+    import re
+    
+    class StderrFilter:
+        """Filter XLA allocator warnings from stderr"""
+        def __init__(self, original_stderr):
+            self.original_stderr = original_stderr
+            # Match XLA allocator warnings (can appear in full or partial lines)
+            self.xla_patterns = [
+                re.compile(r'.*Allocation.*exceeds.*free system memory.*'),
+                re.compile(r'.*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*'),
+            ]
+        
+        def write(self, message):
+            # Check if message contains XLA allocator warning
+            should_suppress = any(pattern.search(message) for pattern in self.xla_patterns)
+            if not should_suppress:
+                self.original_stderr.write(message)
+        
+        def flush(self):
+            self.original_stderr.flush()
+    
+    # Install stderr filter to suppress XLA warnings (unless disabled)
+    if not args.no_stderr_filter:
+        sys.stderr = StderrFilter(sys.stderr)
+
     # Now safe to import TensorFlow/Sionna and configure runtime
     import tensorflow as tf
     import sionna
-    tf.get_logger().setLevel('ERROR')
+    import warnings
+    import logging
+    
+    # Configure logging levels
+    import logging
+    _level = getattr(logging, args.log_level.upper(), logging.INFO)
+    logging.getLogger().setLevel(_level)
+    # TensorFlow Python logger
+    tf.get_logger().setLevel('ERROR' if _level > logging.DEBUG else 'INFO')
+    
+    # Suppress Python warnings
+    warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
+    
+    # 3p libraries
+    logging.getLogger('tensorflow').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
+    logging.getLogger('absl').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
+
+    # Enforce TensorFlow/absl errors-only if requested
+    if args.tf_errors_only:
+        tf.get_logger().setLevel('ERROR')
+        logging.getLogger('tensorflow').setLevel(logging.ERROR)
+        logging.getLogger('absl').setLevel(logging.ERROR)
+    
     setup_gpu(args.gpu)
     
     # Set random seed (Sionna >=0.16 has no global phy seed)

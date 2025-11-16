@@ -12,7 +12,7 @@ import importlib
 import pkgutil
 from pathlib import Path
 
-from ..scenario_spec import ScenarioSpec
+from .spec import ScenarioSpec
 
 # Re-export ScenarioSpec for convenience
 __all__ = ["ScenarioSpec", "SCENARIO_PRESETS"]

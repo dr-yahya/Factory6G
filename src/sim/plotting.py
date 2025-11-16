@@ -279,9 +279,15 @@ def plot_simulation_results(results: dict, output_dir: str):
         color = colors[idx % len(colors)]
         linestyle = linestyles[idx % len(linestyles)]
 
+        # Avoid log-scale issues: replace non-positive values with a small epsilon
+        import numpy as _np
+        eps = 1e-12
+        ber_plot = [_np.nan if v is None else (max(v, eps)) for v in ber]
+        bler_plot = [_np.nan if v is None else (max(v, eps)) for v in bler]
+
         ax1.semilogy(
             ebno,
-            ber,
+            ber_plot,
             color=color,
             linestyle=linestyle,
             marker='o',
@@ -291,7 +297,7 @@ def plot_simulation_results(results: dict, output_dir: str):
         )
         ax2.semilogy(
             ebno,
-            bler,
+            bler_plot,
             color=color,
             linestyle=linestyle,
             marker='s',
@@ -300,8 +306,9 @@ def plot_simulation_results(results: dict, output_dir: str):
             markersize=6,
         )
 
-    ax1.set_ylim([1e-6, 1])
-    ax2.set_ylim([1e-6, 1])
+    # If curves include zeros (clamped to eps), ensure y-limits cover the range
+    ax1.set_ylim([1e-12, 1])
+    ax2.set_ylim([1e-12, 1])
     ax1.legend(loc='upper right')
     ax2.legend(loc='upper right')
     plt.tight_layout()

@@ -29,7 +29,7 @@ The memory management system provides:
 
 ### Basic Usage
 
-The memory management is automatically integrated into `scripts/run_6g_simulation.py`:
+You can integrate the memory helpers directly in your scripts (including `main.py`) if needed:
 
 ```python
 from src.utils.memory_manager import (
@@ -188,7 +188,6 @@ Memory Estimation:
 
 The memory management system is implemented in:
 - `src/utils/memory_manager.py`: Core memory management functions
-- `scripts/run_6g_simulation.py`: Integration with simulation script
 - `main.py`: Periodic cache clearing in simulation loop
 
 ## References

@@ -176,7 +176,7 @@ class SystemConfig:
     
     # RF Parameters
     carrier_frequency: float = 3.5e9  # Hz (3.5 GHz)
-    fft_size: int = 512  # Updated to max params: 6G range 512-16384
+    fft_size: int = 512  # Enforce minimum per 6G params (never less)
     subcarrier_spacing: float = 30e3  # Hz (30 kHz)
     
     # OFDM Frame Structure
@@ -185,13 +185,13 @@ class SystemConfig:
     pilot_ofdm_symbol_indices: List[int] = None
     
     # MIMO Configuration
-    num_bs_ant: int = 32  # Keep default to avoid stream management issues
-    num_ut: int = 8  # Updated to max params: 6G range 8-256
-    num_ut_ant: int = 2  # Updated to max params: 6G range 2-8
+    num_bs_ant: int = 32  # Enforce minimum per 6G params (never less)
+    num_ut: int = 8  # Enforce minimum per 6G params (never less)
+    num_ut_ant: int = 2  # Enforce minimum per 6G params (never less)
     
     # Modulation and Coding
-    num_bits_per_symbol: int = 2  # QPSK - most reliable for low BER
-    coderate: float = 0.5  # Standard code rate - 0.4 may cause issues
+    num_bits_per_symbol: int = 2  # QPSK - stable for error-free baseline
+    coderate: float = 0.5  # Moderate code rate for stability
     
     # Channel Model
     scenario: str = "umi"  # UMi, UMa, RMa

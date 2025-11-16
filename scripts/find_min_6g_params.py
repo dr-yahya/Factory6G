@@ -23,7 +23,7 @@ from typing import Dict, Any, Optional, Union
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.utils.env import configure_env
+from src.sim.env import configure_env
 
 # Configure environment before importing TensorFlow
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")

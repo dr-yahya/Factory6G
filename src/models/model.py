@@ -57,7 +57,7 @@ from ..components.antenna import AntennaConfig
 from ..components.transmitter import Transmitter
 from ..components.channel import ChannelModel
 from ..components.receiver import Receiver
-from ..components.estimators import NeuralChannelEstimator, SmoothedLSEstimator, TemporalEstimator
+from ..components.estimators import NeuralChannelEstimator, SmoothedLSEstimator, TemporalEstimator, PSOChannelEstimator
 from .resource_manager import ResourceManager, StaticResourceManager, ResourceDirectives
 
 
@@ -182,10 +182,16 @@ class Model:
                     self._rg,
                     **estimator_kwargs,
                 )
+            elif et == "pso":
+                channel_estimator = PSOChannelEstimator(
+                    self.config,
+                    self._rg,
+                    **estimator_kwargs,
+                )
             else:
                 raise ValueError(
                     f"Unsupported estimator_type '{estimator_type}'. "
-                    "Supported: 'ls', 'ls_nn', 'ls_lin', 'neural', 'ls_smooth', 'ls_temporal'."
+                    "Supported: 'ls', 'ls_nn', 'ls_lin', 'neural', 'ls_smooth', 'ls_temporal', 'pso'."
                 )
 
         # Receiver needs encoder reference for LDPC decoder

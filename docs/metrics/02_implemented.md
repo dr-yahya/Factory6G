@@ -174,9 +174,10 @@ All metrics have been tested and verified:
 
 The implementation is complete and ready for use. When running actual simulations:
 
-1. Run: `python scripts/run_6g_simulation.py`
-2. Results will be saved in `results/run_YYYYMMDD_HHMMSS/`
-3. All metrics (including new ones) will be computed, saved, and plotted automatically
+1. Baseline run: `python main.py`
+2. AI estimator run: `python main.py --scenario-profile 6g_ai_estimator --neural-weights artifacts/neural_channel_estimator.weights.h5`
+3. Results will be saved in `results/`
+4. All metrics (including new ones) will be computed, saved, and plotted automatically
 
 ---
 

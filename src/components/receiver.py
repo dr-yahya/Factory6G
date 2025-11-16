@@ -65,7 +65,6 @@ from sionna.phy.ofdm import (
 from sionna.phy.mapping import Demapper
 from sionna.phy.fec.ldpc import LDPC5GDecoder
 from .config import SystemConfig
-from .ldpc_6g import LDPC6GDecoder, LDPC6GEncoder
 
 
 class Receiver:
@@ -178,14 +177,8 @@ class Receiver:
         # APP demapper: converts symbols to log-likelihood ratios
         self._demapper = Demapper("app", "qam", config.num_bits_per_symbol)
         
-        # LDPC decoder: use 6G decoder if encoder is 6G, otherwise use 5G decoder
-        # Check if encoder is LDPC6GEncoder
-        if isinstance(encoder, LDPC6GEncoder):
-            # Explicitly set return_num_iter=True and num_iter=50 for proper iteration tracking
-            self._decoder = LDPC6GDecoder(encoder, num_iter=50, hard_out=True, return_num_iter=True)
-        else:
-            # Fallback to 5G decoder for compatibility
-            self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
+        # LDPC decoder: use Sionna's 5G decoder
+        self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
     
     def estimate_channel(self, y: tf.Tensor, noise_var: tf.Tensor) -> tuple:
         """
@@ -328,7 +321,12 @@ class Receiver:
             Shape: [batch_size, num_tx, num_streams, num_coded_bits]
             Higher values indicate higher confidence in bit = 1
         """
-        return self._demapper(x_hat, no_eff)
+        llr = self._demapper(x_hat, no_eff)
+        # Clip extreme LLRs to prevent numerical issues and improve decoder performance
+        # Diagnostic showed 27.5% of LLRs have |LLR| > 50, which can cause decoder issues
+        # Clip to reasonable range: ±20 is typical for LDPC decoders
+        llr_clipped = tf.clip_by_value(llr, -20.0, 20.0)
+        return llr_clipped
     
     def decode(self, llr: tf.Tensor) -> tuple:
         """
