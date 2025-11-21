@@ -57,7 +57,7 @@ from ..components.antenna import AntennaConfig
 from ..components.transmitter import Transmitter
 from ..components.channel import ChannelModel
 from ..components.receiver import Receiver
-from ..components.estimators import NeuralChannelEstimator, SmoothedLSEstimator, TemporalEstimator, PSOChannelEstimator
+from ..components.estimators import PSOChannelEstimator
 from .resource_manager import ResourceManager, StaticResourceManager, ResourceDirectives
 
 
@@ -163,25 +163,6 @@ class Model:
             elif et in ("ls_lin", "ls-lin", "ls_linear"):
                 from sionna.phy.ofdm import LSChannelEstimator
                 channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
-            elif et == "neural":
-                channel_estimator = NeuralChannelEstimator(
-                    self.config,
-                    self._rg,
-                    weights_path=estimator_weights,
-                    **estimator_kwargs,
-                )
-            elif et == "ls_smooth":
-                channel_estimator = SmoothedLSEstimator(
-                    self.config,
-                    self._rg,
-                    **estimator_kwargs,
-                )
-            elif et == "ls_temporal":
-                channel_estimator = TemporalEstimator(
-                    self.config,
-                    self._rg,
-                    **estimator_kwargs,
-                )
             elif et == "pso":
                 channel_estimator = PSOChannelEstimator(
                     self.config,
@@ -191,7 +172,7 @@ class Model:
             else:
                 raise ValueError(
                     f"Unsupported estimator_type '{estimator_type}'. "
-                    "Supported: 'ls', 'ls_nn', 'ls_lin', 'neural', 'ls_smooth', 'ls_temporal', 'pso'."
+                    "Supported: 'ls', 'ls_nn', 'ls_lin', 'pso'."
                 )
 
         # Receiver needs encoder reference for LDPC decoder

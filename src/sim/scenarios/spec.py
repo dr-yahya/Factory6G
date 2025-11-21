@@ -29,6 +29,10 @@ class ScenarioSpec:
     notes: Optional[str] = None
     min_ut_velocity: float = 0.0
     max_ut_velocity: float = 0.0
+    channel_model_type: str = "tr38901"  # "tr38901", "rayleigh", "awgn"
+    num_bs_ant: int = 0  # 0 means use SystemConfig default
+    num_ut: int = 0
+    num_ut_ant: int = 0
 
 
 

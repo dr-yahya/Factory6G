@@ -466,17 +466,29 @@ def main():
                 # For now, use default config with optimized Eb/No range and perfect CSI
                 custom_config = None
                 
-                # Apply mobility parameters if specified
-                if spec.min_ut_velocity > 0 or spec.max_ut_velocity > 0:
-                    # We need to pass this to run_simulation or modify config
-                    # run_simulation takes a config object or creates one.
-                    # Let's create a config object if none exists, or modify it.
+                # Apply mobility, channel model, and antenna parameters if specified
+                if (spec.min_ut_velocity > 0 or spec.max_ut_velocity > 0 or 
+                    spec.channel_model_type != "tr38901" or
+                    spec.num_bs_ant > 0 or spec.num_ut > 0 or spec.num_ut_ant > 0):
+                    
+                    # Create base config args
+                    config_args = {
+                        "scenario": scenario_name,
+                        "min_ut_velocity": spec.min_ut_velocity,
+                        "max_ut_velocity": spec.max_ut_velocity,
+                        "channel_model_type": spec.channel_model_type
+                    }
+                    
+                    # Override antenna params if set in spec
+                    if spec.num_bs_ant > 0:
+                        config_args["num_bs_ant"] = spec.num_bs_ant
+                    if spec.num_ut > 0:
+                        config_args["num_ut"] = spec.num_ut
+                    if spec.num_ut_ant > 0:
+                        config_args["num_ut_ant"] = spec.num_ut_ant
+                        
                     from src.components.config import SystemConfig
-                    custom_config = SystemConfig(
-                        scenario=scenario_name,
-                        min_ut_velocity=spec.min_ut_velocity,
-                        max_ut_velocity=spec.max_ut_velocity
-                    )
+                    custom_config = SystemConfig(**config_args)
 
                 profile_output_dir = Path(args.output_dir) / spec.name
                 results = run_simulation(

@@ -25,24 +25,49 @@ from sionna.phy.ofdm import LSChannelEstimator, ResourceGrid
 from ..config import SystemConfig
 
 
-def _poly_eval(k: np.ndarray, coeffs_real_imag: np.ndarray) -> np.ndarray:
-    """Evaluate complex polynomial with real-imag coefficients on k.
-    coeffs_real_imag has shape [(degree+1)*2] arranged as:
-        [Re(c0), Im(c0), Re(c1), Im(c1), ..., Re(cd), Im(cd)]
-    Returns complex array of shape [len(k)].
+def _poly_eval_vec(k: np.ndarray, coeffs_real_imag: np.ndarray) -> np.ndarray:
+    """Evaluate complex polynomial with real-imag coefficients on k (vectorized).
+    
+    Args:
+        k: Subcarrier indices [SC]
+        coeffs_real_imag: Coefficients [N, Swarm, (degree+1)*2]
+        
+    Returns:
+        y: Evaluated polynomial [N, Swarm, SC]
     """
-    degree = coeffs_real_imag.shape[0] // 2 - 1
-    real = coeffs_real_imag[0::2]
-    imag = coeffs_real_imag[1::2]
-    coeffs = real + 1j * imag  # shape [degree+1]
-    # Horner's method
-    y = np.zeros_like(k, dtype=np.complex64)
-    for c in coeffs[::-1]:
-        y = y * k + c
+    # coeffs_real_imag shape: [N, Swarm, Dim]
+    # k shape: [SC]
+    
+    dim = coeffs_real_imag.shape[-1]
+    degree = dim // 2 - 1
+    
+    # Extract real and imag parts
+    # coeffs_real_imag is [..., 2*(degree+1)]
+    # real parts at 0, 2, 4...
+    real = coeffs_real_imag[..., 0::2] # [N, Swarm, degree+1]
+    imag = coeffs_real_imag[..., 1::2] # [N, Swarm, degree+1]
+    
+    coeffs = real + 1j * imag  # [N, Swarm, degree+1]
+    
+    # Horner's method vectorized
+    # We want output [N, Swarm, SC]
+    # Initialize y with zeros
+    shape = coeffs.shape[:-1] + (k.shape[0],) # [N, Swarm, SC]
+    y = np.zeros(shape, dtype=np.complex64)
+    
+    # Reshape k for broadcasting: [1, 1, SC]
+    k_reshaped = k.reshape(1, 1, -1)
+    
+    # Iterate through coefficients from highest degree
+    for i in range(degree, -1, -1):
+        c = coeffs[..., i] # [N, Swarm]
+        c = c[..., np.newaxis] # [N, Swarm, 1]
+        y = y * k_reshaped + c
+        
     return y
 
 
-def _pso_optimize(
+def _pso_optimize_vec(
     target: np.ndarray,
     k: np.ndarray,
     degree: int,
@@ -54,44 +79,92 @@ def _pso_optimize(
     c2: float,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Run PSO to fit complex polynomial to target (complex) vs k (float).
-    Returns best coeffs_real_imag as a flat array of length (degree+1)*2.
+    """Run PSO to fit complex polynomial to target (complex) vs k (float) - Vectorized.
+    
+    Args:
+        target: Target values [N, SC]
+        k: Subcarrier indices [SC]
+        
+    Returns:
+        best_coeffs: [N, Dim]
     """
+    num_problems = target.shape[0]
     dim = (degree + 1) * 2
-    # Initialize swarm within bounds based on target magnitude statistics
-    mag = np.maximum(1e-6, np.median(np.abs(target)))
-    pos = rng.uniform(low=-mag, high=mag, size=(swarm_size, dim)).astype(np.float32)
+    
+    # Initialize swarm
+    # [N, Swarm, Dim]
+    # Initialize within bounds based on target magnitude
+    # Compute median magnitude per problem: [N, 1, 1]
+    mag = np.maximum(1e-6, np.median(np.abs(target), axis=1))
+    mag = mag.reshape(num_problems, 1, 1)
+    
+    pos = rng.uniform(low=-1.0, high=1.0, size=(num_problems, swarm_size, dim)).astype(np.float32)
+    pos = pos * mag # Scale by magnitude
+    
     vel = np.zeros_like(pos, dtype=np.float32)
+    
+    # Target reshaping for broadcasting: [N, 1, SC]
+    target_expanded = target.reshape(num_problems, 1, -1)
+    
+    def evaluate_fitness(p):
+        # p: [N, Swarm, Dim]
+        # Returns: [N, Swarm]
+        pred = _poly_eval_vec(k, p) # [N, Swarm, SC]
+        err = target_expanded - pred
+        # Mean squared error over subcarriers
+        mse = np.mean(err.real**2 + err.imag**2, axis=-1)
+        return mse.astype(np.float32)
 
-    def fitness(p):
-        pred = _poly_eval(k, p)
-        # MSE on complex values
-        err = target - pred
-        return np.mean((err.real ** 2 + err.imag ** 2).astype(np.float32))
-
-    fvals = np.array([fitness(p) for p in pos], dtype=np.float32)
+    # Initial evaluation
+    fvals = evaluate_fitness(pos) # [N, Swarm]
+    
     pbest = pos.copy()
     pbest_val = fvals.copy()
-    g_idx = int(np.argmin(pbest_val))
-    gbest = pbest[g_idx].copy()
-    gbest_val = pbest_val[g_idx]
+    
+    # Find global best per problem
+    # argmin over swarm dimension
+    g_idx = np.argmin(pbest_val, axis=1) # [N]
+    
+    # Extract gbest: [N, Dim]
+    # We need advanced indexing
+    row_indices = np.arange(num_problems)
+    gbest = pbest[row_indices, g_idx, :].copy() # [N, Dim]
+    gbest_val = pbest_val[row_indices, g_idx].copy() # [N]
+    
+    # Reshape gbest for broadcasting: [N, 1, Dim]
+    gbest_expanded = gbest.reshape(num_problems, 1, dim)
 
     for t in range(iters):
         w = w_start + (w_end - w_start) * (t / max(1, iters - 1))
-        r1 = rng.random(size=(swarm_size, dim), dtype=np.float32)
-        r2 = rng.random(size=(swarm_size, dim), dtype=np.float32)
-        vel = w * vel + c1 * r1 * (pbest - pos) + c2 * r2 * (gbest - pos)
+        
+        r1 = rng.random(size=(num_problems, swarm_size, dim), dtype=np.float32)
+        r2 = rng.random(size=(num_problems, swarm_size, dim), dtype=np.float32)
+        
+        # Update velocity
+        # gbest_expanded: [N, 1, Dim] broadcasts to [N, Swarm, Dim]
+        vel = w * vel + c1 * r1 * (pbest - pos) + c2 * r2 * (gbest_expanded - pos)
         pos = pos + vel
-
-        fvals = np.array([fitness(p) for p in pos], dtype=np.float32)
-        improved = fvals < pbest_val
-        if np.any(improved):
-            pbest[improved] = pos[improved]
-            pbest_val[improved] = fvals[improved]
-            g_idx = int(np.argmin(pbest_val))
-            if pbest_val[g_idx] < gbest_val:
-                gbest = pbest[g_idx].copy()
-                gbest_val = pbest_val[g_idx]
+        
+        # Evaluate
+        fvals = evaluate_fitness(pos)
+        
+        # Update pbest
+        improved = fvals < pbest_val # [N, Swarm]
+        pbest[improved] = pos[improved]
+        pbest_val[improved] = fvals[improved]
+        
+        # Update gbest
+        # Find best in current pbest
+        current_best_idx = np.argmin(pbest_val, axis=1) # [N]
+        current_best_val = pbest_val[row_indices, current_best_idx] # [N]
+        
+        improved_g = current_best_val < gbest_val # [N]
+        
+        if np.any(improved_g):
+            gbest[improved_g] = pbest[improved_g, current_best_idx[improved_g], :]
+            gbest_val[improved_g] = current_best_val[improved_g]
+            gbest_expanded = gbest.reshape(num_problems, 1, dim)
+            
     return gbest
 
 
@@ -142,52 +215,44 @@ class PSOChannelEstimator(Block):
 
         # Expect shape: [B, rx, tx, ut, stream, n_sym, n_sc]
         shape = tf.shape(h_ls)
-        b = int(h_ls.shape[0])
-        rx = int(h_ls.shape[1])
-        tx = int(h_ls.shape[2])
-        ut = int(h_ls.shape[3])
-        stream = int(h_ls.shape[4])
-        n_sym = int(h_ls.shape[5])
-        n_sc = int(h_ls.shape[6])
-
-        # Fallback to dynamic shape if not statically known
-        if any(v is None for v in [b, rx, tx, ut, stream, n_sym, n_sc]):
-            b = int(shape[0])
-            rx = int(shape[1])
-            tx = int(shape[2])
-            ut = int(shape[3])
-            stream = int(shape[4])
-            n_sym = int(shape[5])
-            n_sc = int(shape[6])
-
-        k = self._k  # [-1, 1], length n_sc
+        # We need concrete values for reshaping
+        
+        h_np = h_ls.numpy()
+        orig_shape = h_np.shape
+        n_sc = orig_shape[-1]
+        
+        # Flatten all dimensions except subcarriers
+        # [N_problems, SC]
+        h_flat = h_np.reshape(-1, n_sc)
+        
+        k = self._k
         assert n_sc == k.shape[0], "Resource grid FFT size mismatch."
 
-        h_np = h_ls.numpy()
-        h_out = np.empty_like(h_np)
-
-        # Loop: per batch, rx, tx, ut, stream, per symbol -> PSO over coefficients
-        for ib in range(b):
-            for ir in range(rx):
-                for it in range(tx):
-                    for iu in range(ut):
-                        for is_ in range(stream):
-                            for isym in range(n_sym):
-                                target = h_np[ib, ir, it, iu, is_, isym, :]
-                                best = _pso_optimize(
-                                    target=target,
-                                    k=k,
-                                    degree=self.degree,
-                                    swarm_size=self.swarm_size,
-                                    iters=self.iters,
-                                    w_start=self.inertia_start,
-                                    w_end=self.inertia_end,
-                                    c1=self.c1,
-                                    c2=self.c2,
-                                    rng=self._rng,
-                                )
-                                pred = _poly_eval(k, best).astype(target.dtype)
-                                h_out[ib, ir, it, iu, is_, isym, :] = pred
+        # Run vectorized PSO
+        best_coeffs = _pso_optimize_vec(
+            target=h_flat,
+            k=k,
+            degree=self.degree,
+            swarm_size=self.swarm_size,
+            iters=self.iters,
+            w_start=self.inertia_start,
+            w_end=self.inertia_end,
+            c1=self.c1,
+            c2=self.c2,
+            rng=self._rng,
+        )
+        
+        # Evaluate polynomial with best coefficients
+        # best_coeffs: [N_problems, Dim]
+        # We need to reshape for _poly_eval_vec which expects [N, Swarm, Dim]
+        # Here we just have 1 "particle" (the best one) per problem
+        best_coeffs_expanded = best_coeffs[:, np.newaxis, :] # [N_problems, 1, Dim]
+        
+        pred = _poly_eval_vec(k, best_coeffs_expanded) # [N_problems, 1, SC]
+        pred = pred.squeeze(axis=1) # [N_problems, SC]
+        
+        # Reshape back to original
+        h_out = pred.reshape(orig_shape)
 
         h_pred = tf.convert_to_tensor(h_out)
         return h_pred, err_var

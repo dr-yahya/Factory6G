@@ -221,11 +221,22 @@ class ChannelModel:
         Returns:
             RayleighBlockFading channel model instance.
         """
+        if self.config.direction == "uplink":
+            num_rx = 1
+            num_rx_ant = self.config.num_bs_ant
+            num_tx = self.config.num_ut
+            num_tx_ant = self.config.num_ut_ant
+        else:
+            num_rx = self.config.num_ut
+            num_rx_ant = self.config.num_ut_ant
+            num_tx = 1
+            num_tx_ant = self.config.num_bs_ant
+            
         return RayleighBlockFading(
-            num_rx=self.config.num_bs_ant if self.config.direction == "uplink" else self.config.num_ut_ant,
-            num_rx_ant=self.config.num_bs_ant if self.config.direction == "uplink" else self.config.num_ut_ant,
-            num_tx=self.config.num_ut_ant if self.config.direction == "uplink" else self.config.num_bs_ant,
-            num_tx_ant=self.config.num_ut_ant if self.config.direction == "uplink" else self.config.num_bs_ant,
+            num_rx=num_rx,
+            num_rx_ant=num_rx_ant,
+            num_tx=num_tx,
+            num_tx_ant=num_tx_ant,
             add_awgn=False,
             return_channel=True
         )

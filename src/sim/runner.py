@@ -147,17 +147,7 @@ def run_simulation(
             run_entry["metrics"].append(finalized)
 
             ber_value = finalized["overall"]["ber"]
-            bler_value = finalized["overall"]["bler"]
-            if ber_value is not None:
-                if bler_value is None:
-                    bler_value = float("nan")
-                summary_line = (
-                    f"  Eb/No={ebno:>4.1f} dB | iterations={iterations} | "
-                    f"BER={ber_value:.3e} | BLER={bler_value:.3e}"
-                )
-            else:
-                summary_line = f"  Eb/No={ebno:>4.1f} dB | iterations={iterations}"
-            print(summary_line)
+            print(f"  Eb/No={float(ebno):5.1f} dB | iterations={iterations} | BER={ber_value:.3e}")
 
         results["runs"].append(run_entry)
         print(f"[{csi_str} CSI] ✓ completed")
