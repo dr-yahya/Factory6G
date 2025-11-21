@@ -210,6 +210,13 @@ class SystemConfig:
     # Target BLER for link adaptation decisions
     target_bler: float = 1e-3
     
+    # Channel Model Type
+    channel_model_type: str = "tr38901"  # "tr38901" or "rayleigh"
+
+    # Mobility
+    min_ut_velocity: float = 0.0  # m/s
+    max_ut_velocity: float = 0.0  # m/s
+    
     def __post_init__(self):
         """
         Initialize default values after dataclass initialization.

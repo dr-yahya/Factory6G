@@ -8,6 +8,7 @@ To enable the following instructions: AVX2 FMA, in other operations, rebuild Ten
 2025-11-16 22:20:30.493481: W external/local_xla/xla/tsl/framework/cpu_allocator_impl.cc:84] Allocation of 2701131776 exceeds 10% of free system memory.
 2025-11-16 22:20:57.534765: W external/local_xla/xla/tsl/framework/cpu_allocator_impl.cc:84] Allocation of 2701131776 exceeds 10% of free system memory.
 2025-11-16 22:21:25.165613: W external/local_xla/xla/tsl/framework/cpu_allocator_impl.cc:84] Allocation of 2701131776 exceeds 10% of free system memory.
+⚠ No GPU found, using CPU
 ================================================================================
 6G Smart Factory Physical Layer Simulation
 ================================================================================
@@ -19,3 +20,202 @@ CSI conditions: [False]
 ================================================================================
 
 [Imperfect CSI] Running simulation...
+  Eb/No=-5.0 dB | iterations=8 | BER=2.784e-01 | BLER=1.000e+00
+  Eb/No=-4.5 dB | iterations=8 | BER=2.745e-01 | BLER=1.000e+00
+  Eb/No=-4.0 dB | iterations=8 | BER=2.772e-01 | BLER=1.000e+00
+  Eb/No=-3.5 dB | iterations=8 | BER=2.772e-01 | BLER=1.000e+00
+  Eb/No=-3.0 dB | iterations=8 | BER=2.765e-01 | BLER=1.000e+00
+  Eb/No=-2.5 dB | iterations=8 | BER=2.811e-01 | BLER=1.000e+00
+  Eb/No=-2.0 dB | iterations=8 | BER=2.776e-01 | BLER=1.000e+00
+  Eb/No=-1.5 dB | iterations=8 | BER=2.777e-01 | BLER=1.000e+00
+  Eb/No=-1.0 dB | iterations=8 | BER=2.756e-01 | BLER=1.000e+00
+  Eb/No=-0.5 dB | iterations=8 | BER=2.807e-01 | BLER=1.000e+00
+  Eb/No= 0.0 dB | iterations=8 | BER=2.805e-01 | BLER=1.000e+00
+  Eb/No= 0.5 dB | iterations=8 | BER=2.828e-01 | BLER=1.000e+00
+  Eb/No= 1.0 dB | iterations=8 | BER=2.825e-01 | BLER=1.000e+00
+  Eb/No= 1.5 dB | iterations=8 | BER=2.816e-01 | BLER=1.000e+00
+  Eb/No= 2.0 dB | iterations=8 | BER=2.867e-01 | BLER=1.000e+00
+  Eb/No= 2.5 dB | iterations=8 | BER=2.901e-01 | BLER=1.000e+00
+  Eb/No= 3.0 dB | iterations=8 | BER=2.896e-01 | BLER=1.000e+00
+  Eb/No= 3.5 dB | iterations=8 | BER=2.932e-01 | BLER=1.000e+00
+  Eb/No= 4.0 dB | iterations=8 | BER=2.923e-01 | BLER=1.000e+00
+  Eb/No= 4.5 dB | iterations=8 | BER=2.929e-01 | BLER=1.000e+00
+  Eb/No= 5.0 dB | iterations=8 | BER=2.958e-01 | BLER=1.000e+00
+  Eb/No= 5.5 dB | iterations=8 | BER=3.026e-01 | BLER=1.000e+00
+  Eb/No= 6.0 dB | iterations=8 | BER=3.013e-01 | BLER=1.000e+00
+  Eb/No= 6.5 dB | iterations=8 | BER=3.006e-01 | BLER=1.000e+00
+  Eb/No= 7.0 dB | iterations=8 | BER=3.139e-01 | BLER=1.000e+00
+  Eb/No= 7.5 dB | iterations=8 | BER=3.153e-01 | BLER=1.000e+00
+  Eb/No= 8.0 dB | iterations=8 | BER=3.160e-01 | BLER=1.000e+00
+  Eb/No= 8.5 dB | iterations=8 | BER=3.222e-01 | BLER=1.000e+00
+  Eb/No= 9.0 dB | iterations=8 | BER=3.217e-01 | BLER=1.000e+00
+  Eb/No= 9.5 dB | iterations=8 | BER=3.250e-01 | BLER=1.000e+00
+  Eb/No=10.0 dB | iterations=8 | BER=3.237e-01 | BLER=1.000e+00
+  Eb/No=10.5 dB | iterations=8 | BER=3.315e-01 | BLER=1.000e+00
+  Eb/No=11.0 dB | iterations=8 | BER=3.389e-01 | BLER=1.000e+00
+  Eb/No=11.5 dB | iterations=8 | BER=3.379e-01 | BLER=1.000e+00
+  Eb/No=12.0 dB | iterations=8 | BER=3.435e-01 | BLER=1.000e+00
+  Eb/No=12.5 dB | iterations=8 | BER=3.476e-01 | BLER=1.000e+00
+  Eb/No=13.0 dB | iterations=8 | BER=3.500e-01 | BLER=1.000e+00
+  Eb/No=13.5 dB | iterations=8 | BER=3.525e-01 | BLER=1.000e+00
+  Eb/No=14.0 dB | iterations=8 | BER=3.577e-01 | BLER=1.000e+00
+  Eb/No=14.5 dB | iterations=8 | BER=3.595e-01 | BLER=1.000e+00
+  Eb/No=15.0 dB | iterations=8 | BER=3.634e-01 | BLER=1.000e+00
+  Eb/No=15.5 dB | iterations=8 | BER=3.689e-01 | BLER=1.000e+00
+  Eb/No=16.0 dB | iterations=8 | BER=3.755e-01 | BLER=1.000e+00
+  Eb/No=16.5 dB | iterations=8 | BER=3.748e-01 | BLER=1.000e+00
+  Eb/No=17.0 dB | iterations=8 | BER=3.761e-01 | BLER=1.000e+00
+  Eb/No=17.5 dB | iterations=8 | BER=3.800e-01 | BLER=1.000e+00
+  Eb/No=18.0 dB | iterations=8 | BER=3.885e-01 | BLER=1.000e+00
+  Eb/No=18.5 dB | iterations=8 | BER=3.867e-01 | BLER=1.000e+00
+  Eb/No=19.0 dB | iterations=8 | BER=3.934e-01 | BLER=1.000e+00
+  Eb/No=19.5 dB | iterations=8 | BER=3.868e-01 | BLER=1.000e+00
+  Eb/No=20.0 dB | iterations=8 | BER=4.011e-01 | BLER=1.000e+00
+  Eb/No=20.5 dB | iterations=8 | BER=3.969e-01 | BLER=1.000e+00
+  Eb/No=21.0 dB | iterations=8 | BER=4.041e-01 | BLER=1.000e+00
+  Eb/No=21.5 dB | iterations=8 | BER=4.039e-01 | BLER=1.000e+00
+  Eb/No=22.0 dB | iterations=8 | BER=4.071e-01 | BLER=1.000e+00
+  Eb/No=22.5 dB | iterations=8 | BER=4.168e-01 | BLER=1.000e+00
+  Eb/No=23.0 dB | iterations=8 | BER=4.171e-01 | BLER=1.000e+00
+  Eb/No=23.5 dB | iterations=8 | BER=4.190e-01 | BLER=1.000e+00
+  Eb/No=24.0 dB | iterations=8 | BER=4.183e-01 | BLER=1.000e+00
+  Eb/No=24.5 dB | iterations=8 | BER=4.202e-01 | BLER=1.000e+00
+  Eb/No=25.0 dB | iterations=8 | BER=4.255e-01 | BLER=1.000e+00
+[Imperfect CSI] ✓ completed
+
+================================================================================
+Simulation completed in 39611.15 seconds
+================================================================================
+Traceback (most recent call last):
+  File "/home/ysabe/personal/Factory6G/main.py", line 492, in <module>
+    results_all.append(results)
+  File "/home/ysabe/personal/Factory6G/main.py", line 410, in main
+    warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
+  File "/home/ysabe/personal/Factory6G/src/sim/runner.py", line 173, in run_simulation
+    output_path = save_simulation_results(results, output_dir)
+  File "/home/ysabe/personal/Factory6G/src/sim/results.py", line 33, in save_simulation_results
+    with open(filename, "w") as f:
+FileNotFoundError: [Errno 2] No such file or directory: 'results/6g_baseline/6g_baseline/simulation_results_umi_ls_lin_6g_baseline_20251117_091945.json'
+  Eb/No= 5.0 dB | iterations=8 | BER=2.939e-01 | BLER=1.000e+00
+  Eb/No= 5.5 dB | iterations=8 | BER=3.027e-01 | BLER=1.000e+00
+  Eb/No= 6.0 dB | iterations=8 | BER=3.003e-01 | BLER=1.000e+00
+  Eb/No= 6.5 dB | iterations=8 | BER=3.032e-01 | BLER=1.000e+00
+  Eb/No= 7.0 dB | iterations=8 | BER=3.073e-01 | BLER=1.000e+00
+  Eb/No= 7.5 dB | iterations=8 | BER=3.132e-01 | BLER=1.000e+00
+  Eb/No= 8.0 dB | iterations=8 | BER=3.130e-01 | BLER=1.000e+00
+  Eb/No= 8.5 dB | iterations=8 | BER=3.166e-01 | BLER=1.000e+00
+  Eb/No= 9.0 dB | iterations=8 | BER=3.155e-01 | BLER=1.000e+00
+  Eb/No= 9.5 dB | iterations=8 | BER=3.231e-01 | BLER=1.000e+00
+  Eb/No=10.0 dB | iterations=8 | BER=3.332e-01 | BLER=1.000e+00
+  Eb/No=10.5 dB | iterations=8 | BER=3.299e-01 | BLER=1.000e+00
+  Eb/No=11.0 dB | iterations=8 | BER=3.297e-01 | BLER=1.000e+00
+  Eb/No=11.5 dB | iterations=8 | BER=3.346e-01 | BLER=1.000e+00
+  Eb/No=12.0 dB | iterations=8 | BER=3.484e-01 | BLER=1.000e+00
+  Eb/No=12.5 dB | iterations=8 | BER=3.487e-01 | BLER=1.000e+00
+  Eb/No=13.0 dB | iterations=8 | BER=3.584e-01 | BLER=1.000e+00
+  Eb/No=13.5 dB | iterations=8 | BER=3.529e-01 | BLER=1.000e+00
+  Eb/No=14.0 dB | iterations=8 | BER=3.577e-01 | BLER=1.000e+00
+  Eb/No=14.5 dB | iterations=8 | BER=3.592e-01 | BLER=1.000e+00
+  Eb/No=15.0 dB | iterations=8 | BER=3.689e-01 | BLER=1.000e+00
+  Eb/No=15.5 dB | iterations=8 | BER=3.636e-01 | BLER=1.000e+00
+  Eb/No=16.0 dB | iterations=8 | BER=3.733e-01 | BLER=1.000e+00
+  Eb/No=16.5 dB | iterations=8 | BER=3.697e-01 | BLER=1.000e+00
+  Eb/No=17.0 dB | iterations=8 | BER=3.806e-01 | BLER=1.000e+00
+  Eb/No=17.5 dB | iterations=8 | BER=3.792e-01 | BLER=1.000e+00
+  Eb/No=18.0 dB | iterations=8 | BER=3.824e-01 | BLER=1.000e+00
+  Eb/No=18.5 dB | iterations=8 | BER=3.920e-01 | BLER=1.000e+00
+  Eb/No=19.0 dB | iterations=8 | BER=3.937e-01 | BLER=1.000e+00
+  Eb/No=19.5 dB | iterations=8 | BER=4.004e-01 | BLER=1.000e+00
+  Eb/No=20.0 dB | iterations=8 | BER=3.965e-01 | BLER=1.000e+00
+  Eb/No=20.5 dB | iterations=8 | BER=3.964e-01 | BLER=1.000e+00
+  Eb/No=21.0 dB | iterations=8 | BER=4.059e-01 | BLER=1.000e+00
+  Eb/No=21.5 dB | iterations=8 | BER=4.046e-01 | BLER=1.000e+00
+  Eb/No=22.0 dB | iterations=8 | BER=4.059e-01 | BLER=1.000e+00
+  Eb/No=22.5 dB | iterations=8 | BER=4.115e-01 | BLER=1.000e+00
+  Eb/No=23.0 dB | iterations=8 | BER=4.140e-01 | BLER=1.000e+00
+  Eb/No=23.5 dB | iterations=8 | BER=4.213e-01 | BLER=1.000e+00
+  Eb/No=24.0 dB | iterations=8 | BER=4.197e-01 | BLER=1.000e+00
+  Eb/No=24.5 dB | iterations=8 | BER=4.221e-01 | BLER=1.000e+00
+  Eb/No=25.0 dB | iterations=8 | BER=4.218e-01 | BLER=1.000e+00
+[Imperfect CSI] ✓ completed
+
+================================================================================
+Simulation completed in 55214.53 seconds
+================================================================================
+✓ Results saved to: results/6g_baseline/simulation_results_umi_ls_lin_6g_baseline_20251117_160802.json
+
+Description: 6G baseline simulation optimized for 6G requirements - perfect CSI, lower code rate, more antennas
+
+================================================================================
+SIMULATION RESULTS SUMMARY
+================================================================================
+Scenario : umi
+Estimator: LS_LIN
+Profile : 6g_baseline
+
+[Imperfect CSI]
+--------------------------------------------------------------------------------
+Eb/No [dB] |          BER |         BLER |  SINR (dB) |  NMSE (dB) |  Avg Iter
+------------------------------------------------------------------------------
+     -5.00 |    2.758e-01 |    1.000e+00 |      1.951 |     -5.238 |     0.000
+     -4.50 |    2.789e-01 |    1.000e+00 |      2.028 |     -5.069 |     0.000
+     -4.00 |    2.761e-01 |    1.000e+00 |      2.090 |     -5.791 |     0.000
+     -3.50 |    2.774e-01 |    1.000e+00 |      2.171 |     -5.717 |     0.000
+     -3.00 |    2.750e-01 |    1.000e+00 |      2.216 |     -6.496 |     0.000
+     -2.50 |    2.754e-01 |    1.000e+00 |      2.271 |     -6.772 |     0.000
+     -2.00 |    2.776e-01 |    1.000e+00 |      2.331 |     -6.534 |     0.000
+     -1.50 |    2.768e-01 |    1.000e+00 |      2.375 |     -6.946 |     0.000
+     -1.00 |    2.769e-01 |    1.000e+00 |      2.412 |     -7.481 |     0.000
+     -0.50 |    2.789e-01 |    1.000e+00 |      2.442 |     -7.206 |     0.000
+      0.00 |    2.795e-01 |    1.000e+00 |      2.521 |     -7.375 |     0.000
+      0.50 |    2.823e-01 |    1.000e+00 |      2.549 |     -7.291 |     0.000
+      1.00 |    2.845e-01 |    1.000e+00 |      2.641 |     -7.285 |     0.000
+      1.50 |    2.845e-01 |    1.000e+00 |      2.635 |     -7.486 |     0.000
+      2.00 |    2.867e-01 |    1.000e+00 |      2.696 |     -7.413 |     0.000
+      2.50 |    2.864e-01 |    1.000e+00 |      2.690 |     -7.925 |     0.000
+      3.00 |    2.903e-01 |    1.000e+00 |      2.756 |     -7.519 |     0.000
+      3.50 |    2.867e-01 |    1.000e+00 |      2.762 |     -8.418 |     0.000
+      4.00 |    2.947e-01 |    1.000e+00 |      2.901 |     -7.507 |     0.000
+      4.50 |    2.923e-01 |    1.000e+00 |      2.860 |     -8.382 |     0.000
+      5.00 |    2.939e-01 |    1.000e+00 |      2.887 |     -8.728 |     0.000
+      5.50 |    3.027e-01 |    1.000e+00 |      2.979 |     -8.074 |     0.000
+      6.00 |    3.003e-01 |    1.000e+00 |      2.990 |     -8.820 |     0.000
+      6.50 |    3.032e-01 |    1.000e+00 |      3.052 |     -8.924 |     0.000
+      7.00 |    3.073e-01 |    1.000e+00 |      3.109 |     -8.643 |     0.000
+      7.50 |    3.132e-01 |    1.000e+00 |      3.303 |     -7.637 |     0.000
+      8.00 |    3.130e-01 |    1.000e+00 |      3.256 |     -8.280 |     0.000
+      8.50 |    3.166e-01 |    1.000e+00 |      3.448 |     -7.974 |     0.000
+      9.00 |    3.155e-01 |    1.000e+00 |      3.347 |     -8.838 |     0.000
+      9.50 |    3.231e-01 |    1.000e+00 |      3.531 |     -8.700 |     0.000
+     10.00 |    3.332e-01 |    1.000e+00 |      4.095 |     -7.555 |     0.000
+     10.50 |    3.299e-01 |    1.000e+00 |      3.838 |     -8.215 |     0.000
+     11.00 |    3.297e-01 |    1.000e+00 |      3.836 |     -8.631 |     0.000
+     11.50 |    3.346e-01 |    1.000e+00 |      4.099 |     -8.648 |     0.000
+     12.00 |    3.484e-01 |    1.000e+00 |      4.521 |     -7.616 |     0.000
+     12.50 |    3.487e-01 |    1.000e+00 |      4.237 |     -8.712 |     0.000
+     13.00 |    3.584e-01 |    1.000e+00 |      5.210 |     -7.273 |     0.000
+     13.50 |    3.529e-01 |    1.000e+00 |      5.005 |     -7.705 |     0.000
+     14.00 |    3.577e-01 |    1.000e+00 |      5.021 |     -8.576 |     0.000
+     14.50 |    3.592e-01 |    1.000e+00 |      5.558 |     -8.162 |     0.000
+     15.00 |    3.689e-01 |    1.000e+00 |      5.282 |     -7.813 |     0.000
+     15.50 |    3.636e-01 |    1.000e+00 |      5.613 |     -8.958 |     0.000
+     16.00 |    3.733e-01 |    1.000e+00 |      6.038 |     -7.615 |     0.000
+     16.50 |    3.697e-01 |    1.000e+00 |      6.296 |     -8.635 |     0.000
+     17.00 |    3.806e-01 |    1.000e+00 |      6.622 |     -8.074 |     0.000
+     17.50 |    3.792e-01 |    1.000e+00 |      6.705 |     -8.187 |     0.000
+     18.00 |    3.824e-01 |    1.000e+00 |      6.380 |     -8.375 |     0.000
+     18.50 |    3.920e-01 |    1.000e+00 |      7.651 |     -7.539 |     0.000
+     19.00 |    3.937e-01 |    1.000e+00 |      7.431 |     -8.334 |     0.000
+     19.50 |    4.004e-01 |    1.000e+00 |      8.213 |     -8.360 |     0.000
+     20.00 |    3.965e-01 |    1.000e+00 |      8.140 |     -8.453 |     0.000
+     20.50 |    3.964e-01 |    1.000e+00 |      8.685 |     -8.194 |     0.000
+     21.00 |    4.059e-01 |    1.000e+00 |      8.440 |     -8.639 |     0.000
+     21.50 |    4.046e-01 |    1.000e+00 |      9.078 |     -8.942 |     0.000
+     22.00 |    4.059e-01 |    1.000e+00 |      9.155 |     -8.753 |     0.000
+     22.50 |    4.115e-01 |    1.000e+00 |     10.871 |     -7.660 |     0.000
+     23.00 |    4.140e-01 |    1.000e+00 |     10.639 |     -8.869 |     0.000
+     23.50 |    4.213e-01 |    1.000e+00 |     10.564 |     -8.425 |     0.000
+     24.00 |    4.197e-01 |    1.000e+00 |     11.293 |     -9.034 |     0.000
+     24.50 |    4.221e-01 |    1.000e+00 |     12.510 |     -8.326 |     0.000
+     25.00 |    4.218e-01 |    1.000e+00 |     12.455 |     -8.207 |     0.000
+================================================================================

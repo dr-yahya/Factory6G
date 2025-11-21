@@ -87,7 +87,7 @@ References:
 import tensorflow as tf
 from sionna.phy.channel.tr38901 import UMi, UMa, RMa
 from sionna.phy.channel import gen_single_sector_topology as gen_topology
-from sionna.phy.channel import OFDMChannel
+from sionna.phy.channel import OFDMChannel, RayleighBlockFading
 from sionna.phy.ofdm import ResourceGrid
 from .config import SystemConfig
 from .antenna import AntennaConfig
@@ -151,8 +151,11 @@ class ChannelModel:
         self.antenna_config = antenna_config
         self.resource_grid = resource_grid
         
-        # Create channel model based on scenario
-        self._channel_model = self._create_channel_model()
+        # Create channel model based on scenario and type
+        if self.config.channel_model_type == "rayleigh":
+            self._channel_model = self._create_rayleigh_channel()
+        else:
+            self._channel_model = self._create_channel_model()
         
         # Create OFDM channel that applies channel in frequency domain
         self._ofdm_channel = OFDMChannel(
@@ -208,9 +211,24 @@ class ChannelModel:
             return UMa(**channel_params)
         elif scenario_lower == "rma":
             return RMa(**channel_params)
-        else:
-            raise ValueError(f"Unknown scenario: {self.config.scenario}. "
+        raise ValueError(f"Unknown scenario: {self.config.scenario}. "
                            f"Supported: 'umi', 'uma', 'rma'")
+
+    def _create_rayleigh_channel(self):
+        """
+        Create Rayleigh Block Fading channel model.
+        
+        Returns:
+            RayleighBlockFading channel model instance.
+        """
+        return RayleighBlockFading(
+            num_rx=self.config.num_bs_ant if self.config.direction == "uplink" else self.config.num_ut_ant,
+            num_rx_ant=self.config.num_bs_ant if self.config.direction == "uplink" else self.config.num_ut_ant,
+            num_tx=self.config.num_ut_ant if self.config.direction == "uplink" else self.config.num_bs_ant,
+            num_tx_ant=self.config.num_ut_ant if self.config.direction == "uplink" else self.config.num_bs_ant,
+            add_awgn=False,
+            return_channel=True
+        )
     
     def set_topology(self, batch_size: int):
         """
@@ -239,10 +257,11 @@ class ChannelModel:
             batch_size,
             self.config.num_ut,
             self.config.scenario,
-            min_ut_velocity=0.0,  # Static UTs (no mobility)
-            max_ut_velocity=0.0   # Static UTs (no mobility)
+            min_ut_velocity=self.config.min_ut_velocity,
+            max_ut_velocity=self.config.max_ut_velocity
         )
-        self._channel_model.set_topology(*topology)
+        if hasattr(self._channel_model, "set_topology"):
+            self._channel_model.set_topology(*topology)
     
     def call(self, x_rg: tf.Tensor, noise_var: tf.Tensor) -> tuple:
         """

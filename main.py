@@ -465,6 +465,18 @@ def main():
                 # Note: Custom configs cause stream management issues, so we'll optimize via scenario params
                 # For now, use default config with optimized Eb/No range and perfect CSI
                 custom_config = None
+                
+                # Apply mobility parameters if specified
+                if spec.min_ut_velocity > 0 or spec.max_ut_velocity > 0:
+                    # We need to pass this to run_simulation or modify config
+                    # run_simulation takes a config object or creates one.
+                    # Let's create a config object if none exists, or modify it.
+                    from src.components.config import SystemConfig
+                    custom_config = SystemConfig(
+                        scenario=scenario_name,
+                        min_ut_velocity=spec.min_ut_velocity,
+                        max_ut_velocity=spec.max_ut_velocity
+                    )
 
                 profile_output_dir = Path(args.output_dir) / spec.name
                 results = run_simulation(

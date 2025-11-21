@@ -47,6 +47,14 @@ def _load_scenarios() -> Dict[str, ScenarioSpec]:
     return scenarios
 
 
-# Load scenarios dynamically from the scenarios folder
-SCENARIO_PRESETS: Dict[str, ScenarioSpec] = _load_scenarios()
+import importlib
 
+def _import_scenario(name):
+    module = importlib.import_module(f".{name}", package=__package__)
+    return module.SCENARIO
+
+SCENARIO_PRESETS = {
+    "6g_baseline": _import_scenario("6g_baseline"),
+    "6g_ai_estimator": _import_scenario("6g_ai_estimator"),
+    "6g_poc_fast": _import_scenario("6g_poc_fast"),
+}

@@ -55,301 +55,301 @@
         {
           "ebno_db": -5.0,
           "overall": {
-            "ber": 0.1,
-            "bler": 0.2,
-            "throughput_bits": 100000000,
-            "spectral_efficiency": 0.5,
-            "outage_probability": 0.01,
-            "air_interface_latency_ms": 0.15,
-            "energy_per_bit_pj": 2.0
+            "ber": 0.2757509549458821,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14368.57302201588,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -4.416666666666667,
           "overall": {
-            "ber": 0.08254041852680186,
-            "bler": 0.1650808370536037,
-            "throughput_bits": 115700333,
-            "spectral_efficiency": 0.607318000616362,
-            "outage_probability": 0.008659643233600654,
-            "air_interface_latency_ms": 0.1474871295363056,
-            "energy_per_bit_pj": 1.9430638823072117
+            "ber": 0.27844412232985427,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 0.5260281885801518,
+            "air_interface_latency_ms": 13303.50009748172,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -3.833333333333333,
           "overall": {
-            "ber": 0.06812920690579613,
-            "bler": 0.13625841381159226,
-            "throughput_bits": 133865672,
-            "spectral_efficiency": 0.7376703077453113,
-            "outage_probability": 0.007498942093324558,
-            "air_interface_latency_ms": 0.14501635585905995,
-            "energy_per_bit_pj": 1.887748625363387
+            "ber": 0.2765251949041449,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 2.996904358850571e-11,
+            "air_interface_latency_ms": 13460.688050951558,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -3.25,
           "overall": {
-            "ber": 0.05623413251903491,
-            "bler": 0.11246826503806982,
-            "throughput_bits": 154883029,
-            "spectral_efficiency": 0.8960009128278777,
-            "outage_probability": 0.006493816315762113,
-            "air_interface_latency_ms": 0.1425869737431211,
-            "energy_per_bit_pj": 1.8340080864093424
+            "ber": 0.27619925143217355,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 8.356088723200595e-16,
+            "air_interface_latency_ms": 14063.794122226536,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -2.6666666666666665,
           "overall": {
-            "ber": 0.04641588833612779,
-            "bler": 0.09283177667225558,
-            "throughput_bits": 179200182,
-            "spectral_efficiency": 1.0883149658581242,
-            "outage_probability": 0.005623413251903491,
-            "air_interface_latency_ms": 0.14019828977761006,
-            "energy_per_bit_pj": 1.7817974362806785
+            "ber": 0.2753032349106652,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 8.871601555398242e-21,
+            "air_interface_latency_ms": 13484.27950187777,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -2.083333333333333,
           "overall": {
-            "ber": 0.03831186849557288,
-            "bler": 0.07662373699114576,
-            "throughput_bits": 207335209,
-            "spectral_efficiency": 1.3219065382116406,
-            "outage_probability": 0.004869675251658631,
-            "air_interface_latency_ms": 0.1378496221679926,
-            "energy_per_bit_pj": 1.7310731220122861
+            "ber": 0.2772223927768749,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14283.015187374918,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -1.5,
           "overall": {
-            "ber": 0.0316227766016838,
-            "bler": 0.0632455532033676,
-            "throughput_bits": 239887529,
-            "spectral_efficiency": 1.6056352715767805,
-            "outage_probability": 0.004216965034285822,
-            "air_interface_latency_ms": 0.13554030054147673,
-            "energy_per_bit_pj": 1.6817928305074292
+            "ber": 0.276792049407959,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14103.121054299663,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -0.9166666666666661,
           "overall": {
-            "ber": 0.026101572156825365,
-            "bler": 0.05220314431365073,
-            "throughput_bits": 277550672,
-            "spectral_efficiency": 1.95026240570624,
-            "outage_probability": 0.003651741272548377,
-            "air_interface_latency_ms": 0.13326966575567048,
-            "energy_per_bit_pj": 1.6339154532410998
+            "ber": 0.27725849431033395,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 13262.690511066174,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": -0.33333333333333304,
           "overall": {
-            "ber": 0.021544346900318836,
-            "bler": 0.04308869380063767,
-            "throughput_bits": 321127054,
-            "spectral_efficiency": 2.3688589298215397,
-            "outage_probability": 0.0031622776601683794,
-            "air_interface_latency_ms": 0.13103706971044482,
-            "energy_per_bit_pj": 1.5874010519681996
+            "ber": 0.2790847119827701,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 13670.921146087969,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 0.25,
           "overall": {
-            "ber": 0.01778279410038923,
-            "bler": 0.03556558820077846,
-            "throughput_bits": 371545073,
-            "spectral_efficiency": 2.8773013380028654,
-            "outage_probability": 0.0027384196342643613,
-            "air_interface_latency_ms": 0.12884187516294857,
-            "energy_per_bit_pj": 1.542210825407941
+            "ber": 0.28090376857559746,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 6.250000000000005e-17,
+            "air_interface_latency_ms": 14008.35715267699,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 0.8333333333333339,
           "overall": {
-            "ber": 0.014677992676220695,
-            "bler": 0.02935598535244139,
-            "throughput_bits": 429878890,
-            "spectral_efficiency": 3.494873791533368,
-            "outage_probability": 0.0023713737056616554,
-            "air_interface_latency_ms": 0.1266834555457221,
-            "energy_per_bit_pj": 1.4983070768766815
+            "ber": 0.2838065132944331,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 0.003906250000000001,
+            "air_interface_latency_ms": 13723.990102109858,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 1.416666666666667,
           "overall": {
-            "ber": 0.012115276586285882,
-            "bler": 0.024230553172571764,
-            "throughput_bits": 497371311,
-            "spectral_efficiency": 4.244999526961138,
-            "outage_probability": 0.002053525026457146,
-            "air_interface_latency_ms": 0.12456119478785818,
-            "energy_per_bit_pj": 1.4556531828421875
+            "ber": 0.2845061086764648,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 3.968502629920365e-26,
+            "air_interface_latency_ms": 14043.48736130755,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 2.0,
           "overall": {
-            "ber": 0.010000000000000002,
-            "bler": 0.020000000000000004,
-            "throughput_bits": 575460267,
-            "spectral_efficiency": 5.156129250662883,
-            "outage_probability": 0.001778279410038923,
-            "air_interface_latency_ms": 0.12247448713915891,
-            "energy_per_bit_pj": 1.4142135623730951
+            "ber": 0.2866729100545247,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 0.064453125,
+            "air_interface_latency_ms": 14832.564187177017,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 2.583333333333334,
           "overall": {
-            "ber": 0.008254041852680182,
-            "bler": 0.016508083705360364,
-            "throughput_bits": 665809450,
-            "spectral_efficiency": 6.262820214864248,
-            "outage_probability": 0.0015399265260594916,
-            "air_interface_latency_ms": 0.12042273699723817,
-            "energy_per_bit_pj": 1.3739536474580891
+            "ber": 0.2870229574160518,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 13703.768500739421,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 3.166666666666668,
           "overall": {
-            "ber": 0.006812920690579612,
-            "bler": 0.013625841381159224,
-            "throughput_bits": 770343756,
-            "spectral_efficiency": 7.607046902222183,
-            "outage_probability": 0.001333521432163324,
-            "air_interface_latency_ms": 0.11840535873752087,
-            "energy_per_bit_pj": 1.3348398541700344
+            "ber": 0.2891130742386661,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14072.78008884864,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 3.75,
           "overall": {
-            "ber": 0.005623413251903492,
-            "bler": 0.011246826503806984,
-            "throughput_bits": 891290298,
-            "spectral_efficiency": 9.239793030504927,
-            "outage_probability": 0.0011547819846894581,
-            "air_interface_latency_ms": 0.11642177654608984,
-            "energy_per_bit_pj": 1.2968395546510096
+            "ber": 0.2906953279721901,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14184.253890519629,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 4.333333333333334,
           "overall": {
-            "ber": 0.004641588833612777,
-            "bler": 0.009283177667225554,
-            "throughput_bits": 1031225850,
-            "spectral_efficiency": 11.2229852587905,
-            "outage_probability": 0.001,
-            "air_interface_latency_ms": 0.1144714242553332,
-            "energy_per_bit_pj": 1.2599210498948732
+            "ber": 0.2930944660943004,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 14934.440204646775,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 4.916666666666668,
           "overall": {
-            "ber": 0.0038311868495572877,
-            "bler": 0.007662373699114575,
-            "throughput_bits": 1193131750,
-            "spectral_efficiency": 13.631841936631107,
-            "outage_probability": 0.0008659643233600653,
-            "air_interface_latency_ms": 0.11255374518234482,
-            "energy_per_bit_pj": 1.2240535433046553
+            "ber": 0.29365324727184355,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 9930.745516548226,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 5.5,
           "overall": {
-            "ber": 0.0031622776601683794,
-            "bler": 0.006324555320336759,
-            "throughput_bits": 1380457418,
-            "spectral_efficiency": 16.557725979346156,
-            "outage_probability": 0.0007498942093324559,
-            "air_interface_latency_ms": 0.11066819197003218,
-            "energy_per_bit_pj": 1.189207115002721
+            "ber": 0.30272722244262695,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 7075.56454552014,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 6.083333333333334,
           "overall": {
-            "ber": 0.002610157215682536,
-            "bler": 0.005220314431365072,
-            "throughput_bits": 1597193841,
-            "spectral_efficiency": 20.111610073060213,
-            "outage_probability": 0.0006493816315762113,
-            "air_interface_latency_ms": 0.1088142264308858,
-            "energy_per_bit_pj": 1.1553526968722732
+            "ber": 0.30078544232625254,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 7128.9147928630455,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 6.666666666666668,
           "overall": {
-            "ber": 0.0021544346900318834,
-            "bler": 0.004308869380063767,
-            "throughput_bits": 1847958606,
-            "spectral_efficiency": 24.428285637493634,
-            "outage_probability": 0.0005623413251903491,
-            "air_interface_latency_ms": 0.1069913193933663,
-            "energy_per_bit_pj": 1.122462048309373
+            "ber": 0.3045963673380232,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 49314.70736489328,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 7.25,
           "overall": {
-            "ber": 0.001778279410038923,
-            "bler": 0.003556558820077846,
-            "throughput_bits": 2138094275,
-            "spectral_efficiency": 29.671475183696035,
-            "outage_probability": 0.00048696752516586315,
-            "air_interface_latency_ms": 0.10519895055086442,
-            "energy_per_bit_pj": 1.0905077326652577
+            "ber": 0.31022263259926885,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 128082.09352408382,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 7.833333333333334,
           "overall": {
-            "ber": 0.0014677992676220691,
-            "bler": 0.0029355985352441383,
-            "throughput_bits": 2473782214,
-            "spectral_efficiency": 36.04004196780057,
-            "outage_probability": 0.00042169650342858224,
-            "air_interface_latency_ms": 0.10343660831319167,
-            "energy_per_bit_pj": 1.0594630943592953
+            "ber": 0.3130572014554697,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 7141.946543576996,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 8.416666666666668,
           "overall": {
-            "ber": 0.0012115276586285883,
-            "bler": 0.0024230553172571766,
-            "throughput_bits": 2862174279,
-            "spectral_efficiency": 43.775532460028856,
-            "outage_probability": 0.0003651741272548377,
-            "air_interface_latency_ms": 0.10170378966055872,
-            "energy_per_bit_pj": 1.029302236643492
+            "ber": 0.31603195046090804,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 7349.424981995994,
+            "energy_per_bit_pj": NaN
           }
         },
         {
           "ebno_db": 9.0,
           "overall": {
-            "ber": 0.001,
-            "bler": 0.002,
-            "throughput_bits": 3311545195,
-            "spectral_efficiency": 53.17133769908277,
-            "outage_probability": 0.00031622776601683794,
-            "air_interface_latency_ms": 0.08,
-            "energy_per_bit_pj": 0.9
+            "ber": 0.31552569071451825,
+            "bler": 1.0,
+            "throughput_bits": 0.0,
+            "spectral_efficiency": 0.0,
+            "outage_probability": 1.0000000000000024e-30,
+            "air_interface_latency_ms": 7050.378841288884,
+            "energy_per_bit_pj": NaN
           }
         }
       ]
