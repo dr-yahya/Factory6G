@@ -12,12 +12,12 @@ SCENARIO = ScenarioSpec(
     ebno_min=-4.0,
     ebno_max=6.0,
     ebno_step=1.0,
-    batch_size=4, # Reduced to avoid OOM
-    max_iter=50,
-    target_block_errors=200,
+    batch_size=16, # Increased from 4 to match PSO enhanced for fair comparison
+    max_iter=500,  # Increased from 50 to match PSO enhanced for statistical stability
+    target_block_errors=1000,  # Increased from 200 to match PSO enhanced
     target_bler=1e-5,
     num_bs_ant=4, # Reduced from 32 to reduce array gain and show errors
     num_ut=4,
     num_ut_ant=1,
-    notes="Official 6G Smart Factory scenario (Pre-enhancement). Uses Rayleigh fading and reduced antenna count for efficient simulation.",
+    notes="Official 6G Smart Factory scenario (Pre-enhancement). Uses Rayleigh fading and reduced antenna count for efficient simulation. Parameters matched to PSO enhanced for fair comparison.",
 )
