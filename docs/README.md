@@ -88,10 +88,6 @@ If you use this work in your research, please cite:
 
 See [CONTRIBUTING.md](https://www.google.com/search?q=../CONTRIBUTING.md) for guidelines.
 
-## 📄 License
-
-This project is licensed under the MIT License - see [LICENSE](https://www.google.com/search?q=../LICENSE) for details.
-
 ## 📧 Contact
 
 For questions, collaboration, or inquiries regarding the implementation:
