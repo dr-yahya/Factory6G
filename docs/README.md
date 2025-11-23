@@ -46,13 +46,29 @@ Welcome to the Factory6G project documentation. This project implements a 6G phy
 - **Production-ready** implementation with Sionna framework
 - **Scientifically validated** through matched-parameter comparison
 
-## 🔬 Research Highlights
+## 👥 Project Team & Affiliation
 
-This project demonstrates:
-1. Novel PSO-based channel estimation for 6G systems
-2. Integration with NVIDIA Sionna framework
-3. Comprehensive performance evaluation
-4. Production-ready implementation
+**Author:**
+**Yahya Khamayseh**
+*PhD Student, Sunway University*
+
+**Supervisor:**
+**Prof. Ir. Rosdiadee Nordin**
+
+**Affiliation:**
+Faculty of Engineering and Technology
+Sunway University | [www.sunway.edu.my](https://www.sunway.edu.my)
+
+## 🙏 Acknowledgements
+
+We acknowledge the support of the **Ministry of Higher Education, Malaysia**, through the **Fundamental Research Grant Scheme (FRGS)**.
+*Ref: FRGS/1/2022/ICT09/SYUC/03/1*
+
+## ⚠️ Disclaimer & Framework
+
+This project is built upon and makes extensive use of **NVIDIA Sionna™**, an open-source library for link-level simulations.
+
+While this project leverages Sionna for physical layer components (such as OFDM implementations and channel modeling), the PSO-enhanced channel estimation algorithms and specific Smart Factory scenarios described herein are custom implementations developed by the Factory6G authors. This project is not affiliated with or endorsed by NVIDIA.
 
 ## 📖 Citation
 
@@ -61,27 +77,22 @@ If you use this work in your research, please cite:
 ```bibtex
 @software{factory6g2025,
   title={Factory6G: PSO-Enhanced Channel Estimation for 6G Smart Factory},
-  author={Factory6G Research Team},
+  author={Khamayseh, Yahya and Nordin, Rosdiadee},
   year={2025},
-  url={https://github.com/yourusername/Factory6G}
+  note={Supported by FRGS/1/2022/ICT09/SYUC/03/1},
+  url={[https://github.com/dr-yahya/Factory6G](https://github.com/dr-yahya/Factory6G)}
 }
-```
+````
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
-
-## 📄 License
-
-This project is licensed under the MIT License - see [LICENSE](../LICENSE) for details.
+See [CONTRIBUTING.md](https://www.google.com/search?q=../CONTRIBUTING.md) for guidelines.
 
 ## 📧 Contact
 
-For questions or collaboration:
-- GitHub Issues: [Factory6G Issues](https://github.com/yourusername/Factory6G/issues)
-- Email: your.email@example.com
+For questions, collaboration, or inquiries regarding the implementation:
 
----
+**Yahya Khamayseh**
 
-**Last Updated:** November 23, 2025  
-**Version:** 1.0.0
+  - Email: [23102254@imail.sunway.edu.my](mailto:23102254@imail.sunway.edu.my)
+  - GitHub Issues: [Factory6G Issues](https://www.google.com/search?q=https://github.com/dr-yahya/Factory6G/issues)
