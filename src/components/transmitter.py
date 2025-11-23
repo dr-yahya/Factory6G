@@ -70,7 +70,6 @@ from sionna.phy.mapping import BinarySource, Mapper
 from sionna.phy.fec.ldpc import LDPC5GEncoder
 from sionna.phy.ofdm import ResourceGrid, ResourceGridMapper
 from .config import SystemConfig
-from .ldpc_6g import LDPC6GEncoder
 import tensorflow as tf_ops
 
 
@@ -146,14 +145,8 @@ class Transmitter:
         
         # Initialize components
         self._binary_source = BinarySource()  # Random bit generator
-        # Use 6G LDPC encoder with automatic code block segmentation
-        # This supports larger block sizes by segmenting when needed
-        try:
-            self._encoder = LDPC6GEncoder(self._k, self._n)  # 6G LDPC encoder
-        except Exception as e:
-            # Fallback to 5G encoder if 6G encoder fails
-            print(f"Warning: 6G LDPC encoder failed ({e}), falling back to 5G encoder")
-            self._encoder = LDPC5GEncoder(self._k, self._n)  # 5G LDPC encoder
+        # Use Sionna's 5G LDPC encoder
+        self._encoder = LDPC5GEncoder(self._k, self._n)
         self._mapper = Mapper("qam", config.num_bits_per_symbol)  # QAM modulator
         self._rg_mapper = ResourceGridMapper(resource_grid)  # Resource grid mapper
     

@@ -248,19 +248,13 @@ def plot_simulation_results(results: dict, output_dir: str):
     estimator = results.get("estimator", "estimator").upper()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig, ax1 = plt.subplots(1, 1, figsize=(8, 6))
 
     ax1.set_xlabel(r"$E_b/N_0$ (dB)")
     ax1.set_ylabel("BER")
     ax1.set_yscale('log')
     ax1.grid(which="both", alpha=0.3)
     ax1.set_title(f"Bit Error Rate - {scenario} ({estimator})")
-
-    ax2.set_xlabel(r"$E_b/N_0$ (dB)")
-    ax2.set_ylabel("BLER")
-    ax2.set_yscale('log')
-    ax2.grid(which="both", alpha=0.3)
-    ax2.set_title(f"Block Error Rate - {scenario} ({estimator})")
 
     colors = ['r', 'b', 'g', 'm', 'c']
     linestyles = ['-', '--', '-.', ':']
@@ -272,16 +266,20 @@ def plot_simulation_results(results: dict, output_dir: str):
             continue
         ebno = [m["ebno_db"] for m in metrics]
         ber = [m["overall"].get("ber") for m in metrics]
-        bler = [m["overall"].get("bler") for m in metrics]
         if not any(val is not None for val in ber):
             continue
         csi_str = "Perfect" if run.get("perfect_csi") else "Imperfect"
         color = colors[idx % len(colors)]
         linestyle = linestyles[idx % len(linestyles)]
 
+        # Avoid log-scale issues: replace non-positive values with a small epsilon
+        import numpy as _np
+        eps = 1e-12
+        ber_plot = [_np.nan if v is None else (max(v, eps)) for v in ber]
+
         ax1.semilogy(
             ebno,
-            ber,
+            ber_plot,
             color=color,
             linestyle=linestyle,
             marker='o',
@@ -289,21 +287,10 @@ def plot_simulation_results(results: dict, output_dir: str):
             linewidth=2,
             markersize=6,
         )
-        ax2.semilogy(
-            ebno,
-            bler,
-            color=color,
-            linestyle=linestyle,
-            marker='s',
-            label=f"{csi_str} CSI",
-            linewidth=2,
-            markersize=6,
-        )
 
-    ax1.set_ylim([1e-6, 1])
-    ax2.set_ylim([1e-6, 1])
+    # If curves include zeros (clamped to eps), ensure y-limits cover the range
+    ax1.set_ylim([1e-5, 1]) # Adjusted for typical BER range
     ax1.legend(loc='upper right')
-    ax2.legend(loc='upper right')
     plt.tight_layout()
 
     plot_filename = f"{output_dir}/simulation_plot_{scenario}_{estimator}_{timestamp}.png"

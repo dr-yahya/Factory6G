@@ -213,10 +213,12 @@ class StaticResourceManager(ResourceManager):
         active_ut_mask: Optional[List[int]] = None,
         per_ut_power: Optional[List[float]] = None,
         pilot_reuse_factor: Optional[int] = None,
+        channel_model_type: Optional[str] = None,
     ):
         self._active_ut_mask = active_ut_mask
         self._per_ut_power = per_ut_power
         self._pilot_reuse_factor = pilot_reuse_factor
+        self._channel_model_type = channel_model_type
     
     def apply_pre_build(self, config: SystemConfig) -> None:
         """
@@ -229,6 +231,8 @@ class StaticResourceManager(ResourceManager):
         Args:
             config: System configuration to modify with static parameters.
         """
+        if self._channel_model_type is not None:
+            config.channel_model_type = self._channel_model_type
         if self._pilot_reuse_factor is not None:
             config.pilot_reuse_factor = int(self._pilot_reuse_factor)
         # Pre-set defaults so they reflect in initial state

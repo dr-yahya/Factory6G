@@ -12,7 +12,7 @@ import importlib
 import pkgutil
 from pathlib import Path
 
-from ..scenario_spec import ScenarioSpec
+from .spec import ScenarioSpec
 
 # Re-export ScenarioSpec for convenience
 __all__ = ["ScenarioSpec", "SCENARIO_PRESETS"]
@@ -47,6 +47,13 @@ def _load_scenarios() -> Dict[str, ScenarioSpec]:
     return scenarios
 
 
-# Load scenarios dynamically from the scenarios folder
-SCENARIO_PRESETS: Dict[str, ScenarioSpec] = _load_scenarios()
+import importlib
 
+def _import_scenario(name):
+    module = importlib.import_module(f".{name}", package=__package__)
+    return module.SCENARIO
+
+SCENARIO_PRESETS = {
+    "6g_smart_factory_sionna_baseline": _import_scenario("6g_smart_factory_sionna_baseline"),
+    "6g_pso_enhanced": _import_scenario("6g_pso_enhanced"),
+}
