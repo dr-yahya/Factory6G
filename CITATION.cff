@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Khamayseh"
+    given-names: "Yahya"
+    email: "23102254@imail.sunway.edu.my"
+    affiliation: "Sunway University"
+  - family-names: "Nordin"
+    given-names: "Rosdiadee"
+    affiliation: "Sunway University"
+title: "Factory6G: PSO-Enhanced Channel Estimation for 6G Smart Factory"
+version: 1.0.0
+date-released: 2025-11-23
+license: MIT
+keywords:
+  - "6G"
+  - "Sionna"
+  - "Channel Estimation"
+  - "PSO"
+  - "Smart Factory"
+  - "Physical Layer"
+abstract: >-
+  This project implements a 6G physical layer simulation for smart factory
+  environments using the Sionna framework, with a focus on PSO-enhanced channel
+  estimation. We acknowledge the support of the Ministry of Higher Education,
+  Malaysia, through the Fundamental Research Grant Scheme (FRGS), Ref:
+  FRGS/1/2022/ICT09/SYUC/03/1.
+repository-code: "https://github.com/dr-yahya/Factory6G"
