@@ -80,7 +80,7 @@ If you use this work in your research, please cite:
   author={Khamayseh, Yahya and Nordin, Rosdiadee},
   year={2025},
   note={Supported by FRGS/1/2022/ICT09/SYUC/03/1},
-  url={[https://github.com/yourusername/Factory6G](https://github.com/yourusername/Factory6G)}
+  url={[https://github.com/dr-yahya/Factory6G](https://github.com/dr-yahya/Factory6G)}
 }
 ````
 
@@ -93,4 +93,6 @@ See [CONTRIBUTING.md](https://www.google.com/search?q=../CONTRIBUTING.md) for gu
 For questions, collaboration, or inquiries regarding the implementation:
 
 **Yahya Khamayseh**
-Email: [23102254@imail.sunway.edu.my](mailto:23102254@imail.sunway.edu.my)
+
+  - Email: [23102254@imail.sunway.edu.my](mailto:23102254@imail.sunway.edu.my)
+  - GitHub Issues: [Factory6G Issues](https://www.google.com/search?q=https://github.com/dr-yahya/Factory6G/issues)
