@@ -1,0 +1,63 @@
+{
+    "_comments": {
+        "simulation_type": "Main simulation type: 'estimators' or 'resource_managers'",
+        "gpu_id": "GPU device index (e.g., 0). Set to -1 for CPU only (overrides force_cpu if -1)",
+        "force_cpu": "Force CPU execution even if GPU is available (true/false)",
+        "log_level": "Logging level: DEBUG, INFO, WARNING, ERROR",
+        "seed": "Random seed for reproducibility"
+    },
+    "simulation": {
+        "type": "estimators",
+        "gpu_id": 0,
+        "force_cpu": false,
+        "log_level": "INFO",
+        "seed": 42,
+        "output_dir": "results"
+    },
+    "scenario_params": {
+        "scenario": "umi",
+        "estimators": [
+            "ls",
+            "dft",
+            "lmmse",
+            "pso",
+            "perfect"
+        ],
+        "perfect_csi_only": false,
+        "imperfect_csi_only": false,
+        "batch_size": 32,
+        "max_iter": 1000,
+        "target_block_errors": 1000,
+        "target_bler": 1e-3,
+        "ebno_min": -5.0,
+        "ebno_max": 20.0,
+        "ebno_step": 5.0
+    },
+    "resource_manager_params": {
+        "resource_managers": [
+            "static",
+            "round_robin",
+            "max_throughput",
+            "pf",
+            "cnn"
+        ],
+        "cnn_model_path": "models/cnn_resource_manager.h5",
+        "active_ut_mask": null,
+        "per_ut_power": null,
+        "pilot_reuse_factor": null
+    },
+    "system_params": {
+        "fft_size": 512,
+        "num_bs_ant": 32,
+        "num_ut": 8,
+        "num_ut_ant": 1,
+        "num_ofdm_symbols": 14,
+        "subcarrier_spacing": 30000,
+        "num_bits_per_symbol": 2,
+        "coderate": 0.5,
+        "pilot_ofdm_symbol_indices": [
+            2,
+            11
+        ]
+    }
+}

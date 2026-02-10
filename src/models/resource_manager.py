@@ -53,6 +53,7 @@ References:
 
 from __future__ import annotations
 
+import numpy as np
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
@@ -189,24 +190,7 @@ class StaticResourceManager(ResourceManager):
     
     This implementation applies fixed resource allocation decisions that do
     not change during simulation. Useful for baseline comparisons and testing
-    specific resource allocation scenarios.
-    
-    Theory:
-        Static resource management:
-        - Fixed user scheduling: Same users scheduled every batch
-        - Fixed power allocation: Constant power per user
-        - No adaptation: Decisions do not depend on channel conditions
-        
-        Use cases:
-        - Baseline performance evaluation
-        - Testing specific scenarios
-        - Comparison with adaptive schemes
-        - Reproducible experiments
-        
-        Limitations:
-        - Does not adapt to channel conditions
-        - May not be optimal for varying channels
-        - Does not exploit channel diversity
+    specific resource scenarios.
     """
     def __init__(
         self,
@@ -221,21 +205,10 @@ class StaticResourceManager(ResourceManager):
         self._channel_model_type = channel_model_type
     
     def apply_pre_build(self, config: SystemConfig) -> None:
-        """
-        Apply static configuration before system build.
-        
-        Sets fixed resource allocation parameters in the system configuration
-        before components are constructed. These parameters will be used
-        throughout the simulation.
-        
-        Args:
-            config: System configuration to modify with static parameters.
-        """
         if self._channel_model_type is not None:
             config.channel_model_type = self._channel_model_type
         if self._pilot_reuse_factor is not None:
             config.pilot_reuse_factor = int(self._pilot_reuse_factor)
-        # Pre-set defaults so they reflect in initial state
         if self._active_ut_mask is not None:
             config.active_ut_mask = list(self._active_ut_mask)
         if self._per_ut_power is not None:
@@ -247,38 +220,135 @@ class StaticResourceManager(ResourceManager):
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
-        """
-        Return static resource directives for each batch.
-        
-        Returns the same resource allocation decisions for every batch,
-        regardless of channel conditions or feedback. This implements a
-        static resource management policy.
-        
-        Theory:
-            Static resource allocation:
-            - Same users scheduled every batch (active_ut_mask)
-            - Constant power allocation (per_ut_power)
-            - Fixed pilot reuse (pilot_reuse_factor)
-            
-            This policy does not adapt to:
-            - Channel conditions
-            - Interference levels
-            - User demands
-            - System performance
-            
-        Args:
-            config: System configuration (unused, for interface compatibility).
-            ebno_db: Current Eb/No in dB (unused, for interface compatibility).
-            feedback: Feedback dictionary (unused, for interface compatibility).
-            
-        Returns:
-            ResourceDirectives object with fixed resource allocation decisions.
-        """
-        # Static policy: return fixed directives each batch
         return ResourceDirectives(
             active_ut_mask=self._active_ut_mask,
             per_ut_power=self._per_ut_power,
             pilot_reuse_factor=self._pilot_reuse_factor,
         )
+
+
+class RoundRobinResourceManager(ResourceManager):
+    """
+    Round-robin resource manager that cycles through users.
+    
+    Schedules one UT at a time (or a subset) in each batch, rotating through
+    the available population to ensure fairness.
+    """
+    def __init__(self, num_active: int = 1):
+        self.num_active = num_active
+        self._current_index = 0
+        
+    def get_runtime_directives(
+        self,
+        config: SystemConfig,
+        ebno_db: float,
+        feedback: Optional[Dict[str, Any]] = None,
+    ) -> ResourceDirectives:
+        num_ut = config.num_ut
+        mask = [0] * num_ut
+        
+        for i in range(self.num_active):
+            idx = (self._current_index + i) % num_ut
+            mask[idx] = 1
+            
+        self._current_index = (self._current_index + self.num_active) % num_ut
+        
+        return ResourceDirectives(active_ut_mask=mask)
+
+
+class MaxThroughputResourceManager(ResourceManager):
+    """
+    Maximum throughput resource manager.
+    
+    Schedules users with the best instantaneous channel conditions.
+    Requires channel state information in the feedback.
+    """
+    def __init__(self, num_active: int = 1):
+        self.num_active = num_active
+        
+    def get_runtime_directives(
+        self,
+        config: SystemConfig,
+        ebno_db: float,
+        feedback: Optional[Dict[str, Any]] = None,
+    ) -> ResourceDirectives:
+        if not feedback or "h_hat" not in feedback:
+            # Fallback to scheduling all if no CSI
+            return ResourceDirectives(active_ut_mask=[1] * config.num_ut)
+            
+        import tensorflow as tf
+        h_hat = feedback["h_hat"] # [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
+        
+        # Calculate channel energy per UT
+        # Sum over Rx antennas, streams, time, freq
+        power = tf.reduce_sum(tf.abs(h_hat)**2, axis=[1, 2, 4, 5, 6]) # [batch, num_tx]
+        avg_power = tf.reduce_mean(power, axis=0) # [num_tx]
+        
+        # Select Top N users
+        top_indices = tf.argsort(avg_power, direction='DESCENDING')[:self.num_active]
+        top_indices = top_indices.numpy().tolist()
+        
+        mask = [0] * config.num_ut
+        for idx in top_indices:
+            mask[idx] = 1
+            
+        return ResourceDirectives(active_ut_mask=mask)
+
+
+class ProportionalFairResourceManager(ResourceManager):
+    """
+    Proportional fair resource manager.
+    
+    Balances total throughput and fairness by scheduling users i that maximize
+    R_i / T_i, where R_i is instantaneous rate and T_i is historical average rate.
+    """
+    def __init__(self, num_active: int = 1, alpha: float = 0.9):
+        self.num_active = num_active
+        self.alpha = alpha
+        self.avg_rates = None
+        
+    def get_runtime_directives(
+        self,
+        config: SystemConfig,
+        ebno_db: float,
+        feedback: Optional[Dict[str, Any]] = None,
+    ) -> ResourceDirectives:
+        num_ut = config.num_ut
+        if self.avg_rates is None:
+            self.avg_rates = np.ones(num_ut) * 1e-3 # Small epsilon
+            
+        if not feedback or "h_hat" not in feedback:
+            return ResourceDirectives(active_ut_mask=[1] * num_ut)
+
+        import tensorflow as tf
+        h_hat = feedback["h_hat"]
+        
+        # Estimate instantaneous "rate" proportional to channel power
+        # R_i ~ log2(1 + SNR_i)
+        power = tf.reduce_sum(tf.abs(h_hat)**2, axis=[1, 2, 4, 5, 6])
+        avg_power = tf.reduce_mean(power, axis=0).numpy()
+        
+        # Simple proxy for rate
+        inst_rates = np.log2(1 + avg_power * (10**(ebno_db/10)))
+        
+        # PF metric: R_i / T_i
+        pf_metric = inst_rates / self.avg_rates
+        
+        top_indices = np.argsort(pf_metric)[-self.num_active:]
+        
+        mask = [0] * num_ut
+        for idx in top_indices:
+            mask[idx] = 1
+            
+        # Update historical average rates
+        # T_i = (1-alpha)*T_i + alpha*R_i (if scheduled)
+        # T_i = (1-alpha)*T_i (if not scheduled)
+        for i in range(num_ut):
+            if mask[i] == 1:
+                self.avg_rates[i] = (1 - self.alpha) * self.avg_rates[i] + self.alpha * inst_rates[i]
+            else:
+                self.avg_rates[i] = (1 - self.alpha) * self.avg_rates[i]
+                
+        return ResourceDirectives(active_ut_mask=mask)
 
 

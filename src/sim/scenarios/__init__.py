@@ -7,10 +7,7 @@ configurations for indoor smart factory environments.
 
 from __future__ import annotations
 
-from typing import Dict
 import importlib
-import pkgutil
-from pathlib import Path
 
 from .spec import ScenarioSpec
 
@@ -18,40 +15,10 @@ from .spec import ScenarioSpec
 __all__ = ["ScenarioSpec", "SCENARIO_PRESETS"]
 
 
-def _load_scenarios() -> Dict[str, ScenarioSpec]:
-    """
-    Dynamically load all scenarios from the scenarios folder.
-    
-    Scans the scenarios subdirectory and imports all scenario modules,
-    collecting their SCENARIO objects into a dictionary.
-    
-    Returns:
-        Dictionary mapping scenario names to ScenarioSpec objects.
-    """
-    scenarios = {}
-    scenarios_dir = Path(__file__).parent
-    
-    # Import all modules in the scenarios directory
-    for importer, modname, ispkg in pkgutil.iter_modules([str(scenarios_dir)]):
-        if not ispkg and modname != "__init__":
-            try:
-                # Import the scenario module
-                module = importlib.import_module(f"src.sim.scenarios.{modname}")
-                # Get the SCENARIO object from the module
-                if hasattr(module, "SCENARIO"):
-                    scenario = module.SCENARIO
-                    scenarios[scenario.name] = scenario
-            except Exception as e:
-                print(f"Warning: Failed to load scenario from {modname}: {e}")
-    
-    return scenarios
-
-
-import importlib
-
 def _import_scenario(name):
     module = importlib.import_module(f".{name}", package=__package__)
     return module.SCENARIO
+
 
 SCENARIO_PRESETS = {
     "6g_smart_factory_sionna_baseline": _import_scenario("6g_smart_factory_sionna_baseline"),

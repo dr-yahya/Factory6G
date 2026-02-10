@@ -131,7 +131,7 @@ def run_simulation(
                     try:
                         import tensorflow as tf
                         tf.keras.backend.clear_session()
-                    except:
+                    except Exception:
                         pass
 
                 if accumulator.total_block_errors() >= num_target_block_errors:

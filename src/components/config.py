@@ -187,7 +187,7 @@ class SystemConfig:
     # MIMO Configuration
     num_bs_ant: int = 32  # Enforce minimum per 6G params (never less)
     num_ut: int = 8  # Enforce minimum per 6G params (never less)
-    num_ut_ant: int = 2  # Enforce minimum per 6G params (never less)
+    num_ut_ant: int = 1  # Enforce minimum per 6G params (never less)
     
     # Modulation and Coding
     num_bits_per_symbol: int = 2  # QPSK - stable for error-free baseline
@@ -209,6 +209,9 @@ class SystemConfig:
     pilot_reuse_factor: int = 1
     # Target BLER for link adaptation decisions
     target_bler: float = 1e-3
+    
+    # LDPC decoder parameters
+    num_decoding_iter: int = 20  # Number of iterations for LDPC decoder
     
     # Channel Model Type
     channel_model_type: str = "tr38901"  # "tr38901" or "rayleigh"

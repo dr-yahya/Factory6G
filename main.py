@@ -3,66 +3,23 @@ from __future__ import annotations
 """
 Main simulation script for 6G Smart Factory Physical Layer System.
 
-This script runs BER/BLER simulations for the complete OFDM-MIMO system with
-different configurations (scenarios, CSI conditions, channel estimators, etc.).
-It provides a comprehensive command-line interface for system evaluation and
-performance analysis.
-
-Theory:
-    BER/BLER Simulation:
-    
-    The script performs Monte Carlo simulations to estimate:
-    - Bit Error Rate (BER): P(b̂ ≠ b) = E[I(b̂ ≠ b)]
-    - Block Error Rate (BLER): P(∃ i: b̂[i] ≠ b[i]) = 1 - (1 - BER)^n
-    
-    Simulation Process:
-    1. Generate random information bits
-    2. Transmit through system (encoder → modulator → channel → receiver → decoder)
-    3. Compare received bits with transmitted bits
-    4. Compute error rates: BER = (# bit errors) / (# total bits)
-    5. Repeat for multiple channel realizations (Monte Carlo)
-    
-    Stopping Criteria:
-    - Maximum iterations: Stop after max_mc_iter channel realizations
-    - Target block errors: Stop after num_target_block_errors errors
-    - Target BLER: Stop if BLER < target_bler (early stopping)
-    
-    Eb/No Range:
-    - Eb/No: Energy per bit to noise power spectral density ratio
-    - Eb/No (dB) = 10·log10(Eb/N0)
-    - Higher Eb/No: Better performance (lower BER/BLER)
-    - Typical range: -5 dB to 20 dB for evaluation
-    
-    Performance Analysis:
-    - Compare perfect vs imperfect CSI
-    - Compare different channel estimators
-    - Compare different scenarios (UMi, UMa, RMa)
-    - Generate performance curves (BER/BLER vs Eb/No)
+This script runs simulations based on the configuration in config.json.
+It supports two primary simulation types:
+1. 'estimators': Standard BER/BLER simulation comparing channel estimators.
+2. 'resource_managers': Benchmark comparing different resource management strategies.
 
 Usage:
-    python main.py [options]
-
-Examples:
-    # Run default 6G simulation (6g_baseline profile)
     python main.py
-
-    # Run specific 6G scenario profile (AI estimator)
-    python main.py --scenario-profile 6g_ai_estimator
-
-    # Run multiple 6G scenario profiles
-    python main.py --scenario-profile 6g_baseline 6g_ai_estimator
-
-    # Run with manual parameters (bypass scenario profiles)
-    python main.py --scenario-profile "" --scenario uma --estimator ls_lin
-
-    # Run only perfect CSI
-    python main.py --scenario-profile 6g_baseline --perfect-csi-only
+    (Configure parameters in config.json)
 """
 
 import os
+import re
 import sys
 import time
-import argparse
+import json
+import logging
+import warnings
 from pathlib import Path
 from typing import Any, Optional
 
@@ -74,504 +31,157 @@ sys.path.insert(0, str(project_root))
 import numpy as np
 import matplotlib.pyplot as plt
 from src.models.resource_manager import StaticResourceManager
-from src.sim.scenarios import SCENARIO_PRESETS, ScenarioSpec
+from src.models.cnn_resource_manager import CNNResourceManager
 from src.sim.metrics import MetricsAccumulator
 from src.sim.runner import run_simulation
 from src.sim.plotting import plot_simulation_results
 from src.sim.results import save_simulation_results
 from src.sim.env import configure_env, setup_gpu
+from src.components.config import SystemConfig
 
 
-def print_results_summary(results: dict):
-    """Print concise summary tables for the collected metrics."""
-    print("\n" + "=" * 80)
-    print("SIMULATION RESULTS SUMMARY")
-    print("=" * 80)
-    print(f"Scenario : {results.get('scenario', 'unknown')}")
-    print(f"Estimator: {results.get('estimator', 'N/A').upper()}")
-    if results.get("profile"):
-        print(f"Profile : {results['profile']}")
+class _StderrFilter:
+    """Filter XLA allocator warnings from stderr."""
 
-    runs = results.get("runs", [])
-    if not runs:
-        print("No metrics available.")
-        return
+    _XLA_PATTERNS = [
+        re.compile(r'.*Allocation.*exceeds.*free system memory.*'),
+        re.compile(r'.*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*'),
+    ]
 
-    for run in runs:
-        csi_str = "Perfect" if run.get("perfect_csi") else "Imperfect"
-        print(f"\n[{csi_str} CSI]")
-        print("-" * 80)
-        header = f"{'Eb/No [dB]':>10} | {'BER':>12} | {'BLER':>12} | {'SINR (dB)':>10} | {'NMSE (dB)':>10} | {'Avg Iter':>9}"
-        print(header)
-        print("-" * len(header))
-        for metric in run.get("metrics", []):
-            ebno = metric.get("ebno_db")
-            overall = metric.get("overall", {})
-            ber = overall.get("ber")
-            bler = overall.get("bler")
-            sinr_db = overall.get("sinr_db")
-            nmse_db = overall.get("nmse_db")
-            iter_avg = overall.get("decoder_iter_avg")
-            print(
-                f"{ebno:10.2f} | "
-                f"{(ber if ber is not None else float('nan')):>12.3e} | "
-                f"{(bler if bler is not None else float('nan')):>12.3e} | "
-                f"{(sinr_db if sinr_db is not None else float('nan')):>10.3f} | "
-                f"{(nmse_db if nmse_db is not None else float('nan')):>10.3f} | "
-                f"{(iter_avg if iter_avg is not None else float('nan')):>9.3f}"
-            )
-    print("=" * 80)
+    def __init__(self, original_stderr):
+        self.original_stderr = original_stderr
+
+    def write(self, message):
+        if not any(p.search(message) for p in self._XLA_PATTERNS):
+            self.original_stderr.write(message)
+
+    def flush(self):
+        self.original_stderr.flush()
+
+
+def load_config(config_path: str = "config.json") -> dict:
+    """Load configuration from JSON file."""
+    if not os.path.exists(config_path):
+        # Fallback to older config name if primary not found
+        fallback = "min_6g_params_config.json"
+        if os.path.exists(fallback):
+            print(f"⚠ config.json not found, falling back to {fallback}")
+            with open(fallback, 'r') as f:
+                return json.load(f)
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+
+def run_estimators_simulation(config_data: dict):
+    """Run standard channel estimator comparison simulation/benchmark."""
+    sim_config = config_data.get("simulation", {})
+    scenario_params = config_data.get("scenario_params", {})
+    
+    output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
+    batch_size = scenario_params.get("batch_size", 32)
+    estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
+    
+    # Eb/No Range from config
+    ebno_min = scenario_params.get("ebno_min", 0.0)
+    ebno_max = scenario_params.get("ebno_max", 20.0)
+    ebno_step = scenario_params.get("ebno_step", 5.0)
+    ebno_db_range = np.arange(ebno_min, ebno_max + ebno_step, ebno_step)
+
+    # Use the benchmark function which handles running and plotting comparison
+    from src.sim.benchmarks import run_estimator_benchmark
+    
+    return run_estimator_benchmark(
+        estimators=estimators,
+        ebno_db_range=ebno_db_range,
+        batch_size=batch_size,
+        output_dir=output_dir,
+    )
+
+
+def run_resource_managers_benchmark(config_data: dict):
+    """Run resource manager benchmark."""
+    from src.sim.benchmarks import run_resource_manager_benchmark
+    
+    sim_config = config_data.get("simulation", {})
+    scenario_params = config_data.get("scenario_params", {})
+    rm_params = config_data.get("resource_manager_params", {})
+    
+    output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
+    batch_size = scenario_params.get("batch_size", 32)
+    managers_list = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
+    cnn_model_path = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5")
+    
+    # Eb/No Range from config (or default)
+    ebno_min = scenario_params.get("ebno_min", 0.0)
+    ebno_max = scenario_params.get("ebno_max", 20.0)
+    ebno_step = scenario_params.get("ebno_step", 10.0)
+    ebno_db_range = np.arange(ebno_min, ebno_max + ebno_step, ebno_step)
+    
+    return run_resource_manager_benchmark(
+        managers_list=managers_list,
+        ebno_db_range=ebno_db_range,
+        batch_size=batch_size,
+        cnn_model_path=cnn_model_path,
+        output_dir=output_dir,
+    )
 
 
 def main():
     """Main entry point"""
-    # Build CLI without importing TensorFlow yet
-    parser = argparse.ArgumentParser(
-        description="6G Smart Factory Physical Layer Simulation",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
-    )
-    
-    parser.add_argument(
-        '--scenario',
-        type=str,
-        default='umi',
-        choices=['umi', 'uma', 'rma'],
-        help='Channel scenario (default: umi)'
-    )
-
-    parser.add_argument(
-        '--scenario-profile',
-        nargs='+',
-        default=['6g_baseline'],
-        help=f"Run one or more predefined scenario presets ({', '.join(SCENARIO_PRESETS.keys())}). Default: 6g_baseline"
-    )
-
-    parser.add_argument(
-        '--list-scenarios',
-        action='store_true',
-        help='List available scenario presets and exit.'
-    )
-
-    parser.add_argument(
-        '--estimator',
-        nargs='+',
-        default=['ls_nn'],
-        choices=['ls', 'ls_nn', 'ls_lin', 'neural'],
-        help='Channel estimator(s): ls, ls_nn, ls_lin, neural (multiple allowed)'
-    )
-
-    parser.add_argument(
-        '--neural-weights',
-        type=str,
-        default=None,
-        help='Path to pretrained neural estimator weights (required when using --estimator neural).'
-    )
-
-    parser.add_argument(
-        '--neural-hidden-units',
-        type=int,
-        nargs='+',
-        default=[32, 32],
-        help='Hidden layer sizes for the neural estimator (default: 32 32).'
-    )
-    
-    parser.add_argument(
-        '--perfect-csi-only',
-        action='store_true',
-        help='Run only perfect CSI simulation'
-    )
-    
-    parser.add_argument(
-        '--imperfect-csi-only',
-        action='store_true',
-        help='Run only imperfect CSI simulation'
-    )
-    
-    parser.add_argument(
-        '--ebno-min',
-        type=float,
-        default=-5.0,
-        help='Minimum Eb/No in dB (default: -5.0)'
-    )
-    
-    parser.add_argument(
-        '--ebno-max',
-        type=float,
-        default=15.0,
-        help='Maximum Eb/No in dB (default: 15.0)'
-    )
-    
-    parser.add_argument(
-        '--ebno-step',
-        type=float,
-        default=2.0,
-        help='Eb/No step size in dB (default: 2.0)'
-    )
-    
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=128,
-        help='Batch size for simulation (default: 128)'
-    )
-    
-    parser.add_argument(
-        '--max-iter',
-        type=int,
-        default=1000,
-        help='Maximum Monte Carlo iterations (default: 1000)'
-    )
-    
-    parser.add_argument(
-        '--target-block-errors',
-        type=int,
-        default=1000,
-        help='Target number of block errors (default: 1000)'
-    )
-    
-    parser.add_argument(
-        '--target-bler',
-        type=float,
-        default=1e-3,
-        help='Target BLER for early stopping (default: 1e-3)'
-    )
-    
-    parser.add_argument(
-        '--gpu',
-        type=int,
-        default=0,
-        help='GPU device number (default: 0)'
-    )
-    parser.add_argument(
-        '--cpu',
-        action='store_true',
-        help='Force CPU execution and silence CUDA library errors'
-    )
-    
-    parser.add_argument(
-        '--no-plot',
-        action='store_true',
-        help='Skip generating plots'
-    )
-    
-    parser.add_argument(
-        '--no-save',
-        action='store_true',
-        help='Skip saving results'
-    )
-    
-    parser.add_argument(
-        '--output-dir',
-        type=str,
-        default='results',
-        help='Output directory for results (default: results)'
-    )
-    parser.add_argument(
-        '--log-file',
-        type=str,
-        default=None,
-        help='Path to write a full log (captures stdout and stderr), e.g., results/run.log'
-    )
-    parser.add_argument(
-        '--log-level',
-        type=str,
-        default='INFO',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        help='Python logging level for console/file logs (default: INFO)'
-    )
-    parser.add_argument(
-        '--no-stderr-filter',
-        action='store_true',
-        help='Do not filter XLA allocator warnings (show full stderr)'
-    )
-    parser.add_argument(
-        '--tf-errors-only',
-        action='store_true',
-        help='Force TensorFlow/absl logs to ERROR level (suppress INFO/WARNING)'
-    )
-    
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=42,
-        help='Random seed for reproducibility (default: 42)'
-    )
-    
-    # Resource Management (Static) flags
-    parser.add_argument(
-        '--use-static-rm',
-        action='store_true',
-        help='Enable Static Resource Manager (scheduling/power control)'
-    )
-    parser.add_argument(
-        '--active-ut-mask',
-        type=int,
-        nargs='+',
-        default=None,
-        help='Active UT mask, e.g., 1 0 1 0'
-    )
-    parser.add_argument(
-        '--per-ut-power',
-        type=float,
-        nargs='+',
-        default=None,
-        help='Per-UT power scaling (linear), e.g., 1.0 0.5 2.0 0.5'
-    )
-    parser.add_argument(
-        '--pilot-reuse-factor',
-        type=int,
-        default=None,
-        help='Pilot reuse factor placeholder (integer)'
-    )
-    
-    args = parser.parse_args()
-
-    if args.list_scenarios:
-        print("Available scenario profiles:")
-        for key, spec in SCENARIO_PRESETS.items():
-            print(f"  - {key}: {spec.description}")
+    # Load configuration
+    try:
+        config_data = load_config()
+    except Exception as e:
+        print(f"Error loading configuration: {e}")
         return
+
+    sim_config = config_data.get("simulation", {})
+    sim_type = sim_config.get("type", "estimators")
     
+    # Environment Setup
+    gpu_id = sim_config.get("gpu_id", 0)
+    force_cpu = sim_config.get("force_cpu", False)
+    log_level_str = sim_config.get("log_level", "INFO")
+    seed = sim_config.get("seed", 42)
+
     # Configure environment BEFORE importing TensorFlow/Sionna
-    configure_env(force_cpu=args.cpu, gpu_num=args.gpu)
+    configure_env(force_cpu=force_cpu, gpu_num=gpu_id)
 
-    # Optional: tee stdout/stderr to a file if requested
-    if args.log_file:
-        from pathlib import Path as _Path
-        class _Tee:
-            def __init__(self, original, fh):
-                self._orig = original
-                self._fh = fh
-            def write(self, data):
-                try:
-                    self._orig.write(data)
-                except Exception:
-                    pass
-                try:
-                    self._fh.write(data)
-                except Exception:
-                    pass
-            def flush(self):
-                try:
-                    self._orig.flush()
-                except Exception:
-                    pass
-                try:
-                    self._fh.flush()
-                except Exception:
-                    pass
-        _p = _Path(args.log_file)
-        _p.parent.mkdir(parents=True, exist_ok=True)
-        _fh = open(_p, 'a', buffering=1)
-        sys.stdout = _Tee(sys.stdout, _fh)
-        sys.stderr = _Tee(sys.stderr, _fh)
+    # Logging Setup
+    logging.basicConfig(level=getattr(logging, log_level_str.upper(), logging.INFO))
+    sys.stderr = _StderrFilter(sys.stderr)
 
-    # Filter XLA allocator warnings from stderr (they come from C++ code)
-    import re
-    
-    class StderrFilter:
-        """Filter XLA allocator warnings from stderr"""
-        def __init__(self, original_stderr):
-            self.original_stderr = original_stderr
-            # Match XLA allocator warnings (can appear in full or partial lines)
-            self.xla_patterns = [
-                re.compile(r'.*Allocation.*exceeds.*free system memory.*'),
-                re.compile(r'.*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*'),
-            ]
-        
-        def write(self, message):
-            # Check if message contains XLA allocator warning
-            should_suppress = any(pattern.search(message) for pattern in self.xla_patterns)
-            if not should_suppress:
-                self.original_stderr.write(message)
-        
-        def flush(self):
-            self.original_stderr.flush()
-    
-    # Install stderr filter to suppress XLA warnings (unless disabled)
-    if not args.no_stderr_filter:
-        sys.stderr = StderrFilter(sys.stderr)
-
-    # Now safe to import TensorFlow/Sionna and configure runtime
+    # Now safe to import TensorFlow/Sionna
     import tensorflow as tf
     import sionna
-    import warnings
-    import logging
     
     # Configure logging levels
-    import logging
-    _level = getattr(logging, args.log_level.upper(), logging.INFO)
+    _level = getattr(logging, log_level_str.upper(), logging.INFO)
     logging.getLogger().setLevel(_level)
-    # TensorFlow Python logger
     tf.get_logger().setLevel('ERROR' if _level > logging.DEBUG else 'INFO')
     
     # Suppress Python warnings
     warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
-    
-    # 3p libraries
     logging.getLogger('tensorflow').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
     logging.getLogger('absl').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
-
-    # Enforce TensorFlow/absl errors-only if requested
-    if args.tf_errors_only:
-        tf.get_logger().setLevel('ERROR')
-        logging.getLogger('tensorflow').setLevel(logging.ERROR)
-        logging.getLogger('absl').setLevel(logging.ERROR)
     
-    setup_gpu(args.gpu)
+    setup_gpu(gpu_id, force_cpu=force_cpu)
     
-    # Set random seed (Sionna >=0.16 has no global phy seed)
-    np.random.seed(args.seed)
-    tf.random.set_seed(args.seed)
+    # Set random seed
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+
+    print(f"Starting execution with type: {sim_type}")
     
-    results_all = []
-
-    # Filter out empty strings from scenario_profile if provided
-    if args.scenario_profile:
-        args.scenario_profile = [p for p in args.scenario_profile if p and p.strip()]
-        if not args.scenario_profile:
-            args.scenario_profile = None
-
-    if args.scenario_profile:
-        profile_names = [name.lower() for name in args.scenario_profile]
-        for profile_name in profile_names:
-            if profile_name not in SCENARIO_PRESETS:
-                print(f"⚠ Unknown scenario profile '{profile_name}'. Available: {', '.join(SCENARIO_PRESETS.keys())}")
-                continue
-            spec = SCENARIO_PRESETS[profile_name]
-            scenario_name = spec.channel_scenario or args.scenario
-            ebno_db_range = np.arange(spec.ebno_min, spec.ebno_max + spec.ebno_step, spec.ebno_step)
-
-            rm = None
-            if spec.resource_manager:
-                rm = StaticResourceManager(**spec.resource_manager)
-
-            estimators = spec.estimators or args.estimator
-            for estimator in estimators:
-                estimator_kwargs = {}
-                if spec.estimator_kwargs:
-                    if estimator in spec.estimator_kwargs and isinstance(spec.estimator_kwargs[estimator], dict):
-                        estimator_kwargs = dict(spec.estimator_kwargs[estimator])
-                    elif isinstance(spec.estimator_kwargs, dict):
-                        estimator_kwargs = dict(spec.estimator_kwargs)
-                estimator_weights = spec.estimator_weights
-                if estimator == 'neural':
-                    estimator_kwargs.setdefault('hidden_units', args.neural_hidden_units)
-                    if estimator_weights is None:
-                        estimator_weights = args.neural_weights
-
-                # Create optimized config for 6g_baseline to meet 6G requirements
-                # Note: Custom configs cause stream management issues, so we'll optimize via scenario params
-                # For now, use default config with optimized Eb/No range and perfect CSI
-                custom_config = None
-                
-                # Apply mobility, channel model, and antenna parameters if specified
-                if (spec.min_ut_velocity > 0 or spec.max_ut_velocity > 0 or 
-                    spec.channel_model_type != "tr38901" or
-                    spec.num_bs_ant > 0 or spec.num_ut > 0 or spec.num_ut_ant > 0):
-                    
-                    # Create base config args
-                    config_args = {
-                        "scenario": scenario_name,
-                        "min_ut_velocity": spec.min_ut_velocity,
-                        "max_ut_velocity": spec.max_ut_velocity,
-                        "channel_model_type": spec.channel_model_type
-                    }
-                    
-                    # Override antenna params if set in spec
-                    if spec.num_bs_ant > 0:
-                        config_args["num_bs_ant"] = spec.num_bs_ant
-                    if spec.num_ut > 0:
-                        config_args["num_ut"] = spec.num_ut
-                    if spec.num_ut_ant > 0:
-                        config_args["num_ut_ant"] = spec.num_ut_ant
-                        
-                    from src.components.config import SystemConfig
-                    custom_config = SystemConfig(**config_args)
-
-                profile_output_dir = Path(args.output_dir) / spec.name
-                results = run_simulation(
-                    scenario=scenario_name,
-                    perfect_csi_list=spec.perfect_csi,
-                    ebno_db_range=ebno_db_range,
-                    batch_size=spec.batch_size,
-                    max_mc_iter=spec.max_iter,
-                    num_target_block_errors=spec.target_block_errors,
-                    target_bler=spec.target_bler,
-                    config=custom_config,  # Pass optimized config
-                    save_results=not args.no_save,
-                    plot_results=not args.no_plot,
-                    output_dir=str(profile_output_dir),
-                    estimator_type=estimator,
-                    estimator_weights=estimator_weights,
-                    estimator_kwargs=estimator_kwargs,
-                    resource_manager=rm,
-                    resource_manager_config=spec.resource_manager,
-                    profile_name=spec.name,
-                )
-                if spec.description:
-                    print(f"\nDescription: {spec.description}")
-                print_results_summary(results)
-                results_all.append(results)
+    if sim_type == "estimators":
+        run_estimators_simulation(config_data)
+    elif sim_type == "resource_managers":
+        run_resource_managers_benchmark(config_data)
     else:
-        # Determine CSI conditions from CLI switches
-        if args.perfect_csi_only:
-            perfect_csi_list = [True]
-        elif args.imperfect_csi_only:
-            perfect_csi_list = [False]
-        else:
-            perfect_csi_list = [True, False]
-
-        ebno_db_range = np.arange(args.ebno_min, args.ebno_max + args.ebno_step, args.ebno_step)
-
-        rm_config = None
-        resource_manager = None
-        if args.use_static_rm:
-            rm_config = {
-                "active_ut_mask": args.active_ut_mask,
-                "per_ut_power": args.per_ut_power,
-                "pilot_reuse_factor": args.pilot_reuse_factor,
-            }
-            rm_config = {k: v for k, v in rm_config.items() if v is not None}
-            resource_manager = StaticResourceManager(**rm_config) if rm_config else None
-        
-        for estimator in args.estimator:
-            estimator_kwargs = {}
-            estimator_weights = None
-            if estimator == 'neural':
-                estimator_kwargs['hidden_units'] = args.neural_hidden_units
-                estimator_weights = args.neural_weights
-                if estimator_weights is None:
-                    print("⚠ Neural estimator selected without --neural-weights. Provide weights before running.")
-
-            results = run_simulation(
-                scenario=args.scenario,
-                perfect_csi_list=perfect_csi_list,
-                ebno_db_range=ebno_db_range,
-                batch_size=args.batch_size,
-                max_mc_iter=args.max_iter,
-                num_target_block_errors=args.target_block_errors,
-                target_bler=args.target_bler,
-                save_results=not args.no_save,
-                plot_results=not args.no_plot,
-                output_dir=args.output_dir,
-                estimator_type=estimator,
-                estimator_weights=estimator_weights,
-                estimator_kwargs=estimator_kwargs,
-                resource_manager=resource_manager,
-                resource_manager_config=rm_config,
-            )
-
-            print_results_summary(results)
-            results_all.append(results)
-
-    if not results_all:
-        return None
-
-    return results_all if len(results_all) > 1 else results_all[0]
+        print(f"Unknown simulation type: {sim_type}. Supported: 'estimators', 'resource_managers'")
 
 
 if __name__ == "__main__":
     main()
-

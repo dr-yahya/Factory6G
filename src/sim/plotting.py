@@ -273,9 +273,8 @@ def plot_simulation_results(results: dict, output_dir: str):
         linestyle = linestyles[idx % len(linestyles)]
 
         # Avoid log-scale issues: replace non-positive values with a small epsilon
-        import numpy as _np
         eps = 1e-12
-        ber_plot = [_np.nan if v is None else (max(v, eps)) for v in ber]
+        ber_plot = [np.nan if v is None else (max(v, eps)) for v in ber]
 
         ax1.semilogy(
             ebno,

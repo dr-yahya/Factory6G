@@ -161,7 +161,7 @@ class ChannelModel:
         self._ofdm_channel = OFDMChannel(
             self._channel_model,
             resource_grid,
-            add_awgn=True,          # Add additive white Gaussian noise
+            add_awgn=False,         # Add noise manually to avoid dtype/shape issues
             normalize_channel=True, # Normalize channel power to 1
             return_channel=True     # Return channel response for receiver
         )
@@ -321,7 +321,15 @@ class ChannelModel:
                 Shape: [batch_size, num_rx, num_tx, num_streams, num_ofdm_symbols, fft_size]
                 Used for perfect CSI simulations or channel analysis
         """
-        y, h = self._ofdm_channel(x_rg, noise_var)
+        y, h = self._ofdm_channel(x_rg)
+        
+        # Add noise manually (CPU-only for RNG to avoid Metal bug)
+        with tf.device("/CPU:0"):
+            noise_re = tf.random.normal(tf.shape(y), stddev=tf.sqrt(noise_var/2))
+            noise_im = tf.random.normal(tf.shape(y), stddev=tf.sqrt(noise_var/2))
+            noise = tf.complex(noise_re, noise_im)
+        y = y + noise
+        
         return y, h
     
     def __call__(self, x_rg: tf.Tensor, noise_var: tf.Tensor) -> tuple:

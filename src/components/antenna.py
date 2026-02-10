@@ -179,7 +179,7 @@ class AntennaConfig:
         """
         return AntennaArray(
             num_rows=1,
-            num_cols=int(self.config.num_bs_ant / 2),  # Dual polarization
+            num_cols=int(self.config.num_bs_ant // 2),  # Dual polarization
             polarization="dual",
             polarization_type="cross",
             antenna_pattern="38.901",
@@ -206,4 +206,3 @@ class AntennaConfig:
             including directional patterns and dual polarization.
         """
         return self.bs_array
-

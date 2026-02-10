@@ -226,14 +226,15 @@ class Transmitter:
             - x: QAM symbols prior to resource-grid mapping (for EVM diagnostics)
                 Shape: [batch_size, num_tx, num_streams_per_tx, num_data_symbols]
         """
-        # Generate information bits
+        # Generate information bits (CPU-only to avoid Metal RNG bug)
         # Shape: [batch_size, num_tx, num_streams_per_tx, num_info_bits]
-        b = self._binary_source([
-            batch_size,
-            self.config.num_tx,
-            self.config.num_streams_per_tx,
-            self._k
-        ])
+        with tf.device("/CPU:0"):
+            b = self._binary_source([
+                batch_size,
+                self.config.num_tx,
+                self.config.num_streams_per_tx,
+                self._k
+            ])
         
         # Encode bits with LDPC encoder
         # Shape: [batch_size, num_tx, num_streams_per_tx, num_coded_bits]

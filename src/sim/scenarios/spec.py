@@ -25,7 +25,6 @@ class ScenarioSpec:
     resource_manager: Optional[Dict[str, Any]] = None
     estimator_kwargs: Dict[str, Any] = field(default_factory=dict)
     estimator_weights: Optional[str] = None
-    estimator_weights: Optional[str] = None
     notes: Optional[str] = None
     min_ut_velocity: float = 0.0
     max_ut_velocity: float = 0.0
@@ -33,9 +32,5 @@ class ScenarioSpec:
     num_bs_ant: int = 0  # 0 means use SystemConfig default
     num_ut: int = 0
     num_ut_ant: int = 0
-
-
-
-
 
 

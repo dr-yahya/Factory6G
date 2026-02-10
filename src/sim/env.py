@@ -23,7 +23,7 @@ def configure_env(force_cpu: bool = False, gpu_num: int = 0) -> None:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 
 
-def setup_gpu(gpu_num: int = 0) -> None:
+def setup_gpu(gpu_num: int = 0, force_cpu: bool = False) -> None:
     """Optional post-import TensorFlow GPU configuration (safe on CPU-only hosts)."""
     try:
         import tensorflow as tf  # type: ignore[import]
@@ -34,6 +34,13 @@ def setup_gpu(gpu_num: int = 0) -> None:
         gpus = tf.config.list_physical_devices("GPU")
         if not gpus:
             return
+            
+        if force_cpu:
+            tf.config.set_visible_devices([], "GPU")
+            return
+            
+        # Select specific GPU if not forcing CPU (though CUDA_VISIBLE_DEVICES usually handles this)
+        # Here we just set memory growth for all visible GPUs (which might only be 1 if env var worked)
         for gpu in gpus:
             try:
                 tf.config.experimental.set_memory_growth(gpu, True)

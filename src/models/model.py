@@ -46,6 +46,8 @@ References:
     - Proakis & Salehi, "Digital Communications"
 """
 
+import time
+
 import tensorflow as tf
 import numpy as np
 from sionna.phy.mimo import StreamManagement
@@ -113,7 +115,7 @@ class Model:
             perfect_csi: Whether to use perfect channel state information
             config: Optional custom system configuration. If None, uses defaults.
         """
-        super().__init__()
+
         
         # Initialize configuration
         if config is None:
@@ -131,61 +133,98 @@ class Model:
         
         # Setup resource grid
         rx_tx_association = self.config.get_rx_tx_association()
-        self._rg = ResourceGrid(
-            num_ofdm_symbols=self.config.num_ofdm_symbols,
-            fft_size=self.config.fft_size,
-            subcarrier_spacing=self.config.subcarrier_spacing,
-            num_tx=self.config.num_tx,
-            num_streams_per_tx=self.config.num_streams_per_tx,
-            cyclic_prefix_length=self.config.cyclic_prefix_length,
-            pilot_pattern="kronecker",
-            pilot_ofdm_symbol_indices=self.config.pilot_ofdm_symbol_indices
-        )
+        # WORKAROUND: Force CPU for ResourceGrid initialization to avoid 
+        # "minval must be 0-D" error in tf.random.uniform on Metal (Mac) GPU
+        with tf.device("/CPU:0"):
+            self._rg = ResourceGrid(
+                num_ofdm_symbols=self.config.num_ofdm_symbols,
+                fft_size=self.config.fft_size,
+                subcarrier_spacing=self.config.subcarrier_spacing,
+                num_tx=self.config.num_tx,
+                num_streams_per_tx=self.config.num_streams_per_tx,
+                cyclic_prefix_length=self.config.cyclic_prefix_length,
+                pilot_pattern="kronecker",
+                pilot_ofdm_symbol_indices=self.config.pilot_ofdm_symbol_indices
+            )
         
         # Setup stream management
         self._sm = StreamManagement(rx_tx_association, self.config.num_streams_per_tx)
         
-        # Initialize components
-        self._antenna_config = AntennaConfig(self.config)
-        self._transmitter = Transmitter(self.config, self._rg)
-        self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
+        # Initialize components on CPU (Sionna's internal RNG during construction
+        # triggers Metal-specific bugs; call-time ops run on GPU with internal RNG protection)
+        with tf.device("/CPU:0"):
+            self._antenna_config = AntennaConfig(self.config)
+            self._transmitter = Transmitter(self.config, self._rg)
+            self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
 
-        # Prepare optional channel estimator
-        channel_estimator = None
-        if not perfect_csi:
-            estimator_kwargs = estimator_kwargs or {}
-            et = estimator_type.lower()
-            if et in ("ls", "ls_nn", "ls-nn"):
-                # Use default LS with 'nn' interpolation inside Receiver by passing None,
-                # or explicitly construct with 'nn' to be explicit
-                from sionna.phy.ofdm import LSChannelEstimator
-                channel_estimator = LSChannelEstimator(self._rg, interpolation_type="nn")
-            elif et in ("ls_lin", "ls-lin", "ls_linear"):
-                from sionna.phy.ofdm import LSChannelEstimator
-                channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
-            elif et == "pso":
-                channel_estimator = PSOChannelEstimator(
-                    self.config,
-                    self._rg,
-                    **estimator_kwargs,
-                )
-            else:
-                raise ValueError(
-                    f"Unsupported estimator_type '{estimator_type}'. "
-                    "Supported: 'ls', 'ls_nn', 'ls_lin', 'pso'."
-                )
+            # Prepare optional channel estimator
+            channel_estimator = None
+            if not perfect_csi:
+                estimator_kwargs = estimator_kwargs or {}
+                et = estimator_type.lower()
+                if et in ("ls", "ls_nn", "ls-nn"):
+                    from sionna.phy.ofdm import LSChannelEstimator
+                    channel_estimator = LSChannelEstimator(self._rg, interpolation_type="nn")
+                elif et in ("ls_lin", "ls-lin", "ls_linear"):
+                    from sionna.phy.ofdm import LSChannelEstimator
+                    channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
+                elif et == "pso":
+                    channel_estimator = PSOChannelEstimator(
+                        self.config,
+                        self._rg,
+                        **estimator_kwargs,
+                    )
+                elif et in ("dft", "dft-based"):
+                    from ..components.estimators import DFTChannelEstimator
+                    channel_estimator = DFTChannelEstimator(self._rg)
+                elif et in ("lmmse", "approx_lmmse"):
+                    from ..components.estimators import LMMSEChannelEstimator
+                    channel_estimator = LMMSEChannelEstimator(self._rg)
+                else:
+                    raise ValueError(
+                        f"Unsupported estimator_type '{estimator_type}'. "
+                        "Supported: 'ls', 'ls_nn', 'ls_lin', 'pso', 'dft', 'lmmse'."
+                    )
 
-        # Receiver needs encoder reference for LDPC decoder
-        encoder = self._transmitter._encoder
-        self._receiver = Receiver(
-            self.config,
-            self._rg,
-            self._sm,
-            encoder,
-            perfect_csi=perfect_csi,
-            channel_estimator=channel_estimator,
-        )
+            # Receiver needs encoder reference for LDPC decoder
+            encoder = self._transmitter._encoder
+            self._receiver = Receiver(
+                self.config,
+                self._rg,
+                self._sm,
+                encoder,
+                perfect_csi=perfect_csi,
+                channel_estimator=channel_estimator,
+            )
     
+    def _apply_resource_directives(self, batch_size: int, ebno_db: float):
+        """Query the resource manager and apply directives to self.config.
+
+        Performs a zero-noise channel peek so that channel-aware managers
+        (MaxThroughput, ProportionalFair, CNN) can inspect H.
+        """
+        if self._resource_manager is None:
+            return
+        dummy_shape = [
+            batch_size,
+            self.config.num_tx,
+            self.config.num_streams_per_tx,
+            self.config.num_ofdm_symbols,
+            self.config.fft_size,
+        ]
+        dummy_x = tf.zeros(dummy_shape, dtype=tf.complex64)
+        _, h_peek = self._channel(dummy_x, tf.convert_to_tensor(0.0, dtype=tf.float32))
+
+        directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
+            self.config, ebno_db, feedback={"h_hat": h_peek}
+        )
+        if directives.active_ut_mask is not None:
+            self.config.active_ut_mask = list(directives.active_ut_mask)
+        if directives.per_ut_power is not None:
+            self.config.per_ut_power = list(directives.per_ut_power)
+        if directives.pilot_reuse_factor is not None:
+            self.config.pilot_reuse_factor = int(directives.pilot_reuse_factor)
+
     def new_topology(self, batch_size: int):
         """
         Generate and set new topology for the channel.
@@ -193,9 +232,11 @@ class Model:
         Args:
             batch_size: Batch size for topology generation
         """
-        self._channel.set_topology(batch_size)
+        # Topology generation uses RNG internally — keep on CPU
+        with tf.device("/CPU:0"):
+            self._channel.set_topology(batch_size)
     
-    @tf.function
+    # @tf.function
     def call(self, batch_size: int, ebno_db: float) -> tuple:
         """
         Simulate transmission through the complete system.
@@ -210,18 +251,8 @@ class Model:
         # Generate new topology
         self.new_topology(batch_size)
         
-        # Query resource manager for per-batch directives
-        if self._resource_manager is not None:
-            directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
-                self.config, ebno_db, feedback=None
-            )
-            # Apply runtime directives to config for this batch
-            if directives.active_ut_mask is not None:
-                self.config.active_ut_mask = list(directives.active_ut_mask)
-            if directives.per_ut_power is not None:
-                self.config.per_ut_power = list(directives.per_ut_power)
-            if directives.pilot_reuse_factor is not None:
-                self.config.pilot_reuse_factor = int(directives.pilot_reuse_factor)
+        # Apply resource manager directives (if any)
+        self._apply_resource_directives(batch_size, ebno_db)
         
         # Calculate noise variance
         no = ebnodb2no(
@@ -231,13 +262,15 @@ class Model:
             self._rg
         )
         
-        # Transmitter: Generate bits and map to resource grid
-        x_rg, b = self._transmitter.call(batch_size)
+        # Transmitter: CPU-only (RNG + encoding tightly coupled)
+        with tf.device("/CPU:0"):
+            x_rg, b, _ = self._transmitter.call(batch_size)
         
-        # Channel: Apply channel and noise
-        y, h = self._channel(x_rg, no)
+        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops)
+        with tf.device("/CPU:0"):
+            y, h = self._channel(x_rg, no)
         
-        # Receiver: Estimate channel, equalize, demap, and decode
+        # Receiver: GPU-accelerated (LMMSE equalizer, LDPC decoder, demapper)
         if self.perfect_csi:
             b_hat = self._receiver.process_with_perfect_csi(y, h, no)
         else:
@@ -266,7 +299,13 @@ class Model:
         """Alias to support Sionna sim_ber(mc_fun, ...) expectations."""
         return self.call(batch_size, ebno_db)
     
-    def run_batch(self, batch_size: int, ebno_db: float, include_details: bool = True) -> dict:
+    def run_batch(
+        self,
+        batch_size: int,
+        ebno_db: float,
+        include_details: bool = True,
+        regenerate_topology: bool = True
+    ) -> dict:
         """
         Run a batch simulation and return detailed results.
         
@@ -274,36 +313,20 @@ class Model:
             batch_size: Batch size for simulation
             ebno_db: Energy per bit to noise ratio in dB
             include_details: If True, return detailed metrics for analysis
+            regenerate_topology: If True, generate new channel topology.
+                                 If False, reuse existing topology (must match batch_size).
             
         Returns:
-            Dictionary with simulation results including:
-            - bits: Transmitted bits [batch, num_tx, num_streams, num_bits]
-            - bits_hat: Received/decoded bits [batch, num_tx, num_streams, num_bits]
-            - decoder_iterations: Number of LDPC decoder iterations [batch, num_tx, num_streams]
-            - channel: True channel [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
-            - channel_hat: Estimated channel [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
-            - qam: Transmitted QAM symbols [batch, num_tx, num_streams, num_symbols]
-            - qam_hat: Equalized QAM symbols [batch, num_tx, num_streams, num_symbols]
-            - no_eff: Effective noise variance [batch, num_tx, num_streams, num_symbols]
+            Dictionary with simulation results
         """
-        import tensorflow as tf
-        import numpy as np
+        # Generate new topology if requested
+        if regenerate_topology:
+            # Topology generation uses RNG — keep on CPU
+            with tf.device("/CPU:0"):
+                self.new_topology(batch_size)
         
-        # Generate new topology
-        self.new_topology(batch_size)
-        
-        # Query resource manager for per-batch directives
-        if self._resource_manager is not None:
-            from ..models.resource_manager import ResourceDirectives
-            directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
-                self.config, ebno_db, feedback=None
-            )
-            if directives.active_ut_mask is not None:
-                self.config.active_ut_mask = list(directives.active_ut_mask)
-            if directives.per_ut_power is not None:
-                self.config.per_ut_power = list(directives.per_ut_power)
-            if directives.pilot_reuse_factor is not None:
-                self.config.pilot_reuse_factor = int(directives.pilot_reuse_factor)
+        # Apply resource manager directives (if any)
+        self._apply_resource_directives(batch_size, ebno_db)
         
         # Calculate noise variance
         no = ebnodb2no(
@@ -313,13 +336,15 @@ class Model:
             self._rg
         )
         
-        # Transmitter: Generate bits and map to resource grid
-        x_rg, b, x_qam = self._transmitter.call(batch_size)
+        # Transmitter: CPU-only (RNG + encoding tightly coupled)
+        with tf.device("/CPU:0"):
+            x_rg, b, x_qam = self._transmitter.call(batch_size)
         
-        # Channel: Apply channel and noise
-        y, h = self._channel(x_rg, no)
+        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops)
+        with tf.device("/CPU:0"):
+            y, h = self._channel(x_rg, no)
         
-        # Receiver processing
+        # Receiver: GPU-accelerated
         if self.perfect_csi:
             b_hat = self._receiver.process_with_perfect_csi(y, h, no)
             h_hat = h
@@ -329,7 +354,6 @@ class Model:
             b_hat = self._receiver(y, h_hat, err_var, no)
         
         if include_details:
-            import time
             
             # Measure latency: start timing
             t_start = time.time()
