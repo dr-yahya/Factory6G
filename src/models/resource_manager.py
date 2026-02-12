@@ -57,7 +57,7 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
-from ..components.config import SystemConfig
+
 
 
 @dataclass
@@ -121,7 +121,7 @@ class ResourceManager:
     - apply_pre_build(): Configure system before component construction
     - get_runtime_directives(): Return resource allocation decisions per batch
     """
-    def apply_pre_build(self, config: SystemConfig) -> None:
+    def apply_pre_build(self, config: dict) -> None:
         """
         Optional: mutate config prior to model component construction.
         
@@ -137,13 +137,13 @@ class ResourceManager:
             - Initial scheduling setup
             
         Args:
-            config: System configuration to be modified.
+            config: System configuration dict to be modified.
         """
         return
     
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
@@ -168,7 +168,7 @@ class ResourceManager:
             - Fairness: Balance resource allocation across users
             
         Args:
-            config: System configuration (read-only, for reference).
+            config: System configuration dict (read-only, for reference).
             ebno_db: Current Eb/No in dB (can be used for link adaptation).
             feedback: Optional feedback dictionary containing:
                 - BLER per UT
@@ -204,19 +204,19 @@ class StaticResourceManager(ResourceManager):
         self._pilot_reuse_factor = pilot_reuse_factor
         self._channel_model_type = channel_model_type
     
-    def apply_pre_build(self, config: SystemConfig) -> None:
+    def apply_pre_build(self, config: dict) -> None:
         if self._channel_model_type is not None:
-            config.channel_model_type = self._channel_model_type
+            config["channel_model_type"] = self._channel_model_type
         if self._pilot_reuse_factor is not None:
-            config.pilot_reuse_factor = int(self._pilot_reuse_factor)
+            config["pilot_reuse_factor"] = int(self._pilot_reuse_factor)
         if self._active_ut_mask is not None:
-            config.active_ut_mask = list(self._active_ut_mask)
+            config["active_ut_mask"] = list(self._active_ut_mask)
         if self._per_ut_power is not None:
-            config.per_ut_power = list(self._per_ut_power)
+            config["per_ut_power"] = list(self._per_ut_power)
     
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
@@ -240,11 +240,11 @@ class RoundRobinResourceManager(ResourceManager):
         
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
-        num_ut = config.num_ut
+        num_ut = config.get("num_ut", 8)
         mask = [0] * num_ut
         
         for i in range(self.num_active):
@@ -268,13 +268,13 @@ class MaxThroughputResourceManager(ResourceManager):
         
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
         if not feedback or "h_hat" not in feedback:
             # Fallback to scheduling all if no CSI
-            return ResourceDirectives(active_ut_mask=[1] * config.num_ut)
+            return ResourceDirectives(active_ut_mask=[1] * config.get("num_ut", 8))
             
         import tensorflow as tf
         h_hat = feedback["h_hat"] # [batch, num_rx, num_tx, num_streams, num_ofdm, fft_size]
@@ -288,7 +288,7 @@ class MaxThroughputResourceManager(ResourceManager):
         top_indices = tf.argsort(avg_power, direction='DESCENDING')[:self.num_active]
         top_indices = top_indices.numpy().tolist()
         
-        mask = [0] * config.num_ut
+        mask = [0] * config.get("num_ut", 8)
         for idx in top_indices:
             mask[idx] = 1
             
@@ -309,11 +309,11 @@ class ProportionalFairResourceManager(ResourceManager):
         
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
-        num_ut = config.num_ut
+        num_ut = config.get("num_ut", 8)
         if self.avg_rates is None:
             self.avg_rates = np.ones(num_ut) * 1e-3 # Small epsilon
             

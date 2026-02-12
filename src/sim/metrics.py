@@ -12,15 +12,18 @@ from typing import Optional
 class MetricsAccumulator:
     """Accumulates per-batch metrics to compute BER/BLER and diagnostics."""
 
-    def __init__(self, config: "SystemConfig"):
+    def __init__(self, config: dict):
         """
         Initialize metrics accumulator.
         
         Args:
-            config: SystemConfig instance with system parameters
+            config: System configuration dictionary
         """
         self.config = config
-        shape = (config.num_tx, config.num_streams_per_tx)
+        num_tx = config.get("num_ut", 8)
+        num_streams_per_tx = config.get("num_ut_ant", 1)
+        shape = (num_tx, num_streams_per_tx)
+        
         self.bit_errors = np.zeros(shape, dtype=np.int64)
         self.bits_total = np.zeros(shape, dtype=np.int64)
         self.block_errors = np.zeros(shape, dtype=np.int64)
@@ -101,7 +104,7 @@ class MetricsAccumulator:
             out=np.zeros_like(signal_power, dtype=np.float64),
             where=no_eff > 0,
         )
-        sinr_linear = sinr_linear.reshape(-1, self.config.num_tx, self.config.num_streams_per_tx)
+        sinr_linear = sinr_linear.reshape(-1, self.config.get("num_ut", 8), self.config.get("num_ut_ant", 1))
         self.sinr_sum += sinr_linear.sum(axis=0)
         self.sinr_count += sinr_linear.shape[0]
         
@@ -125,7 +128,7 @@ class MetricsAccumulator:
             out=np.zeros_like(signal_power, dtype=np.float64),
             where=noise_power > 0,
         )
-        snr_linear = snr_linear.reshape(-1, self.config.num_tx, self.config.num_streams_per_tx)
+        snr_linear = snr_linear.reshape(-1, self.config.get("num_ut", 8), self.config.get("num_ut_ant", 1))
         self.snr_sum += snr_linear.sum(axis=0)
         self.snr_count += snr_linear.shape[0]
         
@@ -219,8 +222,8 @@ class MetricsAccumulator:
 
         total_re = (
             total_blocks
-            * self.config.num_ofdm_symbols
-            * self.config.fft_size
+            * self.config.get("num_ofdm_symbols", 14)
+            * self.config.get("fft_size", 512)
         )
         spectral_eff = (
             float(throughput_bits_per_stream.sum() / total_re)

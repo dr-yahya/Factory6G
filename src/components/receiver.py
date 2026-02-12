@@ -64,7 +64,7 @@ from sionna.phy.ofdm import (
 )
 from sionna.phy.mapping import Demapper
 from sionna.phy.fec.ldpc import LDPC5GDecoder
-from .config import SystemConfig
+
 
 
 class Receiver:
@@ -99,7 +99,7 @@ class Receiver:
            - Outputs hard-decoded information bits
     """
     
-    def __init__(self, config: SystemConfig, resource_grid: ResourceGrid,
+    def __init__(self, config: dict, resource_grid: ResourceGrid,
                  stream_management: StreamManagement, encoder,
                  perfect_csi: bool = False,
                  channel_estimator: object | None = None):
@@ -175,11 +175,11 @@ class Receiver:
         self._equalizer = LMMSEEqualizer(resource_grid, stream_management)
         
         # APP demapper: converts symbols to log-likelihood ratios
-        self._demapper = Demapper("app", "qam", config.num_bits_per_symbol)
+        self._demapper = Demapper("app", "qam", self.config.get("num_bits_per_symbol", 2))
         
         # LDPC decoder: use Sionna's 5G decoder
         self._decoder = LDPC5GDecoder(encoder, 
-                                      num_iter=config.num_decoding_iter,
+                                      num_iter=self.config.get("num_decoding_iter", 20),
                                       hard_out=True, 
                                       return_num_iter=True)
     

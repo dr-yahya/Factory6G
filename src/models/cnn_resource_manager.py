@@ -5,7 +5,6 @@ import tensorflow as tf
 import numpy as np
 from typing import Optional, Dict, Any, List
 
-from ..components.config import SystemConfig
 from .resource_manager import ResourceManager, ResourceDirectives
 
 class CNNResourceManager(ResourceManager):
@@ -79,7 +78,7 @@ class CNNResourceManager(ResourceManager):
 
     def get_runtime_directives(
         self,
-        config: SystemConfig,
+        config: dict,
         ebno_db: float,
         feedback: Optional[Dict[str, Any]] = None,
     ) -> ResourceDirectives:
@@ -91,11 +90,13 @@ class CNNResourceManager(ResourceManager):
         if feedback and "h_hat" in feedback:
             h_hat = feedback["h_hat"]
         
+        num_ut = config.get("num_ut", 8)
+        
         if self.model is None or h_hat is None:
             # Fallback to default: all active, full power
             return ResourceDirectives(
-                active_ut_mask=[1] * config.num_ut,
-                per_ut_power=[1.0] * config.num_ut,
+                active_ut_mask=[1] * num_ut,
+                per_ut_power=[1.0] * num_ut,
                 pilot_reuse_factor=1
             )
             
@@ -121,7 +122,7 @@ class CNNResourceManager(ResourceManager):
         power_alloc_np = power_alloc.numpy()
         
         # Take the first sample from the batch to determine the mask for this simulation batch
-        # (Since SystemConfig.active_ut_mask is not per-sample in Sionna's typical Model flow)
+        # (Since config["active_ut_mask"] is not per-sample in Sionna's typical Model flow)
         idx = 0
         mask_pred = sched_probs_np[idx]
         power_pred = power_alloc_np[idx]
@@ -130,10 +131,10 @@ class CNNResourceManager(ResourceManager):
         power = power_pred.tolist()
         
         # Ensure it's the right length
-        if len(mask) != config.num_ut:
-            mask = mask[:config.num_ut]
-        if len(power) != config.num_ut:
-            power = power[:config.num_ut]
+        if len(mask) != num_ut:
+            mask = mask[:num_ut]
+        if len(power) != num_ut:
+            power = power[:num_ut]
             
         return ResourceDirectives(
             active_ut_mask=mask,

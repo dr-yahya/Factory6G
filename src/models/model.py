@@ -54,7 +54,6 @@ from sionna.phy.mimo import StreamManagement
 from sionna.phy.ofdm import ResourceGrid
 from sionna.phy.utils import ebnodb2no
 
-from ..components.config import SystemConfig
 from ..components.antenna import AntennaConfig
 from ..components.transmitter import Transmitter
 from ..components.channel import ChannelModel
@@ -101,7 +100,7 @@ class Model:
         self,
         scenario: str = "umi",
         perfect_csi: bool = False,
-        config: SystemConfig | None = None,
+        config: dict | None = None,
         estimator_type: str = "ls",
         estimator_weights: str | None = None,
         estimator_kwargs: dict | None = None,
@@ -113,16 +112,27 @@ class Model:
         Args:
             scenario: Channel scenario ("umi", "uma", "rma")
             perfect_csi: Whether to use perfect channel state information
-            config: Optional custom system configuration. If None, uses defaults.
+            config: Optional custom system configuration dict. If None, uses defaults.
         """
 
-        
         # Initialize configuration
         if config is None:
-            self.config = SystemConfig(scenario=scenario)
+            # Default minimal config if none provided (should rarely happen in new flow)
+            self.config = {
+                "scenario": scenario,
+                "fft_size": 512,
+                "num_ut": 8,
+                "num_bs_ant": 32,
+                "num_ut_ant": 1,
+                "subcarrier_spacing": 30e3,
+                "num_ofdm_symbols": 14,
+                "pilot_ofdm_symbol_indices": [2, 11]
+            }
         else:
-            self.config = config
-            self.config.scenario = scenario
+            self.config = config.copy() # Avoid mutating the passed config directly if reused
+            # Override scenario if explicitly provided and different
+            if scenario:
+                self.config["scenario"] = scenario
         
         self.perfect_csi = perfect_csi
         self.estimator_type = estimator_type
@@ -132,23 +142,33 @@ class Model:
             self._resource_manager.apply_pre_build(self.config)
         
         # Setup resource grid
-        rx_tx_association = self.config.get_rx_tx_association()
+        rx_tx_association = self._get_rx_tx_association()
+        
+        # Extract params for readability
+        num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
+        fft_size = self.config.get("fft_size", 512)
+        subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
+        num_tx = self.config.get("num_ut", 8) # Uplink: num_tx = num_ut
+        num_streams_per_tx = self.config.get("num_ut_ant", 1)
+        cyclic_prefix_length = self.config.get("cyclic_prefix_length", 20)
+        pilot_ofdm_symbol_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
+        
         # WORKAROUND: Force CPU for ResourceGrid initialization to avoid 
         # "minval must be 0-D" error in tf.random.uniform on Metal (Mac) GPU
         with tf.device("/CPU:0"):
             self._rg = ResourceGrid(
-                num_ofdm_symbols=self.config.num_ofdm_symbols,
-                fft_size=self.config.fft_size,
-                subcarrier_spacing=self.config.subcarrier_spacing,
-                num_tx=self.config.num_tx,
-                num_streams_per_tx=self.config.num_streams_per_tx,
-                cyclic_prefix_length=self.config.cyclic_prefix_length,
+                num_ofdm_symbols=num_ofdm_symbols,
+                fft_size=fft_size,
+                subcarrier_spacing=subcarrier_spacing,
+                num_tx=num_tx,
+                num_streams_per_tx=num_streams_per_tx,
+                cyclic_prefix_length=cyclic_prefix_length,
                 pilot_pattern="kronecker",
-                pilot_ofdm_symbol_indices=self.config.pilot_ofdm_symbol_indices
+                pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices
             )
         
         # Setup stream management
-        self._sm = StreamManagement(rx_tx_association, self.config.num_streams_per_tx)
+        self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
         
         # Initialize components on CPU (Sionna's internal RNG during construction
         # triggers Metal-specific bugs; call-time ops run on GPU with internal RNG protection)
@@ -196,6 +216,13 @@ class Model:
                 perfect_csi=perfect_csi,
                 channel_estimator=channel_estimator,
             )
+            
+    def _get_rx_tx_association(self) -> np.ndarray:
+        """Create RX-TX association matrix for MIMO stream management."""
+        num_ut = self.config.get("num_ut", 8)
+        bs_ut_association = np.zeros([1, num_ut])
+        bs_ut_association[0, :] = 1
+        return bs_ut_association
     
     def _apply_resource_directives(self, batch_size: int, ebno_db: float):
         """Query the resource manager and apply directives to self.config.
@@ -205,12 +232,18 @@ class Model:
         """
         if self._resource_manager is None:
             return
+            
+        num_tx = self.config.get("num_ut", 8)
+        fft_size = self.config.get("fft_size", 512)
+        num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
+        num_streams_per_tx = self.config.get("num_ut_ant", 1)
+        
         dummy_shape = [
             batch_size,
-            self.config.num_tx,
-            self.config.num_streams_per_tx,
-            self.config.num_ofdm_symbols,
-            self.config.fft_size,
+            num_tx,
+            num_streams_per_tx,
+            num_ofdm_symbols,
+            fft_size,
         ]
         dummy_x = tf.zeros(dummy_shape, dtype=tf.complex64)
         _, h_peek = self._channel(dummy_x, tf.convert_to_tensor(0.0, dtype=tf.float32))
@@ -219,11 +252,11 @@ class Model:
             self.config, ebno_db, feedback={"h_hat": h_peek}
         )
         if directives.active_ut_mask is not None:
-            self.config.active_ut_mask = list(directives.active_ut_mask)
+            self.config["active_ut_mask"] = list(directives.active_ut_mask)
         if directives.per_ut_power is not None:
-            self.config.per_ut_power = list(directives.per_ut_power)
+            self.config["per_ut_power"] = list(directives.per_ut_power)
         if directives.pilot_reuse_factor is not None:
-            self.config.pilot_reuse_factor = int(directives.pilot_reuse_factor)
+            self.config["pilot_reuse_factor"] = int(directives.pilot_reuse_factor)
 
     def new_topology(self, batch_size: int):
         """
@@ -257,8 +290,8 @@ class Model:
         # Calculate noise variance
         no = ebnodb2no(
             ebno_db,
-            self.config.num_bits_per_symbol,
-            self.config.coderate,
+            self.config.get("num_bits_per_symbol", 2),
+            self.config.get("coderate", 0.5),
             self._rg
         )
         
@@ -279,7 +312,7 @@ class Model:
         
         return b, b_hat
     
-    def get_config(self) -> SystemConfig:
+    def get_config(self) -> dict:
         """Get system configuration"""
         return self.config
     
@@ -331,8 +364,8 @@ class Model:
         # Calculate noise variance
         no = ebnodb2no(
             ebno_db,
-            self.config.num_bits_per_symbol,
-            self.config.coderate,
+            self.config.get("num_bits_per_symbol", 2),
+            self.config.get("coderate", 0.5),
             self._rg
         )
         
@@ -373,11 +406,11 @@ class Model:
             latency_sec = t_end - t_start
             
             # Estimate OFDM symbol transmission time
-            subcarrier_spacing = self.config.subcarrier_spacing  # Hz
+            subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)  # Hz
             symbol_duration = 1.0 / subcarrier_spacing  # seconds
-            cyclic_prefix_ratio = self.config.cyclic_prefix_length / self.config.fft_size
+            cyclic_prefix_ratio = self.config.get("cyclic_prefix_length", 20) / self.config.get("fft_size", 512)
             total_symbol_duration = symbol_duration * (1 + cyclic_prefix_ratio)
-            frame_transmission_time = total_symbol_duration * self.config.num_ofdm_symbols
+            frame_transmission_time = total_symbol_duration * self.config.get("num_ofdm_symbols", 14)
             
             # Add frame transmission time to latency
             latency_sec += frame_transmission_time

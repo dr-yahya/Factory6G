@@ -22,8 +22,6 @@ from typing import Tuple
 from sionna.phy import Block
 from sionna.phy.ofdm import LSChannelEstimator, ResourceGrid
 
-from ..config import SystemConfig
-
 
 def _poly_eval_vec(k: np.ndarray, coeffs_real_imag: np.ndarray) -> np.ndarray:
     """Evaluate complex polynomial with real-imag coefficients on k (vectorized).
@@ -173,7 +171,7 @@ class PSOChannelEstimator(Block):
 
     def __init__(
         self,
-        config: SystemConfig,
+        config: dict,
         resource_grid: ResourceGrid,
         degree: int = 3,
         swarm_size: int = 32,
@@ -256,5 +254,3 @@ class PSOChannelEstimator(Block):
 
         h_pred = tf.convert_to_tensor(h_out)
         return h_pred, err_var
-
-

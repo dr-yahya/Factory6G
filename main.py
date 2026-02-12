@@ -37,7 +37,6 @@ from src.sim.runner import run_simulation
 from src.sim.plotting import plot_simulation_results
 from src.sim.results import save_simulation_results
 from src.sim.env import configure_env, setup_gpu
-from src.components.config import SystemConfig
 
 
 class _StderrFilter:
@@ -60,24 +59,52 @@ class _StderrFilter:
 
 
 def load_config(config_path: str = "config.json") -> dict:
-    """Load configuration from JSON file."""
+    """Load configuration from JSON file and flatten for system use."""
     if not os.path.exists(config_path):
-        # Fallback to older config name if primary not found
-        fallback = "min_6g_params_config.json"
-        if os.path.exists(fallback):
-            print(f"⚠ config.json not found, falling back to {fallback}")
-            with open(fallback, 'r') as f:
-                return json.load(f)
         raise FileNotFoundError(f"Config file not found: {config_path}")
     
     with open(config_path, 'r') as f:
-        return json.load(f)
+        config_data = json.load(f)
+
+    # Flatten configuration for Model consumption
+    # Base is system_params
+    flat_config = config_data.get("system_params", {}).copy()
+    
+    # Merge relevant scenario_params if not present (priority to system_params)
+    scenario_params = config_data.get("scenario_params", {})
+    for k, v in scenario_params.items():
+        if k not in flat_config and k in ["scenario", "target_bler", "min_ut_velocity", "max_ut_velocity"]:
+             flat_config[k] = v
+
+    # Merge resource_manager_params placeholders
+    rm_params = config_data.get("resource_manager_params", {})
+    for k in ["active_ut_mask", "per_ut_power", "pilot_reuse_factor"]:
+        if k in rm_params and rm_params[k] is not None:
+            flat_config[k] = rm_params[k]
+            
+    # Apply defaults for optional fields if missing
+    defaults = {
+        "pilot_ofdm_symbol_indices": [2, 11],
+        "active_ut_mask": [1] * flat_config.get("num_ut", 8),
+        "per_ut_power": [1.0] * flat_config.get("num_ut", 8),
+        "pilot_reuse_factor": 1,
+        "target_bler": 1e-3
+    }
+    
+    for k, v in defaults.items():
+        if k not in flat_config or flat_config[k] is None:
+            flat_config[k] = v
+            
+    # Inject the flattened config back into config_data for passing to runners
+    config_data["system_config"] = flat_config
+    return config_data
 
 
 def run_estimators_simulation(config_data: dict):
     """Run standard channel estimator comparison simulation/benchmark."""
     sim_config = config_data.get("simulation", {})
     scenario_params = config_data.get("scenario_params", {})
+    system_config = config_data.get("system_config", {})
     
     output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
     batch_size = scenario_params.get("batch_size", 32)
@@ -97,6 +124,7 @@ def run_estimators_simulation(config_data: dict):
         ebno_db_range=ebno_db_range,
         batch_size=batch_size,
         output_dir=output_dir,
+        system_config=system_config,
     )
 
 
@@ -107,6 +135,7 @@ def run_resource_managers_benchmark(config_data: dict):
     sim_config = config_data.get("simulation", {})
     scenario_params = config_data.get("scenario_params", {})
     rm_params = config_data.get("resource_manager_params", {})
+    system_config = config_data.get("system_config", {})
     
     output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
     batch_size = scenario_params.get("batch_size", 32)
@@ -125,6 +154,7 @@ def run_resource_managers_benchmark(config_data: dict):
         batch_size=batch_size,
         cnn_model_path=cnn_model_path,
         output_dir=output_dir,
+        system_config=system_config,
     )
 
 
@@ -172,9 +202,16 @@ def main():
     # Set random seed
     np.random.seed(seed)
     tf.random.set_seed(seed)
-
+    
+    print(f"Loaded configuration for scenario: {config_data.get('system_config', {}).get('scenario')}")
     print(f"Starting execution with type: {sim_type}")
     
+    # Basic check to ensure config loaded correctly
+    sys_conf = config_data.get("system_config", {})
+    if not sys_conf.get("fft_size"):
+        print("Error: Invalid system configuration (missing fft_size)")
+        return
+
     if sim_type == "estimators":
         run_estimators_simulation(config_data)
     elif sim_type == "resource_managers":

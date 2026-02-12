@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 
 from src.models.model import Model
-from src.components.config import SystemConfig
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +28,7 @@ def run_estimator_benchmark(
     batch_size: int = 32,
     total_batches: int = 8,
     output_dir: str = "results/benchmarks",
+    system_config: dict | None = None,
 ) -> dict:
     """
     Compare channel estimators.
@@ -60,17 +60,21 @@ def run_estimator_benchmark(
 
     results = {est: {"ber": [], "latency_ms": []} for est in estimators}
 
-    base_config = SystemConfig(
-        num_bs_ant=32,
-        num_ut=8,
-        num_ut_ant=1,
-        fft_size=512,
-        num_ofdm_symbols=14,
-        num_bits_per_symbol=2,  # QPSK
-        coderate=0.5,
-        channel_model_type="tr38901",
-        num_decoding_iter=20,
-    )
+    if system_config is None:
+        # Fallback default
+        base_config = {
+            "num_bs_ant": 32,
+            "num_ut": 8,
+            "num_ut_ant": 1,
+            "fft_size": 512,
+            "num_ofdm_symbols": 14,
+            "num_bits_per_symbol": 2,  # QPSK
+            "coderate": 0.5,
+            "channel_model_type": "tr38901",
+            "num_decoding_iter": 20,
+        }
+    else:
+        base_config = system_config.copy()
 
     # --- run simulations ---
     for ebno_db in ebno_db_range:
@@ -169,8 +173,8 @@ def run_estimator_benchmark(
 
     fig.suptitle(
         f"6G Channel Estimator Benchmark\n"
-        f"(MIMO {base_config.num_bs_ant}×{base_config.num_ut}, "
-        f"QPSK, LDPC R={base_config.coderate}, "
+        f"(MIMO {base_config.get('num_bs_ant', 32)}×{base_config.get('num_ut', 8)}, "
+        f"QPSK, LDPC R={base_config.get('coderate', 0.5)}, "
         f"TR 38.901 UMi)",
         fontsize=15, fontweight="bold", y=1.02,
     )
@@ -195,6 +199,7 @@ def run_resource_manager_benchmark(
     num_active: int = 2,
     cnn_model_path: str = "models/cnn_resource_manager.h5",
     output_dir: str = "results/benchmarks",
+    system_config: dict | None = None,
 ) -> dict:
     """
     Compare resource managers.
@@ -219,13 +224,31 @@ def run_resource_manager_benchmark(
 
     if managers_list is None:
         managers_list = ["static", "round_robin", "max_throughput", "pf", "cnn"]
+    
+    # Use passed config or default
+    if system_config is None:
+        base_config = {
+            "num_bs_ant": 32,
+            "num_ut": 8,
+            "num_ut_ant": 1,
+            "fft_size": 512,
+            "num_ofdm_symbols": 14,
+            "num_bits_per_symbol": 2,  # QPSK
+            "coderate": 0.5,
+            "channel_model_type": "tr38901",
+            "num_decoding_iter": 20,
+        }
+    else:
+        base_config = system_config.copy()
+        
+    num_ut = base_config.get("num_ut", 8)
 
     # --- Factory logic to create managers based on config strings ---
     active_managers = {}
     for name in managers_list:
         name_lower = name.lower()
         if "static" in name_lower:
-            mgr = StaticResourceManager(active_ut_mask=[1] * 8)
+            mgr = StaticResourceManager(active_ut_mask=[1] * num_ut)
             label = "Static (All)"
         elif "round" in name_lower or "robin" in name_lower:
             mgr = RoundRobinResourceManager(num_active=num_active)
@@ -254,18 +277,6 @@ def run_resource_manager_benchmark(
         return {}
         
     results = {name: {"ber": [], "throughput": []} for name in active_managers}
-
-    base_config = SystemConfig(
-        num_bs_ant=32,
-        num_ut=8,
-        num_ut_ant=1,
-        fft_size=512,
-        num_ofdm_symbols=14,
-        num_bits_per_symbol=2,  # QPSK
-        coderate=0.5,
-        channel_model_type="tr38901",
-        num_decoding_iter=20,
-    )
 
     # Iteration
     for ebno_db in ebno_db_range:

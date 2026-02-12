@@ -23,7 +23,7 @@ def run_simulation(
     max_mc_iter: int = 1000,
     num_target_block_errors: int = 1000,
     target_bler: float = 1e-3,
-    config: "SystemConfig" = None,
+    config: dict = None,
     save_results: bool = True,
     plot_results: bool = True,
     output_dir: str = "results",
@@ -45,7 +45,7 @@ def run_simulation(
         max_mc_iter: Maximum Monte Carlo iterations
         num_target_block_errors: Target number of block errors
         target_bler: Target BLER for early stopping
-        config: SystemConfig instance
+        config: System configuration dictionary
         save_results: Whether to save results to disk
         plot_results: Whether to generate plots
         output_dir: Output directory for results
@@ -60,7 +60,7 @@ def run_simulation(
         Dictionary containing simulation results
     """
     from src.models.model import Model
-    from src.components.config import SystemConfig
+    # from src.components.config import SystemConfig # Removed
 
     perfect_csi_list = perfect_csi_list or [False]
     if ebno_db_range is None:
@@ -75,7 +75,7 @@ def run_simulation(
         "scenario": scenario,
         "estimator": estimator_type,
         "ebno_db": ebno_db_range.tolist(),
-        "config": config.__dict__ if config else None,
+        "config": config if config else None,
         "resource_manager": resource_manager_config,
         "runs": [],
         "duration": None,

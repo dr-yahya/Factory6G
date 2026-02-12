@@ -89,7 +89,7 @@ from sionna.phy.channel.tr38901 import UMi, UMa, RMa
 from sionna.phy.channel import gen_single_sector_topology as gen_topology
 from sionna.phy.channel import OFDMChannel, RayleighBlockFading
 from sionna.phy.ofdm import ResourceGrid
-from .config import SystemConfig
+
 from .antenna import AntennaConfig
 
 
@@ -115,7 +115,7 @@ class ChannelModel:
         the time-domain channel impulse response via FFT.
     """
     
-    def __init__(self, config: SystemConfig, antenna_config: AntennaConfig, 
+    def __init__(self, config: dict, antenna_config: AntennaConfig, 
                  resource_grid: ResourceGrid):
         """
         Initialize channel model.
@@ -152,7 +152,7 @@ class ChannelModel:
         self.resource_grid = resource_grid
         
         # Create channel model based on scenario and type
-        if self.config.channel_model_type == "rayleigh":
+        if self.config.get("channel_model_type", "tr38901") == "rayleigh":
             self._channel_model = self._create_rayleigh_channel()
         else:
             self._channel_model = self._create_channel_model()
@@ -195,23 +195,23 @@ class ChannelModel:
             ValueError: If the scenario is not supported.
         """
         channel_params = {
-            'carrier_frequency': self.config.carrier_frequency,
-            'o2i_model': self.config.o2i_model,
+            'carrier_frequency': self.config.get("carrier_frequency", 3.5e9),
+            'o2i_model': self.config.get("o2i_model", "low"),
             'ut_array': self.antenna_config.get_ut_array(),
             'bs_array': self.antenna_config.get_bs_array(),
-            'direction': self.config.direction,
-            'enable_pathloss': self.config.enable_pathloss,
-            'enable_shadow_fading': self.config.enable_shadow_fading
+            'direction': self.config.get("direction", "uplink"),
+            'enable_pathloss': self.config.get("enable_pathloss", False),
+            'enable_shadow_fading': self.config.get("enable_shadow_fading", False)
         }
         
-        scenario_lower = self.config.scenario.lower()
+        scenario_lower = self.config.get("scenario", "umi").lower()
         if scenario_lower == "umi":
             return UMi(**channel_params)
         elif scenario_lower == "uma":
             return UMa(**channel_params)
         elif scenario_lower == "rma":
             return RMa(**channel_params)
-        raise ValueError(f"Unknown scenario: {self.config.scenario}. "
+        raise ValueError(f"Unknown scenario: {scenario_lower}. "
                            f"Supported: 'umi', 'uma', 'rma'")
 
     def _create_rayleigh_channel(self):
@@ -221,16 +221,16 @@ class ChannelModel:
         Returns:
             RayleighBlockFading channel model instance.
         """
-        if self.config.direction == "uplink":
+        if self.config.get("direction", "uplink") == "uplink":
             num_rx = 1
-            num_rx_ant = self.config.num_bs_ant
-            num_tx = self.config.num_ut
-            num_tx_ant = self.config.num_ut_ant
+            num_rx_ant = self.config.get("num_bs_ant", 32)
+            num_tx = self.config.get("num_ut", 8)
+            num_tx_ant = self.config.get("num_ut_ant", 1)
         else:
-            num_rx = self.config.num_ut
-            num_rx_ant = self.config.num_ut_ant
+            num_rx = self.config.get("num_ut", 8)
+            num_rx_ant = self.config.get("num_ut_ant", 1)
             num_tx = 1
-            num_tx_ant = self.config.num_bs_ant
+            num_tx_ant = self.config.get("num_bs_ant", 32)
             
         return RayleighBlockFading(
             num_rx=num_rx,
@@ -266,10 +266,10 @@ class ChannelModel:
         """
         topology = gen_topology(
             batch_size,
-            self.config.num_ut,
-            self.config.scenario,
-            min_ut_velocity=self.config.min_ut_velocity,
-            max_ut_velocity=self.config.max_ut_velocity
+            self.config.get("num_ut", 8),
+            self.config.get("scenario", "umi"),
+            min_ut_velocity=self.config.get("min_ut_velocity", 0.0),
+            max_ut_velocity=self.config.get("max_ut_velocity", 0.0)
         )
         if hasattr(self._channel_model, "set_topology"):
             self._channel_model.set_topology(*topology)

@@ -57,7 +57,7 @@ References:
 """
 
 from sionna.phy.channel.tr38901 import AntennaArray
-from .config import SystemConfig
+
 
 
 class AntennaConfig:
@@ -83,7 +83,7 @@ class AntennaConfig:
         - Beamforming capabilities
     """
     
-    def __init__(self, config: SystemConfig):
+    def __init__(self, config: dict):
         """
         Initialize antenna arrays for base station and user terminals.
         
@@ -131,7 +131,7 @@ class AntennaConfig:
             polarization="single",
             polarization_type="V",
             antenna_pattern="omni",
-            carrier_frequency=self.config.carrier_frequency
+            carrier_frequency=self.config.get("carrier_frequency", 3.5e9)
         )
     
     def _create_bs_array(self) -> AntennaArray:
@@ -179,11 +179,11 @@ class AntennaConfig:
         """
         return AntennaArray(
             num_rows=1,
-            num_cols=int(self.config.num_bs_ant // 2),  # Dual polarization
+            num_cols=int(self.config.get("num_bs_ant", 32) // 2),  # Dual polarization
             polarization="dual",
             polarization_type="cross",
             antenna_pattern="38.901",
-            carrier_frequency=self.config.carrier_frequency
+            carrier_frequency=self.config.get("carrier_frequency", 3.5e9)
         )
     
     def get_ut_array(self) -> AntennaArray:

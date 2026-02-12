@@ -69,7 +69,7 @@ import tensorflow as tf
 from sionna.phy.mapping import BinarySource, Mapper
 from sionna.phy.fec.ldpc import LDPC5GEncoder
 from sionna.phy.ofdm import ResourceGrid, ResourceGridMapper
-from .config import SystemConfig
+
 import tensorflow as tf_ops
 
 
@@ -108,7 +108,7 @@ class Transmitter:
     - Power control (per-UT power scaling)
     """
     
-    def __init__(self, config: SystemConfig, resource_grid: ResourceGrid):
+    def __init__(self, config: dict, resource_grid: ResourceGrid):
         """
         Initialize transmitter components.
         
@@ -139,15 +139,18 @@ class Transmitter:
         
         # Calculate code parameters
         # n = number of coded bits = data symbols × bits per symbol
-        self._n = int(resource_grid.num_data_symbols * config.num_bits_per_symbol)
+        num_bits_per_symbol = self.config.get("num_bits_per_symbol", 2)
+        coderate = self.config.get("coderate", 0.5)
+        
+        self._n = int(resource_grid.num_data_symbols * num_bits_per_symbol)
         # k = number of information bits = n × code rate
-        self._k = int(self._n * config.coderate)
+        self._k = int(self._n * coderate)
         
         # Initialize components
         self._binary_source = BinarySource()  # Random bit generator
         # Use Sionna's 5G LDPC encoder
         self._encoder = LDPC5GEncoder(self._k, self._n)
-        self._mapper = Mapper("qam", config.num_bits_per_symbol)  # QAM modulator
+        self._mapper = Mapper("qam", num_bits_per_symbol)  # QAM modulator
         self._rg_mapper = ResourceGridMapper(resource_grid)  # Resource grid mapper
     
     @property
@@ -228,11 +231,14 @@ class Transmitter:
         """
         # Generate information bits (CPU-only to avoid Metal RNG bug)
         # Shape: [batch_size, num_tx, num_streams_per_tx, num_info_bits]
+        num_tx = self.config.get("num_ut", 8) 
+        num_streams_per_tx = self.config.get("num_ut_ant", 1)
+        
         with tf.device("/CPU:0"):
             b = self._binary_source([
                 batch_size,
-                self.config.num_tx,
-                self.config.num_streams_per_tx,
+                num_tx,
+                num_streams_per_tx,
                 self._k
             ])
         
@@ -254,18 +260,18 @@ class Transmitter:
         # Shapes:
         #   x_rg: [batch, num_tx, num_streams_per_tx, num_ofdm_symbols, fft_size]
         # Build masks with broadcasting-friendly shapes for element-wise multiplication
-        if self.config.active_ut_mask is not None:
+        if self.config.get("active_ut_mask") is not None:
             # Active UT mask: 1 = scheduled, 0 = muted
             # Broadcasting: [1, num_tx, 1, 1, 1] allows element-wise multiplication
-            ut_mask = tf_ops.constant(self.config.active_ut_mask, dtype=x_rg.dtype)  # [num_tx]
-            ut_mask = tf_ops.reshape(ut_mask, [1, self.config.num_tx, 1, 1, 1])
+            ut_mask = tf_ops.constant(self.config.get("active_ut_mask"), dtype=x_rg.dtype)  # [num_tx]
+            ut_mask = tf_ops.reshape(ut_mask, [1, num_tx, 1, 1, 1])
             x_rg = x_rg * ut_mask
-        if self.config.per_ut_power is not None:
+        if self.config.get("per_ut_power") is not None:
             # Per-UT power scaling: applied in linear scale
             # Power scaling: x_scaled = x * sqrt(P), where P is linear power factor
             # This maintains the same average power per symbol while scaling amplitude
-            ut_power = tf_ops.constant(self.config.per_ut_power, dtype=x_rg.dtype)  # [num_tx]
-            ut_power = tf_ops.reshape(ut_power, [1, self.config.num_tx, 1, 1, 1])
+            ut_power = tf_ops.constant(self.config.get("per_ut_power"), dtype=x_rg.dtype)  # [num_tx]
+            ut_power = tf_ops.reshape(ut_power, [1, num_tx, 1, 1, 1])
             x_rg = x_rg * tf_ops.sqrt(ut_power)
         
         return x_rg, b, x  # include QAM symbols for diagnostics
