@@ -7,9 +7,9 @@
         "seed": "Random seed for reproducibility"
     },
     "simulation": {
-        "type": "estimators",
+        "type": "resource_managers",
         "gpu_id": 0,
-        "force_cpu": false,
+        "force_cpu": true,
         "log_level": "INFO",
         "seed": 42,
         "output_dir": "results"
@@ -47,17 +47,28 @@
         "pilot_reuse_factor": null
     },
     "system_params": {
+        "carrier_frequency": 3.5e9,
         "fft_size": 512,
-        "num_bs_ant": 32,
-        "num_ut": 8,
-        "num_ut_ant": 1,
-        "num_ofdm_symbols": 14,
         "subcarrier_spacing": 30000,
-        "num_bits_per_symbol": 2,
-        "coderate": 0.5,
+        "num_ofdm_symbols": 14,
+        "cyclic_prefix_length": 20,
         "pilot_ofdm_symbol_indices": [
             2,
             11
-        ]
+        ],
+        "num_bs_ant": 32,
+        "num_ut": 8,
+        "num_ut_ant": 1,
+        "num_bits_per_symbol": 2,
+        "coderate": 0.5,
+        "num_decoding_iter": 20,
+        "channel_model_type": "tr38901",
+        "scenario": "umi",
+        "direction": "uplink",
+        "o2i_model": "low",
+        "enable_pathloss": false,
+        "enable_shadow_fading": false,
+        "min_ut_velocity": 0.0,
+        "max_ut_velocity": 0.0
     }
 }
