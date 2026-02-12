@@ -29,13 +29,8 @@ sys.path.insert(0, str(project_root))
 
 # Now safe to import other modules directly
 import numpy as np
-import matplotlib.pyplot as plt
-from src.models.resource_manager import StaticResourceManager
-from src.models.cnn_resource_manager import CNNResourceManager
-from src.sim.metrics import MetricsAccumulator
-from src.sim.runner import run_simulation
-from src.sim.plotting import plot_simulation_results
-from src.sim.results import save_simulation_results
+import tensorflow as tf
+from src.sim.simulation import run_simulation_campaign
 from src.sim.env import configure_env, setup_gpu
 
 
@@ -100,64 +95,6 @@ def load_config(config_path: str = "config.json") -> dict:
     return config_data
 
 
-def run_estimators_simulation(config_data: dict):
-    """Run standard channel estimator comparison simulation/benchmark."""
-    sim_config = config_data.get("simulation", {})
-    scenario_params = config_data.get("scenario_params", {})
-    system_config = config_data.get("system_config", {})
-    
-    output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
-    batch_size = scenario_params.get("batch_size", 32)
-    estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
-    
-    # Eb/No Range from config
-    ebno_min = scenario_params.get("ebno_min", 0.0)
-    ebno_max = scenario_params.get("ebno_max", 20.0)
-    ebno_step = scenario_params.get("ebno_step", 5.0)
-    ebno_db_range = np.arange(ebno_min, ebno_max + ebno_step, ebno_step)
-
-    # Use the benchmark function which handles running and plotting comparison
-    from src.sim.benchmarks import run_estimator_benchmark
-    
-    return run_estimator_benchmark(
-        estimators=estimators,
-        ebno_db_range=ebno_db_range,
-        batch_size=batch_size,
-        output_dir=output_dir,
-        system_config=system_config,
-    )
-
-
-def run_resource_managers_benchmark(config_data: dict):
-    """Run resource manager benchmark."""
-    from src.sim.benchmarks import run_resource_manager_benchmark
-    
-    sim_config = config_data.get("simulation", {})
-    scenario_params = config_data.get("scenario_params", {})
-    rm_params = config_data.get("resource_manager_params", {})
-    system_config = config_data.get("system_config", {})
-    
-    output_dir = os.path.join(sim_config.get("output_dir", "results"), "benchmarks")
-    batch_size = scenario_params.get("batch_size", 32)
-    managers_list = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
-    cnn_model_path = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5")
-    
-    # Eb/No Range from config (or default)
-    ebno_min = scenario_params.get("ebno_min", 0.0)
-    ebno_max = scenario_params.get("ebno_max", 20.0)
-    ebno_step = scenario_params.get("ebno_step", 10.0)
-    ebno_db_range = np.arange(ebno_min, ebno_max + ebno_step, ebno_step)
-    
-    return run_resource_manager_benchmark(
-        managers_list=managers_list,
-        ebno_db_range=ebno_db_range,
-        batch_size=batch_size,
-        cnn_model_path=cnn_model_path,
-        output_dir=output_dir,
-        system_config=system_config,
-    )
-
-
 def main():
     """Main entry point"""
     # Load configuration
@@ -168,7 +105,9 @@ def main():
         return
 
     sim_config = config_data.get("simulation", {})
-    sim_type = sim_config.get("type", "estimators")
+    scenario_params = config_data.get("scenario_params", {})
+    rm_params = config_data.get("resource_manager_params", {})
+    system_config = config_data.get("system_config", {})
     
     # Environment Setup
     gpu_id = sim_config.get("gpu_id", 0)
@@ -182,10 +121,6 @@ def main():
     # Logging Setup
     logging.basicConfig(level=getattr(logging, log_level_str.upper(), logging.INFO))
     sys.stderr = _StderrFilter(sys.stderr)
-
-    # Now safe to import TensorFlow/Sionna
-    import tensorflow as tf
-    import sionna
     
     # Configure logging levels
     _level = getattr(logging, log_level_str.upper(), logging.INFO)
@@ -203,21 +138,45 @@ def main():
     np.random.seed(seed)
     tf.random.set_seed(seed)
     
-    print(f"Loaded configuration for scenario: {config_data.get('system_config', {}).get('scenario')}")
-    print(f"Starting execution with type: {sim_type}")
+    # Determine what to run based on simulation type
+    sim_type = sim_config.get("type", "estimators")
     
-    # Basic check to ensure config loaded correctly
-    sys_conf = config_data.get("system_config", {})
-    if not sys_conf.get("fft_size"):
-        print("Error: Invalid system configuration (missing fft_size)")
-        return
+    print(f"Loaded configuration for scenario: {system_config.get('scenario')}")
+    print(f"Starting execution with type: {sim_type}")
+
+    # Construct the unified configuration for run_simulation_campaign
+    campaign_config = {
+        "system_config": system_config,
+        "output_dir": os.path.join(sim_config.get("output_dir", "results"), "campaign"),
+        "batch_size": scenario_params.get("batch_size", 32),
+        "total_batches": scenario_params.get("total_batches", 10),
+        "plot_results": sim_config.get("plot_results", True),
+    }
+
+    # Eb/No Range
+    ebno_min = scenario_params.get("ebno_min", 0.0)
+    ebno_max = scenario_params.get("ebno_max", 20.0)
+    ebno_step = scenario_params.get("ebno_step", 5.0)
+    campaign_config["ebno_db_range"] = np.arange(ebno_min, ebno_max + ebno_step, ebno_step).tolist()
 
     if sim_type == "estimators":
-        run_estimators_simulation(config_data)
+        # Check for estimators list in config, else default
+        estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
+        campaign_config["estimators"] = estimators
+        
     elif sim_type == "resource_managers":
-        run_resource_managers_benchmark(config_data)
+        # Check for resource_managers list in config, else default
+        managers = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
+        campaign_config["resource_managers"] = managers
+        campaign_config["num_active_users"] = rm_params.get("num_active_users", 2) # Pass specific RM param
+        campaign_config["cnn_model_path"] = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5") # Pass specific RM param
+        
     else:
         print(f"Unknown simulation type: {sim_type}. Supported: 'estimators', 'resource_managers'")
+        return
+
+    # Run the campaign
+    run_simulation_campaign(campaign_config)
 
 
 if __name__ == "__main__":

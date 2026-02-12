@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
+import csv
+import numpy as np
 
 
 def save_simulation_results(results: dict, output_dir: str) -> str:
@@ -34,6 +36,44 @@ def save_simulation_results(results: dict, output_dir: str) -> str:
         json.dump(results, f, indent=2)
 
     print(f"✓ Results saved to: {filename}")
+    return filename
+
+
+def save_results_as_csv(results_data: dict, output_dir: str) -> str:
+    """
+    Save simulation results as a CSV file.
+    
+    Args:
+        results_data: Dictionary containing 'results' and 'ebno_db_range'.
+        output_dir: Directory to save the CSV.
+        
+    Returns:
+        Path to the saved CSV file.
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{output_dir}/simulation_results_{timestamp}.csv"
+    
+    ebno_range = results_data["ebno_db_range"]
+    items_results = results_data["results"]
+    
+    # Prepare rows
+    rows = []
+    
+    # Header
+    # Method, Metric, EbNo_0, EbNo_5, ...
+    header = ["Method", "Metric"] + [f"EbNo_{val}dB" for val in ebno_range]
+    
+    for item_name, metrics in items_results.items():
+        for metric_name, values in metrics.items():
+            row = [item_name, metric_name] + values
+            rows.append(row)
+            
+    with open(filename, "w", newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(rows)
+        
+    print(f"✓ CSV Results saved to: {filename}")
     return filename
 
 
