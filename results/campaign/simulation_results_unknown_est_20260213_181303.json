@@ -1,0 +1,127 @@
+{
+  "config": {
+    "system_config": {
+      "carrier_frequency": 3500000000.0,
+      "fft_size": 512,
+      "subcarrier_spacing": 30000,
+      "num_ofdm_symbols": 14,
+      "cyclic_prefix_length": 20,
+      "pilot_ofdm_symbol_indices": [
+        2,
+        11
+      ],
+      "num_bs_ant": 32,
+      "num_ut": 8,
+      "num_ut_ant": 1,
+      "num_bits_per_symbol": 2,
+      "coderate": 0.5,
+      "num_decoding_iter": 20,
+      "channel_model_type": "tr38901",
+      "scenario": "umi",
+      "direction": "uplink",
+      "o2i_model": "low",
+      "enable_pathloss": false,
+      "enable_shadow_fading": false,
+      "min_ut_velocity": 0.0,
+      "max_ut_velocity": 0.0,
+      "active_ut_mask": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "per_ut_power": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "pilot_reuse_factor": 1,
+      "target_bler": 0.001
+    },
+    "output_dir": "results/campaign",
+    "batch_size": 2,
+    "total_batches": 10,
+    "plot_results": true,
+    "ebno_db_range": [
+      0.0,
+      5.0
+    ],
+    "estimators": [
+      "ls",
+      "dft",
+      "lmmse",
+      "perfect"
+    ]
+  },
+  "results": {
+    "ls": {
+      "ber": [
+        0.0024139404296875,
+        0.0013753255208333334
+      ],
+      "throughput": [
+        98066.7,
+        98168.8
+      ],
+      "latency": [
+        0.8790188313802082,
+        0.9402522088368732
+      ]
+    },
+    "dft": {
+      "ber": [
+        0.002288818359375,
+        0.0010406494140625
+      ],
+      "throughput": [
+        98079.0,
+        98201.7
+      ],
+      "latency": [
+        0.886489582188924,
+        0.8887522937138874
+      ]
+    },
+    "lmmse": {
+      "ber": [
+        0.005469767252604166,
+        0.0029378255208333333
+      ],
+      "throughput": [
+        97766.3,
+        98015.2
+      ],
+      "latency": [
+        0.8773878098805744,
+        0.873212576039632
+      ]
+    },
+    "perfect": {
+      "ber": [
+        0.0,
+        0.0
+      ],
+      "throughput": [
+        98304.0,
+        98304.0
+      ],
+      "latency": [
+        0.9334628583272296,
+        0.8882717133839924
+      ]
+    }
+  },
+  "ebno_db_range": [
+    0.0,
+    5.0
+  ]
+}
