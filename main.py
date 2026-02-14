@@ -27,30 +27,30 @@ from typing import Any, Optional
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-# Now safe to import other modules directly
-import numpy as np
-import tensorflow as tf
-from src.sim.simulation import run_simulation_campaign
 from src.sim.env import configure_env, setup_gpu
 
 
-class _StderrFilter:
-    """Filter XLA allocator warnings from stderr."""
+class _StreamFilter:
+    """Filter noisy runtime warnings from stdout/stderr."""
 
     _XLA_PATTERNS = [
         re.compile(r'.*Allocation.*exceeds.*free system memory.*'),
         re.compile(r'.*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*'),
+        re.compile(r'.*No supported GPU was found.*'),
+        re.compile(r'.*Matplotlib created a temporary cache directory.*'),
+        re.compile(r'.*Matplotlib is building the font cache; this may take a moment.*'),
+        re.compile(r'.*\.matplotlib is not a writable directory.*'),
     ]
 
-    def __init__(self, original_stderr):
-        self.original_stderr = original_stderr
+    def __init__(self, original_stream):
+        self.original_stream = original_stream
 
     def write(self, message):
         if not any(p.search(message) for p in self._XLA_PATTERNS):
-            self.original_stderr.write(message)
+            self.original_stream.write(message)
 
     def flush(self):
-        self.original_stderr.flush()
+        self.original_stream.flush()
 
 
 def load_config(config_path: str = "config.json") -> dict:
@@ -117,10 +117,16 @@ def main():
 
     # Configure environment BEFORE importing TensorFlow/Sionna
     configure_env(force_cpu=force_cpu, gpu_num=gpu_id)
+    sys.stdout = _StreamFilter(sys.stdout)
+    sys.stderr = _StreamFilter(sys.stderr)
+
+    # Import TensorFlow-dependent modules only after runtime env is configured
+    import numpy as np
+    import tensorflow as tf
+    from src.sim.simulation import run_simulation_loop
 
     # Logging Setup
     logging.basicConfig(level=getattr(logging, log_level_str.upper(), logging.INFO))
-    sys.stderr = _StderrFilter(sys.stderr)
     
     # Configure logging levels
     _level = getattr(logging, log_level_str.upper(), logging.INFO)
@@ -132,7 +138,8 @@ def main():
     logging.getLogger('tensorflow').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
     logging.getLogger('absl').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
     
-    setup_gpu(gpu_id, force_cpu=force_cpu)
+    if not force_cpu:
+        setup_gpu(gpu_id, force_cpu=force_cpu)
     
     # Set random seed
     np.random.seed(seed)
@@ -144,39 +151,43 @@ def main():
     print(f"Loaded configuration for scenario: {system_config.get('scenario')}")
     print(f"Starting execution with type: {sim_type}")
 
-    # Construct the unified configuration for run_simulation_campaign
-    campaign_config = {
+    # Construct the unified configuration for run_simulation_loop
+    loop_config = {
         "system_config": system_config,
-        "output_dir": os.path.join(sim_config.get("output_dir", "results"), "campaign"),
+        "output_dir": sim_config.get("output_dir", "results"),
         "batch_size": scenario_params.get("batch_size", 32),
         "total_batches": scenario_params.get("total_batches", 10),
         "plot_results": sim_config.get("plot_results", True),
+        "target_ber": scenario_params.get("target_ber"),
+        "confidence_level": scenario_params.get("confidence_level", 0.95),
+        "confidence_max_batches": scenario_params.get("confidence_max_batches", 20000),
     }
 
     # Eb/No Range
     ebno_min = scenario_params.get("ebno_min", 0.0)
     ebno_max = scenario_params.get("ebno_max", 20.0)
     ebno_step = scenario_params.get("ebno_step", 5.0)
-    campaign_config["ebno_db_range"] = np.arange(ebno_min, ebno_max + ebno_step, ebno_step).tolist()
+    loop_config["ebno_db_range"] = np.arange(ebno_min, ebno_max + ebno_step, ebno_step).tolist()
 
     if sim_type == "estimators":
         # Check for estimators list in config, else default
         estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
-        campaign_config["estimators"] = estimators
+        loop_config["estimators"] = estimators
+        loop_config["estimator_kwargs"] = scenario_params.get("estimator_kwargs", {})
         
     elif sim_type == "resource_managers":
         # Check for resource_managers list in config, else default
         managers = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
-        campaign_config["resource_managers"] = managers
-        campaign_config["num_active_users"] = rm_params.get("num_active_users", 2) # Pass specific RM param
-        campaign_config["cnn_model_path"] = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5") # Pass specific RM param
+        loop_config["resource_managers"] = managers
+        loop_config["num_active_users"] = rm_params.get("num_active_users", 2) # Pass specific RM param
+        loop_config["cnn_model_path"] = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5") # Pass specific RM param
         
     else:
         print(f"Unknown simulation type: {sim_type}. Supported: 'estimators', 'resource_managers'")
         return
 
-    # Run the campaign
-    run_simulation_campaign(campaign_config)
+    # Run the simulation loop
+    run_simulation_loop(loop_config)
 
 
 if __name__ == "__main__":

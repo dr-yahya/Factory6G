@@ -7,6 +7,23 @@ from typing import Optional, Dict, Any, List
 
 from .resource_manager import ResourceManager, ResourceDirectives
 
+
+class _CompatibleDense(tf.keras.layers.Dense):
+    """Dense layer shim for legacy models with extra deserialization fields."""
+
+    def __init__(self, *args, quantization_config=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+def _load_model_compat(model_path: str):
+    """Load Keras model with compatibility shims for older/newer artifacts."""
+    try:
+        return tf.keras.models.load_model(model_path, compile=False)
+    except Exception:
+        with tf.keras.utils.custom_object_scope({"Dense": _CompatibleDense}):
+            return tf.keras.models.load_model(model_path, compile=False)
+
+
 class CNNResourceManager(ResourceManager):
     """
     Resource manager that uses a CNN to predict resource allocation directives.
@@ -33,13 +50,13 @@ class CNNResourceManager(ResourceManager):
             confidence_threshold: Threshold for binary decisions (e.g., active/inactive).
         """
         self.model = None
+        self.needs_channel_feedback = True
         self.model_path = model_path
         self.confidence_threshold = confidence_threshold
         
         if model_path:
             try:
-                # Load model roughly
-                self.model = tf.keras.models.load_model(model_path, compile=False)
+                self.model = _load_model_compat(model_path)
                 print(f"Loaded CNN Resource Manager model from {model_path}")
             except Exception as e:
                 print(f"Failed to load model from {model_path}: {e}")

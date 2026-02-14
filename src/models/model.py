@@ -217,7 +217,7 @@ class Model:
                     elif et in ("ls_lin", "ls-lin", "ls_linear"):
                         from sionna.phy.ofdm import LSChannelEstimator
                         channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
-                    elif et == "pso":
+                    elif et in ("pso", "dso"):
                         channel_estimator = PSOChannelEstimator(
                             self.config,
                             self._rg,
@@ -233,7 +233,7 @@ class Model:
                         pass # Allow unknown types if handled elsewhere, or keep error
                         # raise ValueError(...) 
                         # Keeping original error logic but executed here
-                        if et not in ["ls", "ls_nn", "ls_lin", "pso", "dft", "lmmse", "perfect"]:
+                        if et not in ["ls", "ls_nn", "ls_lin", "pso", "dso", "dft", "lmmse", "perfect"]:
                              raise ValueError(f"Unsupported estimator_type '{estimator_type}'.")
     
                 # Receiver needs encoder reference for LDPC decoder
@@ -262,24 +262,27 @@ class Model:
         """
         if self._resource_manager is None:
             return
-            
-        num_tx = self.config.get("num_ut", 8)
-        fft_size = self.config.get("fft_size", 512)
-        num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
-        num_streams_per_tx = self.config.get("num_ut_ant", 1)
-        
-        dummy_shape = [
-            batch_size,
-            num_tx,
-            num_streams_per_tx,
-            num_ofdm_symbols,
-            fft_size,
-        ]
-        dummy_x = tf.zeros(dummy_shape, dtype=tf.complex64)
-        _, h_peek = self._channel(dummy_x, tf.convert_to_tensor(0.0, dtype=tf.float32))
+
+        feedback = None
+        if getattr(self._resource_manager, "needs_channel_feedback", False):
+            num_tx = self.config.get("num_ut", 8)
+            fft_size = self.config.get("fft_size", 512)
+            num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
+            num_streams_per_tx = self.config.get("num_ut_ant", 1)
+
+            dummy_shape = [
+                batch_size,
+                num_tx,
+                num_streams_per_tx,
+                num_ofdm_symbols,
+                fft_size,
+            ]
+            dummy_x = tf.zeros(dummy_shape, dtype=tf.complex64)
+            _, h_peek = self._channel(dummy_x, tf.convert_to_tensor(0.0, dtype=tf.float32))
+            feedback = {"h_hat": h_peek}
 
         directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
-            self.config, ebno_db, feedback={"h_hat": h_peek}
+            self.config, ebno_db, feedback=feedback
         )
         if directives.active_ut_mask is not None:
             self.config["active_ut_mask"] = list(directives.active_ut_mask)
@@ -384,123 +387,72 @@ class Model:
         Returns:
             Dictionary with simulation results
         """
-        # Generate new topology if requested
+        # Generate new topology if requested.
         if regenerate_topology:
-            # Topology generation uses RNG — keep on CPU
             with tf.device("/CPU:0"):
                 self.new_topology(batch_size)
-        
-        # Apply resource manager directives (if any)
+
         self._apply_resource_directives(batch_size, ebno_db)
-        
-        # Calculate noise variance
+
         no = ebnodb2no(
             ebno_db,
             self.config.get("num_bits_per_symbol", 2),
             self.config.get("coderate", 0.5),
-            self._rg
+            self._rg,
         )
-        
-        # Transmitter: CPU-only (RNG + encoding tightly coupled)
+
         with tf.device("/CPU:0"):
             x_rg, b, x_qam = self._transmitter.call(batch_size)
-        
-        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops & OOM on small GPUs)
-        # We must explicitly place inputs on CPU to force the op to run there
+
         with tf.device("/CPU:0"):
-            x_cpu = tf.identity(x_rg)
-            no_cpu = tf.identity(no)
-            y_cpu, h_cpu = self._channel(x_cpu, no_cpu)
-            # Move back to default device (likely GPU) for receiver
+            y_cpu, h_cpu = self._channel(tf.identity(x_rg), tf.identity(no))
             y = tf.identity(y_cpu)
             h = tf.identity(h_cpu)
-        
-        # Receiver: GPU-accelerated
+
         if self.perfect_csi:
-            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
             h_hat = h
             err_var = tf.zeros_like(h)
         else:
             h_hat, err_var = self._receiver.estimate_channel(y, no)
-            b_hat = self._receiver(y, h_hat, err_var, no)
-        
+
         if include_details:
-            
-            # Measure latency: start timing
-            t_start = time.time()
-            
-            # Get detailed information for metrics
-            # Equalize to get QAM symbols and effective noise
+            # Do a single receiver pass and reuse intermediate outputs.
+            t_start = time.perf_counter()
             x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
-            
-            # Get decoder iterations - decode again to get iterations
             llr = self._receiver.demap(x_hat, no_eff)
-            _, decoder_iter = self._receiver.decode(llr)
-            
-            # Measure latency: end timing (encoding + transmission + decoding)
-            # Note: Encoding time is negligible, transmission time is OFDM symbol duration
-            # Decoding time is proportional to iterations
-            t_end = time.time()
-            latency_sec = t_end - t_start
-            
-            # Estimate OFDM symbol transmission time
-            subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)  # Hz
-            symbol_duration = 1.0 / subcarrier_spacing  # seconds
+            b_hat, decoder_iter = self._receiver.decode(llr)
+            processing_latency_sec = time.perf_counter() - t_start
+
+            subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
+            symbol_duration = 1.0 / subcarrier_spacing
             cyclic_prefix_ratio = self.config.get("cyclic_prefix_length", 20) / self.config.get("fft_size", 512)
-            total_symbol_duration = symbol_duration * (1 + cyclic_prefix_ratio)
-            frame_transmission_time = total_symbol_duration * self.config.get("num_ofdm_symbols", 14)
-            
-            # Add frame transmission time to latency
-            latency_sec += frame_transmission_time
-            
-            # Estimate energy consumption (physical layer)
-            # Energy = Power × Time
-            # Power estimates (typical values for 6G systems):
-            # - Encoding: ~10 mW per Mbps
-            # - RF Transmission: ~100-500 mW (depends on power control)
-            # - RF Reception: ~50-200 mW
-            # - Decoding: ~50 mW per Mbps (depends on iterations)
-            
-            # Estimate throughput for energy calculation
-            # Get num_info_bits from transmitter
+            frame_transmission_time = symbol_duration * (1 + cyclic_prefix_ratio) * self.config.get("num_ofdm_symbols", 14)
+            runtime_latency_sec = processing_latency_sec + frame_transmission_time
+            air_interface_latency_sec = frame_transmission_time
+
             num_info_bits = self._transmitter.num_info_bits
-            
-            # Encoding energy (baseband processing)
-            encoding_power_watts = 10e-3 * (num_info_bits / latency_sec) / 1e6  # 10 mW per Mbps
-            encoding_energy = encoding_power_watts * latency_sec * 0.1  # 10% of latency is encoding
-            
-            # RF transmission energy
-            tx_power_watts = 0.2  # 200 mW typical for smart factory devices
+            safe_latency = max(runtime_latency_sec, 1e-12)
+            encoding_power_watts = 10e-3 * (num_info_bits / safe_latency) / 1e6
+            encoding_energy = encoding_power_watts * safe_latency * 0.1
+
+            tx_power_watts = 0.2
+            rx_power_watts = 0.1
             tx_energy = tx_power_watts * frame_transmission_time
-            
-            # RF reception energy
-            rx_power_watts = 0.1  # 100 mW typical
             rx_energy = rx_power_watts * frame_transmission_time
-            
-            # Decoding energy (proportional to iterations)
+
             avg_iterations = float(tf.reduce_mean(decoder_iter))
-            decoding_power_watts = 50e-3 * (num_info_bits / latency_sec) / 1e6 * (1 + avg_iterations / 10)
-            decoding_energy = decoding_power_watts * latency_sec * 0.3  # 30% of latency is decoding
-            
+            decoding_power_watts = 50e-3 * (num_info_bits / safe_latency) / 1e6 * (1 + avg_iterations / 10)
+            decoding_energy = decoding_power_watts * safe_latency * 0.3
             total_energy_joules = encoding_energy + tx_energy + rx_energy + decoding_energy
-            
-            # Get noise power for SNR calculation (without interference)
-            # For SNR, we use the pure noise variance (no interference)
-            # Convert to numpy scalar if tensor
-            if hasattr(no, 'numpy'):
+
+            if hasattr(no, "numpy"):
                 noise_power = float(no.numpy()) if no.shape == () else no.numpy()
             else:
                 noise_power = float(no) if np.isscalar(no) else np.array(no)
-            # Ensure it's a scalar for SNR calculation
-            if isinstance(noise_power, np.ndarray) and noise_power.size == 1:
-                noise_power = float(noise_power.item())
-            elif isinstance(noise_power, np.ndarray):
-                # If it's an array, use mean for SNR calculation
-                noise_power = float(np.mean(noise_power))
-            
-            # Use QAM symbols from transmitter (x_qam) - these are the transmitted symbols
-            # Convert to numpy for metrics accumulator
-            result = {
+            if isinstance(noise_power, np.ndarray):
+                noise_power = float(noise_power.item()) if noise_power.size == 1 else float(np.mean(noise_power))
+
+            return {
                 "bits": b.numpy(),
                 "bits_hat": b_hat.numpy(),
                 "decoder_iterations": decoder_iter.numpy(),
@@ -510,13 +462,17 @@ class Model:
                 "qam_hat": x_hat.numpy(),
                 "no_eff": no_eff.numpy(),
                 "noise_power": noise_power,
-                "latency_sec": latency_sec,
+                "latency_sec": air_interface_latency_sec,
+                "processing_latency_sec": processing_latency_sec,
+                "runtime_latency_sec": runtime_latency_sec,
                 "energy_joules": total_energy_joules,
             }
+
+        if self.perfect_csi:
+            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
         else:
-            result = {
-                "bits": b.numpy(),
-                "bits_hat": b_hat.numpy(),
-            }
-        
-        return result
+            b_hat = self._receiver(y, h_hat, err_var, no)
+        return {
+            "bits": b.numpy(),
+            "bits_hat": b_hat.numpy(),
+        }

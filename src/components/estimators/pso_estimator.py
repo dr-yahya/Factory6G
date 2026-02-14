@@ -75,6 +75,8 @@ def _pso_optimize_vec(
     w_end: float,
     c1: float,
     c2: float,
+    early_stop_patience: int,
+    min_rel_improvement: float,
     rng: np.random.Generator,
 ) -> np.ndarray:
     """Run PSO to fit complex polynomial to target (complex) vs k (float) - Vectorized.
@@ -131,6 +133,7 @@ def _pso_optimize_vec(
     
     # Reshape gbest for broadcasting: [N, 1, Dim]
     gbest_expanded = gbest.reshape(num_problems, 1, dim)
+    stagnant_steps = 0
 
     for t in range(iters):
         w = w_start + (w_end - w_start) * (t / max(1, iters - 1))
@@ -159,9 +162,20 @@ def _pso_optimize_vec(
         improved_g = current_best_val < gbest_val # [N]
         
         if np.any(improved_g):
+            prev_best = gbest_val.copy()
             gbest[improved_g] = pbest[improved_g, current_best_idx[improved_g], :]
             gbest_val[improved_g] = current_best_val[improved_g]
             gbest_expanded = gbest.reshape(num_problems, 1, dim)
+            rel_gain = (prev_best - gbest_val) / np.maximum(prev_best, 1e-12)
+            if np.mean(rel_gain) < min_rel_improvement:
+                stagnant_steps += 1
+            else:
+                stagnant_steps = 0
+        else:
+            stagnant_steps += 1
+
+        if stagnant_steps >= early_stop_patience:
+            break
             
     return gbest
 
@@ -174,12 +188,14 @@ class PSOChannelEstimator(Block):
         config: dict,
         resource_grid: ResourceGrid,
         degree: int = 3,
-        swarm_size: int = 32,
-        iters: int = 60,
+        swarm_size: int = 8,
+        iters: int = 12,
         inertia_start: float = 0.7,
         inertia_end: float = 0.4,
         c1: float = 1.5,
         c2: float = 1.5,
+        early_stop_patience: int = 3,
+        min_rel_improvement: float = 1e-3,
         seed: int = 42,
     ) -> None:
         super().__init__()
@@ -192,6 +208,8 @@ class PSOChannelEstimator(Block):
         self.inertia_end = float(inertia_end)
         self.c1 = float(c1)
         self.c2 = float(c2)
+        self.early_stop_patience = int(early_stop_patience)
+        self.min_rel_improvement = float(min_rel_improvement)
         self._rng = np.random.default_rng(seed)
 
         # Precompute k index normalized to [-1, 1] for numerical stability
@@ -237,6 +255,8 @@ class PSOChannelEstimator(Block):
             w_end=self.inertia_end,
             c1=self.c1,
             c2=self.c2,
+            early_stop_patience=self.early_stop_patience,
+            min_rel_improvement=self.min_rel_improvement,
             rng=self._rng,
         )
         

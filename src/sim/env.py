@@ -7,6 +7,7 @@ can configure TensorFlow/Sionna runtime before importing heavy modules.
 from __future__ import annotations
 
 import os
+import tempfile
 
 
 def configure_env(force_cpu: bool = False, gpu_num: int = 0) -> None:
@@ -16,7 +17,11 @@ def configure_env(force_cpu: bool = False, gpu_num: int = 0) -> None:
     - Optionally force CPU
     - Otherwise select a single GPU by index
     """
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+    # Keep matplotlib cache in a writable location across runs.
+    mpl_cache_dir = os.path.join(tempfile.gettempdir(), "factory6g_mplconfig")
+    os.makedirs(mpl_cache_dir, exist_ok=True)
+    os.environ["MPLCONFIGDIR"] = mpl_cache_dir
     if force_cpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     else:
@@ -49,5 +54,3 @@ def setup_gpu(gpu_num: int = 0, force_cpu: bool = False) -> None:
                 pass
     except Exception:
         return
-
-

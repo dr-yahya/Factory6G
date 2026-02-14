@@ -20,14 +20,26 @@
             "ls",
             "dft",
             "lmmse",
+            "pso",
             "perfect"
         ],
+        "estimator_kwargs": {
+            "pso": {
+                "swarm_size": 8,
+                "iters": 12,
+                "early_stop_patience": 3,
+                "min_rel_improvement": 0.001
+            }
+        },
         "perfect_csi_only": false,
         "imperfect_csi_only": false,
         "batch_size": 1,
         "max_iter": 100,
         "total_batches": 2,
         "target_block_errors": 1000,
+        "target_ber": null,
+        "confidence_level": 0.95,
+        "confidence_max_batches": 2000,
         "ebno_min": 0.0,
         "ebno_max": 20.0,
         "ebno_step": 5.0

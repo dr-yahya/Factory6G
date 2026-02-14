@@ -121,6 +121,8 @@ class ResourceManager:
     - apply_pre_build(): Configure system before component construction
     - get_runtime_directives(): Return resource allocation decisions per batch
     """
+    needs_channel_feedback: bool = False
+
     def apply_pre_build(self, config: dict) -> None:
         """
         Optional: mutate config prior to model component construction.
@@ -264,6 +266,7 @@ class MaxThroughputResourceManager(ResourceManager):
     Requires channel state information in the feedback.
     """
     def __init__(self, num_active: int = 1):
+        self.needs_channel_feedback = True
         self.num_active = num_active
         
     def get_runtime_directives(
@@ -303,6 +306,7 @@ class ProportionalFairResourceManager(ResourceManager):
     R_i / T_i, where R_i is instantaneous rate and T_i is historical average rate.
     """
     def __init__(self, num_active: int = 1, alpha: float = 0.9):
+        self.needs_channel_feedback = True
         self.num_active = num_active
         self.alpha = alpha
         self.avg_rates = None
@@ -350,5 +354,4 @@ class ProportionalFairResourceManager(ResourceManager):
                 self.avg_rates[i] = (1 - self.alpha) * self.avg_rates[i]
                 
         return ResourceDirectives(active_ut_mask=mask)
-
 
