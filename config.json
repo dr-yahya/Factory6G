@@ -9,7 +9,7 @@
     "simulation": {
         "type": "estimators",
         "gpu_id": 0,
-        "force_cpu": false,
+        "force_cpu": true,
         "log_level": "INFO",
         "seed": 42,
         "output_dir": "results"
@@ -24,11 +24,12 @@
         ],
         "perfect_csi_only": false,
         "imperfect_csi_only": false,
-        "batch_size": 2,
-        "max_iter": 10,
+        "batch_size": 1,
+        "max_iter": 100,
+        "total_batches": 2,
         "target_block_errors": 1000,
         "ebno_min": 0.0,
-        "ebno_max": 5.0,
+        "ebno_max": 20.0,
         "ebno_step": 5.0
     },
     "resource_manager_params": {
@@ -39,22 +40,56 @@
             "pf",
             "cnn"
         ],
-        "cnn_model_path": "models/cnn_resource_manager.h5",
+        "cnn_model_path": "models/cnn_resource_manager_50.h5",
         "active_ut_mask": null,
         "per_ut_power": null,
         "pilot_reuse_factor": null
     },
+    "factory_scenario": {
+        "room_dimensions": [
+            25.0,
+            25.0,
+            6.0
+        ],
+        "num_machines": 8,
+        "machine_size_range": [
+            [
+                1.0,
+                3.0
+            ],
+            [
+                1.0,
+                3.0
+            ],
+            [
+                1.0,
+                2.5
+            ]
+        ],
+        "materials": {
+            "metal": {
+                "name": "factory_metal",
+                "relative_permittivity": 1.0,
+                "conductivity": 1e7
+            },
+            "concrete": {
+                "name": "factory_concrete",
+                "relative_permittivity": 7.0,
+                "conductivity": 0.1
+            }
+        }
+    },
     "system_params": {
         "carrier_frequency": 3.5e9,
         "fft_size": 512,
-        "subcarrier_spacing": 30000,
+        "subcarrier_spacing": 120000,
         "num_ofdm_symbols": 14,
         "cyclic_prefix_length": 20,
         "pilot_ofdm_symbol_indices": [
             2,
             11
         ],
-        "num_bs_ant": 32,
+        "num_bs_ant": 64,
         "num_ut": 8,
         "num_ut_ant": 1,
         "num_bits_per_symbol": 2,
@@ -68,5 +103,23 @@
         "enable_shadow_fading": false,
         "min_ut_velocity": 0.0,
         "max_ut_velocity": 0.0
+    },
+    "ray_tracing_params": {
+        "max_depth": 5,
+        "samples_per_src": 10000,
+        "_comment_samples": "Reduce samples_per_src to 100000 for lower-end hardware (e.g., restricted memory)",
+        "max_paths": 50
+    },
+    "transceiver_params": {
+        "tx_height_offset": 1.0,
+        "rx_height": 1.0,
+        "antenna_spacing": 0.5,
+        "tx_pattern": "tr38901",
+        "tx_polarization": "VH",
+        "rx_pattern": "iso",
+        "rx_polarization": "V",
+        "wall_thickness": 0.2,
+        "room_padding": 2.0,
+        "rx_boundary_padding": 1.0
     }
 }

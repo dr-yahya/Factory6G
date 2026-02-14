@@ -105,6 +105,7 @@ class Model:
         estimator_weights: str | None = None,
         estimator_kwargs: dict | None = None,
         resource_manager: ResourceManager | None = None,
+        reused_components: dict | None = None,
     ):
         """
         Initialize the complete system model.
@@ -113,6 +114,7 @@ class Model:
             scenario: Channel scenario ("umi", "uma", "rma")
             perfect_csi: Whether to use perfect channel state information
             config: Optional custom system configuration dict. If None, uses defaults.
+            reused_components: Optional dict of pre-initialized components to reuse.
         """
 
         # Initialize configuration
@@ -144,78 +146,106 @@ class Model:
         # Setup resource grid
         rx_tx_association = self._get_rx_tx_association()
         
-        # Extract params for readability
-        num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
-        fft_size = self.config.get("fft_size", 512)
-        subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
-        num_tx = self.config.get("num_ut", 8) # Uplink: num_tx = num_ut
-        num_streams_per_tx = self.config.get("num_ut_ant", 1)
-        cyclic_prefix_length = self.config.get("cyclic_prefix_length", 20)
-        pilot_ofdm_symbol_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
-        
-        # WORKAROUND: Force CPU for ResourceGrid initialization to avoid 
-        # "minval must be 0-D" error in tf.random.uniform on Metal (Mac) GPU
-        with tf.device("/CPU:0"):
-            self._rg = ResourceGrid(
-                num_ofdm_symbols=num_ofdm_symbols,
-                fft_size=fft_size,
-                subcarrier_spacing=subcarrier_spacing,
-                num_tx=num_tx,
-                num_streams_per_tx=num_streams_per_tx,
-                cyclic_prefix_length=cyclic_prefix_length,
-                pilot_pattern="kronecker",
-                pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices
-            )
-        
-        # Setup stream management
-        self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
-        
-        # Initialize components on CPU (Sionna's internal RNG during construction
-        # triggers Metal-specific bugs; call-time ops run on GPU with internal RNG protection)
-        with tf.device("/CPU:0"):
-            self._antenna_config = AntennaConfig(self.config)
-            self._transmitter = Transmitter(self.config, self._rg)
-            self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
+        # Use reused components if provided
+        if reused_components:
+            self._rg = reused_components["rg"]
+            self._sm = reused_components["sm"]
+            self._antenna_config = reused_components["antenna_config"]
+            self._transmitter = reused_components["transmitter"]
+            self._channel = reused_components["channel"]
+            # Receiver is usually specific to estimator/config, but could be reused if estimator is same
+            # Ideally we rebuild receiver to handle specific Estimator logic
+            # OR we pass receiver too if identical.
+            # For RM benchmarks, estimator is usually LMMSE and fixed.
+            if "receiver" in reused_components and reused_components.get("estimator_type") == estimator_type and reused_components.get("perfect_csi") == perfect_csi:
+                 self._receiver = reused_components["receiver"]
+                 return # Done!
+                 
+            # Fallthrough to build receiver if not matching
+            pass # Continue to build receiver logic below
+            
+        else:
+             # Extract params for readability if NOT reusing components
+             # Note: If reusing, we already have self._rg, self._sm, etc.
+             
+             # ... (existing else block content is skipped if reused_components is True)
+             # This structure is buggy as analyzed.
+             pass
 
-            # Prepare optional channel estimator
-            channel_estimator = None
-            if not perfect_csi:
-                estimator_kwargs = estimator_kwargs or {}
-                et = estimator_type.lower()
-                if et in ("ls", "ls_nn", "ls-nn"):
-                    from sionna.phy.ofdm import LSChannelEstimator
-                    channel_estimator = LSChannelEstimator(self._rg, interpolation_type="nn")
-                elif et in ("ls_lin", "ls-lin", "ls_linear"):
-                    from sionna.phy.ofdm import LSChannelEstimator
-                    channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
-                elif et == "pso":
-                    channel_estimator = PSOChannelEstimator(
-                        self.config,
-                        self._rg,
-                        **estimator_kwargs,
+        # === Ensure Receiver is built if not reused ===
+        if not hasattr(self, "_receiver"):
+            # Check if we need to initialize base components (only if NOT reused)
+            if not reused_components:
+                num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
+                fft_size = self.config.get("fft_size", 512)
+                subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
+                num_tx = self.config.get("num_ut", 8) 
+                num_streams_per_tx = self.config.get("num_ut_ant", 1)
+                cyclic_prefix_length = self.config.get("cyclic_prefix_length", 20)
+                pilot_ofdm_symbol_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
+                
+                with tf.device("/CPU:0"):
+                    self._rg = ResourceGrid(
+                        num_ofdm_symbols=num_ofdm_symbols,
+                        fft_size=fft_size,
+                        subcarrier_spacing=subcarrier_spacing,
+                        num_tx=num_tx,
+                        num_streams_per_tx=num_streams_per_tx,
+                        cyclic_prefix_length=cyclic_prefix_length,
+                        pilot_pattern="kronecker",
+                        pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices
                     )
-                elif et in ("dft", "dft-based"):
-                    from ..components.estimators import DFTChannelEstimator
-                    channel_estimator = DFTChannelEstimator(self._rg)
-                elif et in ("lmmse", "approx_lmmse"):
-                    from ..components.estimators import LMMSEChannelEstimator
-                    channel_estimator = LMMSEChannelEstimator(self._rg)
-                else:
-                    raise ValueError(
-                        f"Unsupported estimator_type '{estimator_type}'. "
-                        "Supported: 'ls', 'ls_nn', 'ls_lin', 'pso', 'dft', 'lmmse'."
-                    )
+                
+                self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
+                
+                with tf.device("/CPU:0"):
+                    self._antenna_config = AntennaConfig(self.config)
+                    self._transmitter = Transmitter(self.config, self._rg)
+                    self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
 
-            # Receiver needs encoder reference for LDPC decoder
-            encoder = self._transmitter._encoder
-            self._receiver = Receiver(
-                self.config,
-                self._rg,
-                self._sm,
-                encoder,
-                perfect_csi=perfect_csi,
-                channel_estimator=channel_estimator,
-            )
+            # Build Receiver (and Estimator)
+            # This runs whether we just built components OR reused them but need a new receiver
+            with tf.device("/CPU:0"):
+                # Prepare optional channel estimator
+                channel_estimator = None
+                if not perfect_csi:
+                    estimator_kwargs = estimator_kwargs or {}
+                    et = estimator_type.lower()
+                    if et in ("ls", "ls_nn", "ls-nn"):
+                        from sionna.phy.ofdm import LSChannelEstimator
+                        channel_estimator = LSChannelEstimator(self._rg, interpolation_type="nn")
+                    elif et in ("ls_lin", "ls-lin", "ls_linear"):
+                        from sionna.phy.ofdm import LSChannelEstimator
+                        channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
+                    elif et == "pso":
+                        channel_estimator = PSOChannelEstimator(
+                            self.config,
+                            self._rg,
+                            **estimator_kwargs,
+                        )
+                    elif et in ("dft", "dft-based"):
+                        from ..components.estimators import DFTChannelEstimator
+                        channel_estimator = DFTChannelEstimator(self._rg)
+                    elif et in ("lmmse", "approx_lmmse"):
+                        from ..components.estimators import LMMSEChannelEstimator
+                        channel_estimator = LMMSEChannelEstimator(self._rg)
+                    else:
+                        pass # Allow unknown types if handled elsewhere, or keep error
+                        # raise ValueError(...) 
+                        # Keeping original error logic but executed here
+                        if et not in ["ls", "ls_nn", "ls_lin", "pso", "dft", "lmmse", "perfect"]:
+                             raise ValueError(f"Unsupported estimator_type '{estimator_type}'.")
+    
+                # Receiver needs encoder reference for LDPC decoder
+                encoder = self._transmitter._encoder
+                self._receiver = Receiver(
+                    self.config,
+                    self._rg,
+                    self._sm,
+                    encoder,
+                    perfect_csi=perfect_csi,
+                    channel_estimator=channel_estimator,
+                )
             
     def _get_rx_tx_association(self) -> np.ndarray:
         """Create RX-TX association matrix for MIMO stream management."""
@@ -332,6 +362,8 @@ class Model:
         """Alias to support Sionna sim_ber(mc_fun, ...) expectations."""
         return self.call(batch_size, ebno_db)
     
+
+
     def run_batch(
         self,
         batch_size: int,
@@ -373,9 +405,15 @@ class Model:
         with tf.device("/CPU:0"):
             x_rg, b, x_qam = self._transmitter.call(batch_size)
         
-        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops)
+        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops & OOM on small GPUs)
+        # We must explicitly place inputs on CPU to force the op to run there
         with tf.device("/CPU:0"):
-            y, h = self._channel(x_rg, no)
+            x_cpu = tf.identity(x_rg)
+            no_cpu = tf.identity(no)
+            y_cpu, h_cpu = self._channel(x_cpu, no_cpu)
+            # Move back to default device (likely GPU) for receiver
+            y = tf.identity(y_cpu)
+            h = tf.identity(h_cpu)
         
         # Receiver: GPU-accelerated
         if self.perfect_csi:

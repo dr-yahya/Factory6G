@@ -16,6 +16,12 @@ from typing import List, Dict, Any, Optional
 from src.models.model import Model
 from src.sim.results import save_simulation_results, save_results_as_csv
 from src.sim.plotting import plot_simulation_results
+from src.components.antenna import AntennaConfig
+from src.components.transmitter import Transmitter
+from src.components.channel import ChannelModel
+from src.components.receiver import Receiver
+from sionna.phy.ofdm import ResourceGrid
+from sionna.phy.mimo import StreamManagement
 
 # ---------------------------------------------------------------------------
 # Core Simulation Loop
@@ -66,45 +72,164 @@ def run_simulation_campaign(config: Dict[str, Any]) -> Dict[str, Any]:
 
     # Storage for aggregated results
     # Structure: { item_name: { "ber": [], "throughput": [], "latency": [] } }
+    # Storage for aggregated results
+    # Structure: { item_name: { "ber": [], "throughput": [], "latency": [] } }
     aggregated_results = {item: {"ber": [], "throughput": [], "latency": []} for item in items_to_compare}
     
-    # --- Main Loop ---
-    # We iterate Eb/No first, then items? Or items then Eb/No?
-    # iterating Eb/No outer allows easier progress tracking per SNR point.
+    # --- Component Initialization (Shared) ---
+    print("\nInitializing shared simulation components...")
+    # Using LMMSE receiver for all RM comparisons to ensure fair channel estimation benchmark
+    # If mode is estimators, we might not be able to share Receiver, but can share Channel/Tx.
     
-    for ebno_db in ebno_db_range:
-        print(f"\nTarget Eb/No: {ebno_db:.1f} dB")
+    # We need to create the components on CPU to avoid RNG issues
+    with tf.device("/CPU:0"):
+        # 1. Config & Grid
+        num_ofdm_symbols = system_config.get("num_ofdm_symbols", 14)
+        fft_size = system_config.get("fft_size", 512)
+        subcarrier_spacing = system_config.get("subcarrier_spacing", 30e3)
+        num_tx = system_config.get("num_ut", 8) 
+        num_streams_per_tx = system_config.get("num_ut_ant", 1)
+        cyclic_prefix_length = system_config.get("cyclic_prefix_length", 20)
+        pilot_ofdm_symbol_indices = system_config.get("pilot_ofdm_symbol_indices", [2, 11])
         
-        for item_name in items_to_compare:
-            print(f"  Running {item_name:20s} ... ", end="", flush=True)
+        rx_tx_association = np.zeros([1, num_tx])
+        rx_tx_association[0, :] = 1
+        
+        rg = ResourceGrid(
+            num_ofdm_symbols=num_ofdm_symbols,
+            fft_size=fft_size,
+            subcarrier_spacing=subcarrier_spacing,
+            num_tx=num_tx,
+            num_streams_per_tx=num_streams_per_tx,
+            cyclic_prefix_length=cyclic_prefix_length,
+            pilot_pattern="kronecker",
+            pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices
+        )
+        
+        sm = StreamManagement(rx_tx_association, num_streams_per_tx)
+        
+        # 2. Components
+        antenna_config = AntennaConfig(system_config)
+        transmitter = Transmitter(system_config, rg)
+        channel = ChannelModel(system_config, antenna_config, rg)
+        
+        # 3. Default Receiver (LMMSE) for RM mode
+        # For Estimator mode, we might need different receivers, so we might only share Tx/Channel.
+        default_receiver = None
+        if mode == "resource_manager_comparison":
+            from sionna.phy.ofdm import LSChannelEstimator
+            from src.components.estimators import LMMSEChannelEstimator
+            # Use LMMSE for fair comparison of RMs
+            estimator = LMMSEChannelEstimator(rg)
+            encoder = transmitter._encoder
+            default_receiver = Receiver(
+                system_config, rg, sm, encoder, 
+                perfect_csi=False, 
+                channel_estimator=estimator
+            )
+
+    shared_components = {
+        "rg": rg,
+        "sm": sm,
+        "antenna_config": antenna_config,
+        "transmitter": transmitter,
+        "channel": channel,
+        "receiver": default_receiver,
+        "estimator_type": "lmmse",
+        "perfect_csi": False
+    }
+
+    # Storage for intermediate sums: [item][ebno_idx] -> {errors, bits, throughput, latency}
+    intermediate_results = {
+        item: [
+            {"errors": 0, "bits": 0, "throughput": 0.0, "latency": 0.0} 
+            for _ in ebno_db_range
+        ] for item in items_to_compare
+    }
+
+    # --- Model Initialization (Once) ---
+    print("Initializing models...")
+    models = {}
+    for item_name in items_to_compare:
+        # Build Model (wrapper) reusing components
+        # If mode is estimators, we might need to swap receiver/estimator type
+        # But channel is same.
+        
+        # Handling Estimator Mode nuances
+        current_shared = shared_components.copy()
+        if mode == "estimator_comparison":
+            # We can't reuse the LMMSE receiver if testing LS or Perfect
+            # But we reuse Channel/Tx/RG
+            if "receiver" in current_shared:
+                del current_shared["receiver"]
+        
+        models[item_name] = _build_model(mode, item_name, system_config, config, reused_components=current_shared)
+
+    # --- Main Loop (Inverted for Efficiency) ---
+    print(f"Starting Campaign: {total_batches} Batches (Batch Size {batch_size})")
+    print("Optimization: Reusing channel realizations across comparison items.")
+    print("Optimization: Reusing Model instances (no reload overhead).")
+    
+    import time
+    global_start = time.time()
+    
+    for b in range(total_batches):
+        batch_start = time.time()
+        print(f"Batch {b+1}/{total_batches} ... ", end="", flush=True)
+        
+        # 1. Generate Channel Topology (Once per batch)
+        # This is the expensive step!
+        with tf.device("/CPU:0"):
+            channel.set_topology(batch_size)
             
-            # Setup Model based on mode
-            tf.keras.backend.clear_session()
-            gc.collect()
+        print(f"[Channel Gen] ", end="", flush=True)
             
-            try:
-                model = _build_model(mode, item_name, system_config, config)
+        # 2. Iterate Eb/No
+        # For a fixed channel, we sweep SNR.
+        # Ideally we could even vectorise SNR but Model takes scalar.
+        
+        for e_idx, ebno_val in enumerate(ebno_db_range):
+            ebno_val = float(ebno_val)
+            
+            # 3. Iterate Managers/Estimators
+            for item_name in items_to_compare:
+                model = models[item_name]
                 
-                # Run batches
-                metrics = _run_batches(model, batch_size, total_batches, float(ebno_db))
+                # Run batch (No topology gen)
+                metrics = model.run_batch(batch_size, ebno_val, include_details=True, regenerate_topology=False)
                 
-                # Store metrics
-                aggregated_results[item_name]["ber"].append(metrics["ber"])
-                aggregated_results[item_name]["throughput"].append(metrics["throughput"])
-                aggregated_results[item_name]["latency"].append(metrics["latency"])
+                # Accumulate
+                stats = intermediate_results[item_name][e_idx]
                 
-                print(f"BER: {metrics['ber']:.2e}, Thr: {metrics['throughput']:.2f}, Lat: {metrics['latency']*1000:.2f}ms")
+                # Parse metrics from model result
+                bits = metrics["bits"]
+                bits_hat = metrics["bits_hat"]
+                errors = np.sum(bits != bits_hat)
                 
-                del model
+                stats["errors"] += errors
+                stats["bits"] += bits.size
+                stats["throughput"] += max(0, bits.size - errors)
+                stats["latency"] += metrics["latency_sec"]
                 
-            except Exception as e:
-                print(f"FAILED: {e}")
-                # Append NaNs or defaults to keep list lengths consistent
-                aggregated_results[item_name]["ber"].append(1.0)
-                aggregated_results[item_name]["throughput"].append(0.0)
-                aggregated_results[item_name]["latency"].append(0.0)
-                import traceback
-                traceback.print_exc()
+        batch_time = time.time() - batch_start
+        print(f"Done ({batch_time:.2f}s)")
+
+    # --- Final Aggregation ---
+    print("\nAggregating final results...")
+    for item_name in items_to_compare:
+        for e_idx, _ in enumerate(ebno_db_range):
+            stats = intermediate_results[item_name][e_idx]
+            
+            avg_ber = stats["errors"] / stats["bits"] if stats["bits"] > 0 else 0.0
+            avg_thr = stats["throughput"] / total_batches
+            avg_lat = stats["latency"] / total_batches
+            
+            aggregated_results[item_name]["ber"].append(avg_ber)
+            aggregated_results[item_name]["throughput"].append(avg_thr)
+            aggregated_results[item_name]["latency"].append(avg_lat)
+            
+    total_time = time.time() - global_start
+    print(f"Total Simulation Time: {total_time:.2f}s")
 
     # --- Save Results ---
     os.makedirs(output_dir, exist_ok=True)
@@ -115,14 +240,31 @@ def run_simulation_campaign(config: Dict[str, Any]) -> Dict[str, Any]:
         "results": aggregated_results,
         "ebno_db_range": ebno_db_range.tolist()
     }
-    json_path = save_simulation_results(full_results, output_dir)
+    # Save results
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    if mode == "resource_manager_comparison":
+        filename_base = f"simulation_results_resource_managers_{timestamp}"
+    else:
+        estimator_type = system_config.get("estimator_type", "unknown_est")
+        filename_base = f"simulation_results_{estimator_type}_{timestamp}"
+
+    # 1. Save as JSON (Raw data)
+    full_results = {
+        "config": config,
+        "results": aggregated_results,
+        "ebno_db_range": ebno_db_range.tolist(),
+        "timestamp": timestamp
+    }
+    json_path = os.path.join(output_dir, f"{filename_base}.json")
+    save_simulation_results(full_results, output_dir, filename=f"{filename_base}.json")
     
     # 2. Save as CSV (Tabular data for easy reading)
-    csv_path = save_results_as_csv(full_results, output_dir)
+    csv_path = os.path.join(output_dir, f"{filename_base}.csv")
+    save_results_as_csv(full_results, output_dir, filename=f"{filename_base}.csv")
     
     # --- Generate Plots ---
     if config.get("plot_results", True):
-        _plot_campaign_results(full_results, output_dir, mode)
+        _plot_campaign_results(full_results, output_dir, mode, timestamp)
         
     return full_results
 
@@ -131,7 +273,7 @@ def run_simulation_campaign(config: Dict[str, Any]) -> Dict[str, Any]:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _build_model(mode: str, item_name: str, system_config: dict, global_config: dict) -> Model:
+def _build_model(mode: str, item_name: str, system_config: dict, global_config: dict, reused_components: dict = None) -> Model:
     """Factory to create the Model instance based on configuration."""
     
     # Default base config
@@ -145,7 +287,8 @@ def _build_model(mode: str, item_name: str, system_config: dict, global_config: 
         return Model(
             config=base_config,
             estimator_type=estimator_type,
-            perfect_csi=perfect_csi
+            perfect_csi=perfect_csi,
+            reused_components=reused_components
         )
         
     elif mode == "resource_manager_comparison":
@@ -185,7 +328,8 @@ def _build_model(mode: str, item_name: str, system_config: dict, global_config: 
             config=base_config,
             estimator_type="lmmse", # Fixed good estimator for manager benchmarks
             resource_manager=manager,
-            perfect_csi=False
+            perfect_csi=False,
+            reused_components=reused_components
         )
         
     raise ValueError(f"Unknown mode: {mode}")
@@ -225,7 +369,7 @@ def _run_batches(model: Model, batch_size: int, total_batches: int, ebno_db: flo
     }
 
 
-def _plot_campaign_results(full_results: dict, output_dir: str, mode: str):
+def _plot_campaign_results(full_results: dict, output_dir: str, mode: str, timestamp: str):
     """Generates comparison plots."""
     results = full_results["results"]
     ebno_range = full_results["ebno_db_range"]
@@ -242,7 +386,24 @@ def _plot_campaign_results(full_results: dict, output_dir: str, mode: str):
         
         # Plot 2: Secondary Metric (Throughput or Latency)
         if mode == "resource_manager_comparison":
-            ax2.plot(ebno_range, metrics["throughput"], marker=m, label=name, linewidth=2)
+            # Apply smoothing for smoother visualization of low-batch runs
+            throughput = metrics["throughput"]
+            if len(throughput) > 3:
+                # Simple 3-point moving average for smoothing
+                throughput_smooth = []
+                for i in range(len(throughput)):
+                    if i == 0:
+                        val = (throughput[0] + throughput[1]) / 2
+                    elif i == len(throughput) - 1:
+                        val = (throughput[-2] + throughput[-1]) / 2
+                    else:
+                        val = (throughput[i-1] + throughput[i] + throughput[i+1]) / 3
+                    throughput_smooth.append(val)
+                ax2.plot(ebno_range, throughput_smooth, marker=m, label=f"{name} (smoothed)", linewidth=2, linestyle='--')
+                ax2.plot(ebno_range, throughput, marker=m, label=name, linewidth=1, alpha=0.3) # Show raw data faintly
+            else:
+                ax2.plot(ebno_range, throughput, marker=m, label=name, linewidth=2)
+                
             ylabel2 = "Avg Throughput (bits/batch)"
             title2 = "Throughput Comparison"
         else:
@@ -263,10 +424,20 @@ def _plot_campaign_results(full_results: dict, output_dir: str, mode: str):
     ax2.grid(True, alpha=0.3)
     ax2.legend()
     
-    plt.suptitle(f"Campaign Results: {mode.replace('_', ' ').title()}")
+    title_text = mode.replace('_', ' ').title().replace("Comparison", "Comparison") # Ensure consistency
+    if mode == "estimator_comparison":
+        title_text = "Estimator Comparison"
+        filename_base = "estimator_comparison"
+    elif mode == "resource_manager_comparison":
+        title_text = "Resource Manager Comparison"
+        filename_base = "resource_manager_comparison"
+    else:
+        filename_base = "campaign_comparison"
+
+    plt.suptitle(title_text)
     plt.tight_layout()
     
-    plot_path = os.path.join(output_dir, "campaign_comparison.png")
+    plot_path = os.path.join(output_dir, f"{filename_base}_{timestamp}.png")
     plt.savefig(plot_path, dpi=300)
     plt.close()
     print(f"✓ Plots saved to {plot_path}")

@@ -13,24 +13,28 @@ import csv
 import numpy as np
 
 
-def save_simulation_results(results: dict, output_dir: str) -> str:
+def save_simulation_results(results: dict, output_dir: str, filename: Optional[str] = None) -> str:
     """
     Persist simulation results to disk and return the path.
     
     Args:
         results: Simulation results dictionary
         output_dir: Output directory path
+        filename: Optional specific filename to use
         
     Returns:
         Path to saved results file
     """
-    scenario = results.get("scenario", "unknown")
-    estimator = results.get("estimator", "est")
-    profile = results.get("profile")
+    if filename is None:
+        scenario = results.get("scenario", "unknown")
+        estimator = results.get("estimator", "est")
+        profile = results.get("profile")
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    profile_suffix = f"_{profile}" if profile else ""
-    filename = f"{output_dir}/simulation_results_{scenario}_{estimator}{profile_suffix}_{timestamp}.json"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        profile_suffix = f"_{profile}" if profile else ""
+        filename = f"simulation_results_{scenario}_{estimator}{profile_suffix}_{timestamp}.json"
+    
+    filename = f"{output_dir}/{filename}"
 
     with open(filename, "w") as f:
         json.dump(results, f, indent=2)
@@ -39,19 +43,23 @@ def save_simulation_results(results: dict, output_dir: str) -> str:
     return filename
 
 
-def save_results_as_csv(results_data: dict, output_dir: str) -> str:
+def save_results_as_csv(results_data: dict, output_dir: str, filename: Optional[str] = None) -> str:
     """
     Save simulation results as a CSV file.
     
     Args:
         results_data: Dictionary containing 'results' and 'ebno_db_range'.
         output_dir: Directory to save the CSV.
+        filename: Optional specific filename to use
         
     Returns:
         Path to the saved CSV file.
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{output_dir}/simulation_results_{timestamp}.csv"
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"simulation_results_{timestamp}.csv"
+        
+    filename = f"{output_dir}/{filename}"
     
     ebno_range = results_data["ebno_db_range"]
     items_results = results_data["results"]

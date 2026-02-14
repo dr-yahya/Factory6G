@@ -65,12 +65,12 @@ class CNNResourceManager(ResourceManager):
         # (1, 1, 32, 8, 2, 14, 512)
         
         power = tf.abs(h_hat)**2
-        # Sum over Rx receivers (axis 1) -> [batch, 32, 8, 2, 14, 512]
-        power = tf.reduce_sum(power, axis=1)
-        # Sum over Rx antennas (axis 1) -> [batch, 8, 2, 14, 512]
-        power = tf.reduce_sum(power, axis=1)
-        # Sum over Streams (axis 2) -> [batch, 8, 14, 512]
-        power = tf.reduce_sum(power, axis=2)
+        # Mean over Rx receivers (axis 1) -> [batch, 32, 8, 2, 14, 512]
+        power = tf.reduce_mean(power, axis=1)
+        # Mean over Rx antennas (axis 1) -> [batch, 8, 2, 14, 512]
+        power = tf.reduce_mean(power, axis=1)
+        # Mean over Streams (axis 2) -> [batch, 8, 14, 512]
+        power = tf.reduce_mean(power, axis=2)
         # Avg over Time (axis 2) -> [batch, 8, 512]
         channel_energy = tf.reduce_mean(power, axis=2)
         

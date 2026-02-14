@@ -264,6 +264,11 @@ class ChannelModel:
                 generate. Each realization corresponds to a different user
                 terminal configuration.
         """
+        if self.config.get("channel_model_type") == "rayleigh":
+            # Synthetic channel does not need topology generation (geometry)
+            # This allows for extremely fast "PoC" simulations
+            return
+
         topology = gen_topology(
             batch_size,
             self.config.get("num_ut", 8),
