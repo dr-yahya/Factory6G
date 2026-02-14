@@ -57,9 +57,70 @@ def load_config(config_path: str = "config.json") -> dict:
     """Load configuration from JSON file and flatten for system use."""
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Config file not found: {config_path}")
-    
-    with open(config_path, 'r') as f:
-        config_data = json.load(f)
+
+    def _strip_json_comments(raw_text: str) -> str:
+        """Strip // and /* */ comments while preserving string literals."""
+        result = []
+        i = 0
+        in_string = False
+        in_line_comment = False
+        in_block_comment = False
+        escape = False
+        length = len(raw_text)
+
+        while i < length:
+            ch = raw_text[i]
+            nxt = raw_text[i + 1] if i + 1 < length else ""
+
+            if in_line_comment:
+                if ch == "\n":
+                    in_line_comment = False
+                    result.append(ch)
+                i += 1
+                continue
+
+            if in_block_comment:
+                if ch == "*" and nxt == "/":
+                    in_block_comment = False
+                    i += 2
+                else:
+                    i += 1
+                continue
+
+            if in_string:
+                result.append(ch)
+                if escape:
+                    escape = False
+                elif ch == "\\":
+                    escape = True
+                elif ch == "\"":
+                    in_string = False
+                i += 1
+                continue
+
+            if ch == "\"":
+                in_string = True
+                result.append(ch)
+                i += 1
+                continue
+
+            if ch == "/" and nxt == "/":
+                in_line_comment = True
+                i += 2
+                continue
+
+            if ch == "/" and nxt == "*":
+                in_block_comment = True
+                i += 2
+                continue
+
+            result.append(ch)
+            i += 1
+
+        return "".join(result)
+
+    with open(config_path, 'r', encoding="utf-8") as f:
+        config_data = json.loads(_strip_json_comments(f.read()))
 
     # Flatten configuration for Model consumption
     # Base is system_params
@@ -145,11 +206,24 @@ def main():
     np.random.seed(seed)
     tf.random.set_seed(seed)
     
-    # Determine what to run based on simulation type
-    sim_type = sim_config.get("type", "estimators")
-    
+    run_mode = sim_config.get("run_mode", "single")
+    single_run_target = sim_config.get("single_run_target", sim_config.get("type", "estimators"))
+    if isinstance(single_run_target, str):
+        single_run_target = single_run_target.lower()
+    if isinstance(run_mode, str):
+        run_mode = run_mode.lower()
+
+    if run_mode == "both":
+        run_sequence = ["estimators", "resource_managers"]
+    elif run_mode == "single":
+        run_sequence = [single_run_target]
+    else:
+        print("Unknown simulation.run_mode. Supported: 'single', 'both'")
+        return
+
     print(f"Loaded configuration for scenario: {system_config.get('scenario')}")
-    print(f"Starting execution with type: {sim_type}")
+    print(f"Starting execution with run mode: {run_mode}")
+    print(f"Run sequence: {run_sequence}")
 
     # Construct the unified configuration for run_simulation_loop
     loop_config = {
@@ -169,25 +243,27 @@ def main():
     ebno_step = scenario_params.get("ebno_step", 5.0)
     loop_config["ebno_db_range"] = np.arange(ebno_min, ebno_max + ebno_step, ebno_step).tolist()
 
-    if sim_type == "estimators":
-        # Check for estimators list in config, else default
-        estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
-        loop_config["estimators"] = estimators
-        loop_config["estimator_kwargs"] = scenario_params.get("estimator_kwargs", {})
-        
-    elif sim_type == "resource_managers":
-        # Check for resource_managers list in config, else default
-        managers = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
-        loop_config["resource_managers"] = managers
-        loop_config["num_active_users"] = rm_params.get("num_active_users", 2) # Pass specific RM param
-        loop_config["cnn_model_path"] = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5") # Pass specific RM param
-        
-    else:
-        print(f"Unknown simulation type: {sim_type}. Supported: 'estimators', 'resource_managers'")
-        return
+    for sim_type in run_sequence:
+        active_loop_config = dict(loop_config)
 
-    # Run the simulation loop
-    run_simulation_loop(loop_config)
+        if sim_type == "estimators":
+            estimators = scenario_params.get("estimators", ["ls", "dft", "lmmse", "pso", "perfect"])
+            active_loop_config["estimators"] = estimators
+            active_loop_config["estimator_kwargs"] = scenario_params.get("estimator_kwargs", {})
+            print("\n=== Running estimator comparison ===")
+            run_simulation_loop(active_loop_config)
+
+        elif sim_type == "resource_managers":
+            managers = rm_params.get("resource_managers", ["static", "round_robin", "max_throughput", "pf", "cnn"])
+            active_loop_config["resource_managers"] = managers
+            active_loop_config["num_active_users"] = rm_params.get("num_active_users", 2)
+            active_loop_config["cnn_model_path"] = rm_params.get("cnn_model_path", "models/cnn_resource_manager.h5")
+            print("\n=== Running resource manager comparison ===")
+            run_simulation_loop(active_loop_config)
+
+        else:
+            print(f"Unknown simulation target: {sim_type}. Supported: 'estimators', 'resource_managers'")
+            return
 
 
 if __name__ == "__main__":

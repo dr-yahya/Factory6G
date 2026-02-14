@@ -11,9 +11,41 @@ from sionna.rt import load_scene, SceneObject, Transmitter, Receiver, PlanarArra
 from sionna.rt.scene import box as box_xml_path
 
 def load_config(config_path="config.json"):
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    return config
+    with open(config_path, 'r', encoding="utf-8") as f:
+        raw = f.read()
+
+    # Support JSON with // comments in config.json
+    cleaned = []
+    in_string = False
+    escaped = False
+    i = 0
+    while i < len(raw):
+        ch = raw[i]
+        nxt = raw[i + 1] if i + 1 < len(raw) else ""
+        if in_string:
+            cleaned.append(ch)
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == "\"":
+                in_string = False
+            i += 1
+            continue
+        if ch == "\"":
+            in_string = True
+            cleaned.append(ch)
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            i += 2
+            while i < len(raw) and raw[i] != "\n":
+                i += 1
+            continue
+        cleaned.append(ch)
+        i += 1
+
+    return json.loads("".join(cleaned))
 
 def generate_factory_dataset(args):
     """

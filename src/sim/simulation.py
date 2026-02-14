@@ -233,7 +233,8 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
 
     # --- Save Results ---
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(output_dir, timestamp)
+    run_label = "resource_managers" if mode == "resource_manager_comparison" else "estimators"
+    run_dir = os.path.join(output_dir, f"{timestamp}_{run_label}")
     os.makedirs(run_dir, exist_ok=True)
 
     if mode == "resource_manager_comparison":
@@ -248,6 +249,7 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
         "results": aggregated_results,
         "ebno_db_range": ebno_db_range.tolist(),
         "timestamp": timestamp,
+        "run_label": run_label,
         "run_dir": run_dir,
         "mode": mode,
         "confidence_level": confidence_level,

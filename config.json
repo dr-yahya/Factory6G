@@ -1,137 +1,122 @@
 {
-    "_comments": {
-        "simulation_type": "Main simulation type: 'estimators' or 'resource_managers'",
-        "gpu_id": "GPU device index (e.g., 0). Set to -1 for CPU only (overrides force_cpu if -1)",
-        "force_cpu": "Force CPU execution even if GPU is available (true/false)",
-        "log_level": "Logging level: DEBUG, INFO, WARNING, ERROR",
-        "seed": "Random seed for reproducibility"
-    },
     "simulation": {
-        "type": "estimators",
-        "gpu_id": 0,
-        "force_cpu": true,
-        "log_level": "INFO",
-        "seed": 42,
-        "output_dir": "results"
+        "run_mode": "both", // "single" runs one target, "both" runs estimators then resource_managers
+        "single_run_target": "estimators", // used only when run_mode="single": "estimators" | "resource_managers"
+        "gpu_id": 0, // GPU index to use (set -1 to force CPU path)
+        "force_cpu": true, // true: always CPU, false: allow GPU if available
+        "log_level": "INFO", // DEBUG | INFO | WARNING | ERROR
+        "seed": 42, // random seed for reproducibility
+        "output_dir": "results", // base folder for generated run outputs
+        "plot_results": true // true to generate plots, false to skip plotting
     },
+
     "scenario_params": {
-        "scenario": "umi",
-        "estimators": [
+        "scenario": "umi", // channel scenario (e.g., "umi", "uma", "rma" depending on model support)
+        "estimators": [ // estimator list used during estimator comparison mode
             "ls",
             "dft",
             "lmmse",
             "pso",
             "perfect"
         ],
-        "estimator_kwargs": {
+        "estimator_kwargs": { // estimator-specific tuning parameters
             "pso": {
-                "swarm_size": 8,
-                "iters": 12,
-                "early_stop_patience": 3,
-                "min_rel_improvement": 0.001
+                "swarm_size": 8, // particle count
+                "iters": 12, // PSO max iterations per estimate
+                "early_stop_patience": 3, // stop early after N non-improving iterations
+                "min_rel_improvement": 0.001 // minimum relative improvement threshold
             }
         },
-        "perfect_csi_only": false,
-        "imperfect_csi_only": false,
-        "batch_size": 1,
-        "max_iter": 100,
-        "total_batches": 2,
-        "target_block_errors": 1000,
-        "target_ber": null,
-        "confidence_level": 0.95,
-        "confidence_max_batches": 2000,
-        "ebno_min": 0.0,
-        "ebno_max": 20.0,
-        "ebno_step": 5.0
+        "perfect_csi_only": false, // true: run only perfect CSI path if supported
+        "imperfect_csi_only": false, // true: run only imperfect CSI path if supported
+        "batch_size": 1, // number of samples per batch
+        "max_iter": 100, // optional legacy loop iteration cap (if consumed by pipeline)
+        "total_batches": 2, // number of batches per Eb/No point
+        "target_block_errors": 1000, // optional stopping criterion based on block errors
+        "target_ber": null, // optional BER target for confidence-based stopping; null disables
+        "confidence_level": 0.95, // confidence level for BER upper bound
+        "confidence_max_batches": 2000, // max batches when confidence stopping is active
+        "ebno_min": 0.0, // minimum Eb/No in dB
+        "ebno_max": 20.0, // maximum Eb/No in dB
+        "ebno_step": 5.0 // Eb/No increment in dB
     },
+
     "resource_manager_params": {
-        "resource_managers": [
+        "resource_managers": [ // manager list used during resource manager comparison mode
             "static",
             "round_robin",
             "max_throughput",
             "pf",
             "cnn"
         ],
-        "cnn_model_path": "models/cnn_resource_manager_50.h5",
-        "active_ut_mask": null,
-        "per_ut_power": null,
-        "pilot_reuse_factor": null
+        "cnn_model_path": "models/cnn_resource_manager_1k.h5", // path to trained CNN manager model
+        "num_active_users": 2, // target active users per scheduling interval
+        "active_ut_mask": null, // optional explicit active-UT mask; null uses defaults
+        "per_ut_power": null, // optional per-UT transmit power allocation list; null uses defaults
+        "pilot_reuse_factor": null // optional pilot reuse factor; null defaults to 1
     },
+
     "factory_scenario": {
-        "room_dimensions": [
-            25.0,
-            25.0,
-            6.0
-        ],
-        "num_machines": 8,
-        "machine_size_range": [
-            [
-                1.0,
-                3.0
-            ],
-            [
-                1.0,
-                3.0
-            ],
-            [
-                1.0,
-                2.5
-            ]
+        "room_dimensions": [25.0, 25.0, 6.0], // room size [x, y, z] in meters
+        "num_machines": 8, // number of obstacle machines in the factory layout
+        "machine_size_range": [ // min/max box dimensions for synthetic machine placement
+            [1.0, 3.0],
+            [1.0, 3.0],
+            [1.0, 2.5]
         ],
         "materials": {
             "metal": {
-                "name": "factory_metal",
-                "relative_permittivity": 1.0,
-                "conductivity": 1e7
+                "name": "factory_metal", // material label
+                "relative_permittivity": 1.0, // dielectric constant
+                "conductivity": 1e7 // conductivity (S/m)
             },
             "concrete": {
-                "name": "factory_concrete",
-                "relative_permittivity": 7.0,
-                "conductivity": 0.1
+                "name": "factory_concrete", // material label
+                "relative_permittivity": 7.0, // dielectric constant
+                "conductivity": 0.1 // conductivity (S/m)
             }
         }
     },
+
     "system_params": {
-        "carrier_frequency": 3.5e9,
-        "fft_size": 512,
-        "subcarrier_spacing": 120000,
-        "num_ofdm_symbols": 14,
-        "cyclic_prefix_length": 20,
-        "pilot_ofdm_symbol_indices": [
-            2,
-            11
-        ],
-        "num_bs_ant": 64,
-        "num_ut": 8,
-        "num_ut_ant": 1,
-        "num_bits_per_symbol": 2,
-        "coderate": 0.5,
-        "num_decoding_iter": 20,
-        "channel_model_type": "tr38901",
-        "scenario": "umi",
-        "direction": "uplink",
-        "o2i_model": "low",
-        "enable_pathloss": false,
-        "enable_shadow_fading": false,
-        "min_ut_velocity": 0.0,
-        "max_ut_velocity": 0.0
+        "carrier_frequency": 3.5e9, // carrier frequency in Hz
+        "fft_size": 512, // OFDM FFT size
+        "subcarrier_spacing": 120000, // subcarrier spacing in Hz
+        "num_ofdm_symbols": 14, // OFDM symbols per slot/frame unit
+        "cyclic_prefix_length": 20, // cyclic prefix length in samples
+        "pilot_ofdm_symbol_indices": [2, 11], // OFDM symbol indices used for pilots
+        "num_bs_ant": 64, // base station antenna count
+        "num_ut": 8, // user terminal count
+        "num_ut_ant": 1, // antennas per user terminal
+        "num_bits_per_symbol": 2, // modulation bits/symbol (2=QPSK, 4=16QAM, ...)
+        "coderate": 0.5, // channel coding rate
+        "num_decoding_iter": 20, // receiver decoding iterations
+        "channel_model_type": "tr38901", // channel model backend/type
+        "scenario": "umi", // scenario override used by some channel models
+        "direction": "uplink", // "uplink" | "downlink" if supported
+        "o2i_model": "low", // outdoor-to-indoor loss model variant
+        "enable_pathloss": false, // true to enable pathloss modeling
+        "enable_shadow_fading": false, // true to enable shadow fading
+        "min_ut_velocity": 0.0, // min UT speed (m/s)
+        "max_ut_velocity": 0.0 // max UT speed (m/s)
     },
+
     "ray_tracing_params": {
-        "max_depth": 5,
-        "samples_per_src": 10000,
-        "_comment_samples": "Reduce samples_per_src to 100000 for lower-end hardware (e.g., restricted memory)",
-        "max_paths": 50
+        "max_depth": 5, // maximum reflection/refraction depth
+        "samples_per_src": 10000, // rays/samples per source (reduce for lower memory usage)
+        "max_paths": 50 // maximum propagated paths kept per link
     },
+
     "transceiver_params": {
-        "tx_height_offset": 1.0,
-        "rx_height": 1.0,
-        "antenna_spacing": 0.5,
-        "tx_pattern": "tr38901",
-        "tx_polarization": "VH",
-        "rx_pattern": "iso",
-        "rx_polarization": "V",
-        "wall_thickness": 0.2,
-        "room_padding": 2.0,
-        "rx_boundary_padding": 1.0
+        "tx_height_offset": 1.0, // TX height offset from reference plane (m)
+        "rx_height": 1.0, // RX antenna height (m)
+        "antenna_spacing": 0.5, // inter-element spacing in wavelengths
+        "tx_pattern": "tr38901", // transmit antenna pattern preset
+        "tx_polarization": "VH", // TX polarization mode
+        "rx_pattern": "iso", // receive antenna pattern preset
+        "rx_polarization": "V", // RX polarization mode
+        "wall_thickness": 0.2, // wall thickness for geometry/material interactions (m)
+        "room_padding": 2.0, // extra room margin around layout (m)
+        "rx_boundary_padding": 1.0 // keep RX away from room boundaries (m)
     }
 }

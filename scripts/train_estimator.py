@@ -169,7 +169,7 @@ def create_estimator_model(input_shape):
 
 def train_estimator(args):
     dataset = load_dataset(args.data)
-    dataset = dataset.batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
+    dataset = dataset.repeat().batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
     
     # Validate split? (Skip for prototype, use all for train)
     
