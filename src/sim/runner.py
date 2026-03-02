@@ -150,7 +150,7 @@ def run_simulation(
             print(f"  Eb/No={float(ebno):5.1f} dB | iterations={iterations} | BER={ber_value:.3e}")
 
         results["runs"].append(run_entry)
-        print(f"[{csi_str} CSI] ✓ completed")
+        print(f"[{csi_str} CSI] [OK] completed")
 
     results["duration"] = time.time() - start_time
 

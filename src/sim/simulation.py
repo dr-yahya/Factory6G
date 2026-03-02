@@ -542,13 +542,13 @@ def _plot_simulation_results(full_results: dict, output_dir: str, mode: str):
     plt.close(fig_lat)
     plt.close(fig_thr)
     plt.close(fig_tradeoff)
-    print(f"✓ Plot saved to {ber_path}")
-    print(f"✓ Plot saved to {ber_bound_path}")
-    print(f"✓ Plot saved to {lat_path}")
-    print(f"✓ Plot saved to {throughput_path}")
-    print(f"✓ Plot saved to {tradeoff_path}")
+    print(f"[OK] Plot saved to {ber_path}")
+    print(f"[OK] Plot saved to {ber_bound_path}")
+    print(f"[OK] Plot saved to {lat_path}")
+    print(f"[OK] Plot saved to {throughput_path}")
+    print(f"[OK] Plot saved to {tradeoff_path}")
     if runtime_map:
-        print(f"✓ Plot saved to {runtime_path}")
+        print(f"[OK] Plot saved to {runtime_path}")
 
 
 def run_simulation_campaign(config: Dict[str, Any]) -> Dict[str, Any]:

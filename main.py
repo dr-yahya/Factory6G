@@ -137,6 +137,18 @@ def load_config(config_path: str = "config.json") -> dict:
     for k in ["active_ut_mask", "per_ut_power", "pilot_reuse_factor"]:
         if k in rm_params and rm_params[k] is not None:
             flat_config[k] = rm_params[k]
+
+    # Merge transceiver parameters that affect the Sionna antenna arrays.
+    transceiver_params = config_data.get("transceiver_params", {})
+    for k in [
+        "antenna_spacing",
+        "tx_pattern",
+        "tx_polarization",
+        "rx_pattern",
+        "rx_polarization",
+    ]:
+        if k in transceiver_params and transceiver_params[k] is not None:
+            flat_config[k] = transceiver_params[k]
             
     # Apply defaults for optional fields if missing
     defaults = {

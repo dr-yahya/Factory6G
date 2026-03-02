@@ -115,7 +115,7 @@ def save_metric_matrices_and_plots(
                 matrix = np.stack(metric_data)
                 matrix_file = matrices_dir / f"{metric_name}_per_stream_{csi_str}_run{run_idx}.npy"
                 np.save(matrix_file, matrix)
-                print(f"  ✓ Saved matrix: {matrix_file.name} (shape: {matrix.shape})")
+                print(f"  [OK] Saved matrix: {matrix_file.name} (shape: {matrix.shape})")
                 
                 # Create plot
                 fig, ax = plt.subplots(figsize=(10, 6))
@@ -134,7 +134,7 @@ def save_metric_matrices_and_plots(
                 plot_file = plots_dir / f"{metric_name}_per_stream_{csi_str}_run{run_idx}.png"
                 plt.savefig(plot_file, dpi=300, bbox_inches='tight')
                 plt.close()
-                print(f"  ✓ Saved plot: {plot_file.name}")
+                print(f"  [OK] Saved plot: {plot_file.name}")
         
         # Process overall metrics (vectors: [num_ebno])
         for metric_name in OVERALL_METRICS:
@@ -148,7 +148,7 @@ def save_metric_matrices_and_plots(
                 vector = np.array(metric_values)
                 vector_file = matrices_dir / f"{metric_name}_overall_{csi_str}_run{run_idx}.npy"
                 np.save(vector_file, vector)
-                print(f"  ✓ Saved vector: {vector_file.name} (shape: {vector.shape})")
+                print(f"  [OK] Saved vector: {vector_file.name} (shape: {vector.shape})")
                 
                 # Create plot
                 fig, ax = plt.subplots(figsize=(10, 6))
@@ -165,7 +165,7 @@ def save_metric_matrices_and_plots(
                 plot_file = plots_dir / f"{metric_name}_overall_{csi_str}_run{run_idx}.png"
                 plt.savefig(plot_file, dpi=300, bbox_inches='tight')
                 plt.close()
-                print(f"  ✓ Saved plot: {plot_file.name}")
+                print(f"  [OK] Saved plot: {plot_file.name}")
     
     # Create comparison plots (both CSI conditions on same plot)
     for metric_name in OVERALL_METRICS:
@@ -231,7 +231,7 @@ def save_metric_matrices_and_plots(
             plot_file = plots_dir / f"{metric_name}_comparison.png"
             plt.savefig(plot_file, dpi=300, bbox_inches='tight')
             plt.close()
-            print(f"  ✓ Saved comparison plot: {plot_file.name}")
+            print(f"  [OK] Saved comparison plot: {plot_file.name}")
 
 
 def plot_simulation_results(results: dict, output_dir: str):
@@ -294,7 +294,7 @@ def plot_simulation_results(results: dict, output_dir: str):
 
     plot_filename = f"{output_dir}/simulation_plot_{scenario}_{estimator}_{timestamp}.png"
     plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    print(f"✓ Plot saved to: {plot_filename}")
+    print(f"[OK] Plot saved to: {plot_filename}")
 
     pdf_filename = f"{output_dir}/simulation_plot_{scenario}_{estimator}_{timestamp}.pdf"
     plt.savefig(pdf_filename, bbox_inches='tight')
