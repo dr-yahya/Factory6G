@@ -48,11 +48,17 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
     output_dir = config.get("output_dir", "results/runs")
     ebno_db_range = np.array(config.get("ebno_db_range", [0, 5, 10, 15, 20]))
     batch_size = config.get("batch_size", 32)
-    total_batches = config.get("total_batches", 10)
+    min_batches = int(config.get("total_batches", 10))
+    max_mc_batches = max(
+        min_batches,
+        int(config.get("max_mc_batches", config.get("confidence_max_batches", 20000))),
+    )
     system_config = config.get("system_config", {})
+    target_block_errors = config.get("target_block_errors", 1000)
+    target_block_errors = None if target_block_errors is None else int(target_block_errors)
     target_ber = config.get("target_ber")
     confidence_level = float(config.get("confidence_level", 0.95))
-    confidence_max_batches = int(config.get("confidence_max_batches", 20000))
+    min_total_bits = int(config.get("min_total_bits", 0))
     
     # Determine mode
     if "estimators" in config:
@@ -69,7 +75,14 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("Config must specify either 'estimators' or 'resource_managers' list.")
         
     print(f"Eb/No Range: {ebno_db_range} dB")
-    print(f"Batch Size: {batch_size}, Total Batches: {total_batches}")
+    print(
+        f"Batch Size: {batch_size}, Min Batches: {min_batches}, "
+        f"Max Batches: {max_mc_batches}"
+    )
+    print(
+        f"Stopping: target_block_errors={target_block_errors}, "
+        f"target_ber={target_ber}, min_total_bits={min_total_bits}"
+    )
     print("-" * 70)
 
     # Storage for aggregated results per method.
@@ -81,6 +94,9 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
             "latency": [],
             "bit_errors": [],
             "total_bits": [],
+            "block_errors": [],
+            "total_blocks": [],
+            "num_batches": [],
         } for item in items_to_compare
     }
     method_runtime_sec = {item: 0.0 for item in items_to_compare}
@@ -93,7 +109,7 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
             for item_name in items_to_compare
         }
 
-        print(f"Starting Simulation Loop: {total_batches} Batches (Batch Size {batch_size})")
+        print("Starting estimator Monte Carlo sweep...")
         for item_name in items_to_compare:
             print(f"Estimator: {item_name}")
             model = models[item_name]
@@ -101,11 +117,13 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
                 metrics = _run_batches(
                     model,
                     batch_size,
-                    total_batches,
+                    min_batches,
+                    max_mc_batches,
                     float(ebno_val),
+                    target_block_errors=target_block_errors,
                     target_ber=target_ber,
                     confidence_level=confidence_level,
-                    confidence_max_batches=confidence_max_batches,
+                    min_total_bits=min_total_bits,
                 )
                 aggregated_results[item_name]["ber"].append(metrics["ber"])
                 aggregated_results[item_name]["ber_upper_confidence"].append(
@@ -117,6 +135,9 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
                 aggregated_results[item_name]["latency"].append(metrics["latency"])
                 aggregated_results[item_name]["bit_errors"].append(metrics["bit_errors"])
                 aggregated_results[item_name]["total_bits"].append(metrics["total_bits"])
+                aggregated_results[item_name]["block_errors"].append(metrics["block_errors"])
+                aggregated_results[item_name]["total_blocks"].append(metrics["total_blocks"])
+                aggregated_results[item_name]["num_batches"].append(metrics["num_batches"])
                 method_runtime_sec[item_name] += metrics["runtime_sec"]
                 print(
                     f"  Eb/No={float(ebno_val):4.1f} dB"
@@ -124,6 +145,7 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
                     f" | BERub={aggregated_results[item_name]['ber_upper_confidence'][-1]:.3e}"
                     f" | Latency={metrics['latency'] * 1000:.3f} ms"
                     f" | Batches={metrics['num_batches']}"
+                    f" | Stop={metrics['stop_reason']}"
                 )
     else:
         print("\nInitializing shared simulation components...")
@@ -177,7 +199,17 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
         }
         intermediate_results = {
             item: [
-                {"errors": 0, "bits": 0, "throughput": 0.0, "latency": 0.0}
+                {
+                    "errors": 0,
+                    "bits": 0,
+                    "block_errors": 0,
+                    "blocks": 0,
+                    "throughput": 0.0,
+                    "latency": 0.0,
+                    "num_batches": 0,
+                    "done": False,
+                    "stop_reason": None,
+                }
                 for _ in ebno_db_range
             ] for item in items_to_compare
         }
@@ -186,11 +218,25 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
             for item_name in items_to_compare
         }
 
-        print(f"Starting Simulation Loop: {total_batches} Batches (Batch Size {batch_size})")
+        print("Starting resource-manager Monte Carlo sweep...")
         print("Optimization: Reusing channel realizations across resource managers.")
-        for b in range(total_batches):
+        total_points = len(items_to_compare) * len(ebno_db_range)
+        for b in range(max_mc_batches):
+            remaining = sum(
+                1
+                for item_name in items_to_compare
+                for stats in intermediate_results[item_name]
+                if not stats["done"]
+            )
+            if remaining == 0:
+                break
             batch_start = time.time()
-            print(f"Batch {b+1}/{total_batches} ... ", end="", flush=True)
+            print(
+                f"Batch {b+1}/{max_mc_batches} "
+                f"(active points {remaining}/{total_points}) ... ",
+                end="",
+                flush=True,
+            )
 
             with tf.device("/CPU:0"):
                 channel.set_topology(batch_size)
@@ -198,21 +244,45 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
 
             for e_idx, ebno_val in enumerate(ebno_db_range):
                 for item_name in items_to_compare:
+                    stats = intermediate_results[item_name][e_idx]
+                    if stats["done"]:
+                        continue
                     t_method_start = time.perf_counter()
                     metrics = models[item_name].run_batch(
                         batch_size,
                         float(ebno_val),
-                        include_details=True,
+                        include_details=False,
                         regenerate_topology=False,
                     )
                     method_runtime_sec[item_name] += (time.perf_counter() - t_method_start)
-                    stats = intermediate_results[item_name][e_idx]
-                    errors = np.sum(metrics["bits"] != metrics["bits_hat"])
-                    stats["errors"] += errors
-                    stats["bits"] += metrics["bits"].size
-                    stats["throughput"] += max(0, metrics["bits"].size - errors)
-                    stats["latency"] += metrics["latency_sec"]
+                    batch_stats = _extract_error_stats(metrics["bits"], metrics["bits_hat"])
+                    stats["errors"] += batch_stats["bit_errors"]
+                    stats["bits"] += batch_stats["total_bits"]
+                    stats["block_errors"] += batch_stats["block_errors"]
+                    stats["blocks"] += batch_stats["total_blocks"]
+                    stats["throughput"] += max(0, batch_stats["total_bits"] - batch_stats["bit_errors"])
+                    stats["latency"] += _estimate_air_interface_latency(system_config)
+                    stats["num_batches"] += 1
+                    stop_reason = _mc_stop_reason(
+                        num_batches=stats["num_batches"],
+                        total_bits=stats["bits"],
+                        total_block_errors=stats["block_errors"],
+                        target_block_errors=target_block_errors,
+                        total_bit_errors=stats["errors"],
+                        target_ber=target_ber,
+                        confidence_level=confidence_level,
+                        min_batches=min_batches,
+                        min_total_bits=min_total_bits,
+                    )
+                    if stop_reason is not None:
+                        stats["done"] = True
+                        stats["stop_reason"] = stop_reason
             print(f"Done ({time.time() - batch_start:.2f}s)")
+
+        for item_name in items_to_compare:
+            for stats in intermediate_results[item_name]:
+                if stats["num_batches"] > 0 and stats["stop_reason"] is None:
+                    stats["stop_reason"] = "max_mc_batches"
 
         print("\nAggregating final results...")
         for item_name in items_to_compare:
@@ -223,10 +293,14 @@ def run_simulation_loop(config: Dict[str, Any]) -> Dict[str, Any]:
                 aggregated_results[item_name]["ber_upper_confidence"].append(
                     _ber_upper_confidence_bound(stats["errors"], stats["bits"], confidence_level)
                 )
-                aggregated_results[item_name]["throughput"].append(stats["throughput"] / total_batches)
-                aggregated_results[item_name]["latency"].append(stats["latency"] / total_batches)
+                num_batches = max(1, stats["num_batches"])
+                aggregated_results[item_name]["throughput"].append(stats["throughput"] / num_batches)
+                aggregated_results[item_name]["latency"].append(stats["latency"] / num_batches)
                 aggregated_results[item_name]["bit_errors"].append(int(stats["errors"]))
                 aggregated_results[item_name]["total_bits"].append(int(stats["bits"]))
+                aggregated_results[item_name]["block_errors"].append(int(stats["block_errors"]))
+                aggregated_results[item_name]["total_blocks"].append(int(stats["blocks"]))
+                aggregated_results[item_name]["num_batches"].append(int(stats["num_batches"]))
 
     total_time = time.time() - global_start
     print(f"Total Simulation Time: {total_time:.2f}s")
@@ -346,53 +420,55 @@ def _build_model(mode: str, item_name: str, system_config: dict, global_config: 
 def _run_batches(
     model: Model,
     batch_size: int,
-    total_batches: int,
+    min_batches: int,
+    max_mc_batches: int,
     ebno_db: float,
+    target_block_errors: int | None = 1000,
     target_ber: float | None = None,
     confidence_level: float = 0.95,
-    confidence_max_batches: int = 20000,
+    min_total_bits: int = 0,
 ) -> Dict[str, float]:
     """Runs the simulation batches and calculates average metrics."""
     total_errors = 0
     total_bits = 0
+    total_block_errors = 0
+    total_blocks = 0
     total_throughput = 0.0 # bits successfully transferred
     latency_accum = 0.0
     num_batches_run = 0
+    stop_reason = "max_mc_batches"
     runtime_start = time.perf_counter()
 
-    max_batches = total_batches
-    if target_ber is not None:
-        max_batches = max(max_batches, confidence_max_batches)
-
-    for _ in range(max_batches):
-        res = model.run_batch(batch_size, ebno_db, include_details=True)
+    for _ in range(max_mc_batches):
+        res = model.run_batch(batch_size, ebno_db, include_details=False)
         num_batches_run += 1
         
-        # BER inputs
-        bits = res["bits"]
-        bits_hat = res["bits_hat"]
-        errors = np.sum(bits != bits_hat)
-        total_errors += errors
-        total_bits += bits.size
+        batch_stats = _extract_error_stats(res["bits"], res["bits_hat"])
+        total_errors += batch_stats["bit_errors"]
+        total_bits += batch_stats["total_bits"]
+        total_block_errors += batch_stats["block_errors"]
+        total_blocks += batch_stats["total_blocks"]
         
         # Throughput (successful bits)
-        total_throughput += max(0, bits.size - errors)
+        total_throughput += max(0, batch_stats["total_bits"] - batch_stats["bit_errors"])
         
         # Latency
-        latency_accum += res["latency_sec"]
+        latency_accum += _estimate_air_interface_latency(model.get_config())
 
-        if target_ber is None:
-            if num_batches_run >= total_batches:
-                break
-            continue
-
-        # Confidence mode: only continue past baseline batches if still zero-error.
-        if total_errors > 0 and num_batches_run >= total_batches:
+        candidate_stop_reason = _mc_stop_reason(
+            num_batches=num_batches_run,
+            total_bits=total_bits,
+            total_block_errors=total_block_errors,
+            target_block_errors=target_block_errors,
+            total_bit_errors=total_errors,
+            target_ber=target_ber,
+            confidence_level=confidence_level,
+            min_batches=min_batches,
+            min_total_bits=min_total_bits,
+        )
+        if candidate_stop_reason is not None:
+            stop_reason = candidate_stop_reason
             break
-        if total_errors == 0 and total_bits > 0:
-            ber_upper = _zero_error_upper_bound(total_bits, confidence_level)
-            if ber_upper <= target_ber:
-                break
 
     avg_ber = total_errors / total_bits if total_bits > 0 else 0.0
     avg_throughput = total_throughput / num_batches_run if num_batches_run > 0 else 0.0
@@ -404,9 +480,60 @@ def _run_batches(
         "latency": avg_latency,
         "bit_errors": int(total_errors),
         "total_bits": int(total_bits),
+        "block_errors": int(total_block_errors),
+        "total_blocks": int(total_blocks),
         "runtime_sec": time.perf_counter() - runtime_start,
         "num_batches": num_batches_run,
+        "stop_reason": stop_reason,
     }
+
+
+def _extract_error_stats(bits: np.ndarray, bits_hat: np.ndarray) -> Dict[str, int]:
+    """Return bit and block error counters for one Monte Carlo batch."""
+    diff = np.not_equal(bits, bits_hat)
+    block_error_mask = np.any(diff, axis=-1)
+    return {
+        "bit_errors": int(diff.sum()),
+        "total_bits": int(bits.size),
+        "block_errors": int(block_error_mask.sum()),
+        "total_blocks": int(block_error_mask.size),
+    }
+
+
+def _estimate_air_interface_latency(system_config: dict) -> float:
+    """Compute slot latency from OFDM parameters without a full detailed probe."""
+    subcarrier_spacing = float(system_config.get("subcarrier_spacing", 30e3))
+    fft_size = float(system_config.get("fft_size", 512))
+    cyclic_prefix_length = float(system_config.get("cyclic_prefix_length", 20))
+    num_ofdm_symbols = float(system_config.get("num_ofdm_symbols", 14))
+    symbol_duration = 1.0 / subcarrier_spacing
+    cyclic_prefix_ratio = cyclic_prefix_length / max(fft_size, 1.0)
+    return symbol_duration * (1.0 + cyclic_prefix_ratio) * num_ofdm_symbols
+
+
+def _mc_stop_reason(
+    num_batches: int,
+    total_bits: int,
+    total_block_errors: int,
+    target_block_errors: int | None,
+    total_bit_errors: int,
+    target_ber: float | None,
+    confidence_level: float,
+    min_batches: int,
+    min_total_bits: int,
+) -> str | None:
+    """Return the active Monte Carlo stop reason, or None to continue."""
+    if num_batches < min_batches or total_bits < min_total_bits:
+        return None
+    if target_block_errors is None and target_ber is None:
+        return "min_evidence"
+    if target_block_errors is not None and total_block_errors >= target_block_errors:
+        return "target_block_errors"
+    if target_ber is not None:
+        ber_upper = _ber_upper_confidence_bound(total_bit_errors, total_bits, confidence_level)
+        if ber_upper <= target_ber:
+            return "target_ber"
+    return None
 
 
 def _zero_error_upper_bound(total_bits: int, confidence_level: float) -> float:

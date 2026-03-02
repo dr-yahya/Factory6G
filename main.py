@@ -18,6 +18,7 @@ import re
 import sys
 import time
 import json
+import random
 import logging
 import warnings
 from pathlib import Path
@@ -196,6 +197,7 @@ def main():
     # Import TensorFlow-dependent modules only after runtime env is configured
     import numpy as np
     import tensorflow as tf
+    import sionna.phy
     from src.sim.simulation import run_simulation_loop
 
     # Logging Setup
@@ -215,8 +217,10 @@ def main():
         setup_gpu(gpu_id, force_cpu=force_cpu)
     
     # Set random seed
+    random.seed(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
+    sionna.phy.config.seed = seed
     
     run_mode = sim_config.get("run_mode", "single")
     single_run_target = sim_config.get("single_run_target", sim_config.get("type", "estimators"))
@@ -243,10 +247,16 @@ def main():
         "output_dir": sim_config.get("output_dir", "results"),
         "batch_size": scenario_params.get("batch_size", 32),
         "total_batches": scenario_params.get("total_batches", 10),
+        "max_mc_batches": scenario_params.get(
+            "max_mc_batches",
+            scenario_params.get("confidence_max_batches", 20000),
+        ),
         "plot_results": sim_config.get("plot_results", True),
+        "target_block_errors": scenario_params.get("target_block_errors", 1000),
         "target_ber": scenario_params.get("target_ber"),
         "confidence_level": scenario_params.get("confidence_level", 0.95),
         "confidence_max_batches": scenario_params.get("confidence_max_batches", 20000),
+        "min_total_bits": scenario_params.get("min_total_bits", 0),
     }
 
     # Eb/No Range
