@@ -1,11 +1,13 @@
 
 from __future__ import annotations
 
-import tensorflow as tf
-import numpy as np
-from typing import Optional, Dict, Any, List
+from typing import Any, Optional
 
-from .resource_manager import ResourceManager, ResourceDirectives
+import tensorflow as tf
+
+from src.sim.types import ResourceManagerFeedback
+
+from .resource_manager import ResourceDirectives, ResourceManager
 
 
 class _CompatibleDense(tf.keras.layers.Dense):
@@ -97,15 +99,12 @@ class CNNResourceManager(ResourceManager):
         self,
         config: dict,
         ebno_db: float,
-        feedback: Optional[Dict[str, Any]] = None,
+        feedback: ResourceManagerFeedback | None = None,
     ) -> ResourceDirectives:
         """
         Return resource directives predicted by the CNN.
         """
-        # Get h_hat from feedback (passed by Model.call/run_batch)
-        h_hat = None
-        if feedback and "h_hat" in feedback:
-            h_hat = feedback["h_hat"]
+        h_hat = None if feedback is None else feedback.h_hat
         
         num_ut = config.get("num_ut", 8)
         

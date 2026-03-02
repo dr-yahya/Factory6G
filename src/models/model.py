@@ -1,464 +1,195 @@
-"""
-Main 6G smart factory physical layer model using component-based architecture.
-
-This module implements the complete end-to-end physical layer system model,
-composing all components (transmitter, channel, receiver) into a unified
-system for simulation and evaluation. The model supports various channel
-scenarios, channel estimators, and resource management strategies.
-
-Theory:
-    End-to-End System Model:
-    
-    The complete transmission chain can be described as:
-    
-    1. Transmitter:
-       b → [LDPC Encoder] → c → [QAM Mapper] → x → [Resource Grid] → x_rg
-       
-    2. Channel:
-       x_rg → [OFDM Channel] → y = H·x_rg + n
-       
-    3. Receiver:
-       y → [Channel Estimation] → Ĥ, σ²_ε
-       y, Ĥ, σ²_ε → [Equalization] → x̂, σ²_eff
-       x̂, σ²_eff → [Demapping] → LLR
-       LLR → [LDPC Decoder] → b̂
-       
-    Performance Metrics:
-    - Bit Error Rate (BER): P(b̂ ≠ b) = E[I(b̂ ≠ b)]
-    - Block Error Rate (BLER): P(∃ i: b̂[i] ≠ b[i]) = 1 - (1 - BER)^n
-    - Throughput: R = R_code · log2(M) · (1 - BLER) bits/s/Hz
-    - Spectral Efficiency: η = R / B Hz^-1
-    
-    System Capacity:
-    - Shannon capacity: C = log2(1 + SNR) bits/s/Hz
-    - MIMO capacity: C = log2(det(I + (ρ/N_tx)·H·H^H)) bits/s/Hz
-    - With imperfect CSI: C_imperfect < C_perfect (performance gap)
-    
-    Resource Management:
-    - Scheduling: Select which UTs to serve (active_ut_mask)
-    - Power Control: Adjust transmit power per UT (per_ut_power)
-    - Link Adaptation: Adjust MCS based on channel conditions
-    - Pilot Reuse: Manage pilot contamination in multi-cell systems
-
-References:
-    - 3GPP TS 38.211, 38.212: Physical layer specifications
-    - Tse & Viswanath, "Fundamentals of Wireless Communication"
-    - Proakis & Salehi, "Digital Communications"
-"""
+from __future__ import annotations
 
 import time
 
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 from sionna.phy.mimo import StreamManagement
-from sionna.phy.ofdm import ResourceGrid
+from sionna.phy.ofdm import LSChannelEstimator, ResourceGrid
 from sionna.phy.utils import ebnodb2no
 
+from src.sim.types import BatchContext, ResourceManagerFeedback
+
 from ..components.antenna import AntennaConfig
-from ..components.transmitter import Transmitter
 from ..components.channel import ChannelModel
 from ..components.receiver import Receiver
+from ..components.transmitter import Transmitter
 from ..components.estimators import PSOChannelEstimator
-from .resource_manager import ResourceManager, StaticResourceManager, ResourceDirectives
+from .resource_manager import ResourceDirectives
 
 
 class Model:
-    """
-    Complete 6G smart factory physical layer model.
-    
-    This model composes transmitter, channel, and receiver components
-    to simulate OFDM MIMO transmissions over 3GPP TR 38.901 channel models.
-    The model supports various configurations, channel estimators, and resource
-    management strategies for comprehensive system evaluation.
-    
-    Theory:
-        The model implements a complete communication system:
-        
-        Transmitter Chain:
-        - Binary source → LDPC encoder → QAM mapper → Resource grid mapper
-        - Supports dynamic scheduling and power control
-        
-        Channel:
-        - 3GPP TR 38.901 channel models (UMi, UMa, RMa)
-        - OFDM channel with AWGN noise
-        - MIMO spatial multiplexing
-        
-        Receiver Chain:
-        - Channel estimation (LS, neural, smoothed, temporal)
-        - LMMSE equalization
-        - APP demapping
-        - LDPC decoding
-        
-        The model can be used for:
-        - BER/BLER simulation
-        - Performance evaluation
-        - System optimization
-        - Resource management studies
-    """
-    
+    """End-to-end PHY model with explicit batch contexts for fair Monte Carlo reuse."""
+
     def __init__(
         self,
-        scenario: str = "umi",
+        config: dict[str, object],
         perfect_csi: bool = False,
-        config: dict | None = None,
         estimator_type: str = "ls",
-        estimator_weights: str | None = None,
         estimator_kwargs: dict | None = None,
-        resource_manager: ResourceManager | None = None,
-        reused_components: dict | None = None,
-    ):
-        """
-        Initialize the complete system model.
-        
-        Args:
-            scenario: Channel scenario ("umi", "uma", "rma")
-            perfect_csi: Whether to use perfect channel state information
-            config: Optional custom system configuration dict. If None, uses defaults.
-            reused_components: Optional dict of pre-initialized components to reuse.
-        """
-
-        # Initialize configuration
-        if config is None:
-            # Default minimal config if none provided (should rarely happen in new flow)
-            self.config = {
-                "scenario": scenario,
-                "fft_size": 512,
-                "num_ut": 8,
-                "num_bs_ant": 32,
-                "num_ut_ant": 1,
-                "subcarrier_spacing": 30e3,
-                "num_ofdm_symbols": 14,
-                "pilot_ofdm_symbol_indices": [2, 11]
-            }
-        else:
-            self.config = config.copy() # Avoid mutating the passed config directly if reused
-            # Override scenario if explicitly provided and different
-            if scenario:
-                self.config["scenario"] = scenario
-        
+    ) -> None:
+        self.config = config.copy()
         self.perfect_csi = perfect_csi
         self.estimator_type = estimator_type
-        self._resource_manager = resource_manager
-        if self._resource_manager is not None:
-            # Allow resource manager to mutate config before building components
-            self._resource_manager.apply_pre_build(self.config)
-        
-        # Setup resource grid
-        rx_tx_association = self._get_rx_tx_association()
-        
-        # Use reused components if provided
-        if reused_components:
-            self._rg = reused_components["rg"]
-            self._sm = reused_components["sm"]
-            self._antenna_config = reused_components["antenna_config"]
-            self._transmitter = reused_components["transmitter"]
-            self._channel = reused_components["channel"]
-            # Receiver is usually specific to estimator/config, but could be reused if estimator is same
-            # Ideally we rebuild receiver to handle specific Estimator logic
-            # OR we pass receiver too if identical.
-            # For RM benchmarks, estimator is usually LMMSE and fixed.
-            if "receiver" in reused_components and reused_components.get("estimator_type") == estimator_type and reused_components.get("perfect_csi") == perfect_csi:
-                 self._receiver = reused_components["receiver"]
-                 return # Done!
-                 
-            # Fallthrough to build receiver if not matching
-            pass # Continue to build receiver logic below
-            
-        else:
-             # Extract params for readability if NOT reusing components
-             # Note: If reusing, we already have self._rg, self._sm, etc.
-             
-             # ... (existing else block content is skipped if reused_components is True)
-             # This structure is buggy as analyzed.
-             pass
+        self.estimator_kwargs = estimator_kwargs or {}
 
-        # === Ensure Receiver is built if not reused ===
-        if not hasattr(self, "_receiver"):
-            # Check if we need to initialize base components (only if NOT reused)
-            if not reused_components:
-                num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
-                fft_size = self.config.get("fft_size", 512)
-                subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
-                num_tx = self.config.get("num_ut", 8) 
-                num_streams_per_tx = self.config.get("num_ut_ant", 1)
-                cyclic_prefix_length = self.config.get("cyclic_prefix_length", 20)
-                pilot_ofdm_symbol_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
-                
-                with tf.device("/CPU:0"):
-                    self._rg = ResourceGrid(
-                        num_ofdm_symbols=num_ofdm_symbols,
-                        fft_size=fft_size,
-                        subcarrier_spacing=subcarrier_spacing,
-                        num_tx=num_tx,
-                        num_streams_per_tx=num_streams_per_tx,
-                        cyclic_prefix_length=cyclic_prefix_length,
-                        pilot_pattern="kronecker",
-                        pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices
-                    )
-                
-                self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
-                
-                with tf.device("/CPU:0"):
-                    self._antenna_config = AntennaConfig(self.config)
-                    self._transmitter = Transmitter(self.config, self._rg)
-                    self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
+        num_ofdm_symbols = int(self.config.get("num_ofdm_symbols", 14))
+        fft_size = int(self.config.get("fft_size", 512))
+        subcarrier_spacing = float(self.config.get("subcarrier_spacing", 30e3))
+        num_tx = int(self.config.get("num_ut", 8))
+        num_streams_per_tx = int(self.config.get("num_ut_ant", 1))
+        cyclic_prefix_length = int(self.config.get("cyclic_prefix_length", 20))
+        pilot_ofdm_symbol_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
 
-            # Build Receiver (and Estimator)
-            # This runs whether we just built components OR reused them but need a new receiver
-            with tf.device("/CPU:0"):
-                # Prepare optional channel estimator
-                channel_estimator = None
-                if not perfect_csi:
-                    estimator_kwargs = estimator_kwargs or {}
-                    et = estimator_type.lower()
-                    if et in ("ls", "ls_nn", "ls-nn"):
-                        from sionna.phy.ofdm import LSChannelEstimator
-                        channel_estimator = LSChannelEstimator(self._rg, interpolation_type="nn")
-                    elif et in ("ls_lin", "ls-lin", "ls_linear"):
-                        from sionna.phy.ofdm import LSChannelEstimator
-                        channel_estimator = LSChannelEstimator(self._rg, interpolation_type="lin")
-                    elif et in ("pso", "dso"):
-                        channel_estimator = PSOChannelEstimator(
-                            self.config,
-                            self._rg,
-                            **estimator_kwargs,
-                        )
-                    elif et in ("dft", "dft-based"):
-                        from ..components.estimators import DFTChannelEstimator
-                        channel_estimator = DFTChannelEstimator(self._rg)
-                    elif et in ("lmmse", "approx_lmmse"):
-                        from ..components.estimators import LMMSEChannelEstimator
-                        channel_estimator = LMMSEChannelEstimator(self._rg)
-                    else:
-                        pass # Allow unknown types if handled elsewhere, or keep error
-                        # raise ValueError(...) 
-                        # Keeping original error logic but executed here
-                        if et not in ["ls", "ls_nn", "ls_lin", "pso", "dso", "dft", "lmmse", "perfect"]:
-                             raise ValueError(f"Unsupported estimator_type '{estimator_type}'.")
-    
-                # Receiver needs encoder reference for LDPC decoder
-                encoder = self._transmitter._encoder
-                self._receiver = Receiver(
-                    self.config,
-                    self._rg,
-                    self._sm,
-                    encoder,
-                    perfect_csi=perfect_csi,
-                    channel_estimator=channel_estimator,
-                )
-            
-    def _get_rx_tx_association(self) -> np.ndarray:
-        """Create RX-TX association matrix for MIMO stream management."""
-        num_ut = self.config.get("num_ut", 8)
-        bs_ut_association = np.zeros([1, num_ut])
-        bs_ut_association[0, :] = 1
-        return bs_ut_association
-    
-    def _apply_resource_directives(self, batch_size: int, ebno_db: float):
-        """Query the resource manager and apply directives to self.config.
+        rx_tx_association = np.zeros([1, num_tx], dtype=np.int32)
+        rx_tx_association[0, :] = 1
 
-        Performs a zero-noise channel peek so that channel-aware managers
-        (MaxThroughput, ProportionalFair, CNN) can inspect H.
-        """
-        if self._resource_manager is None:
-            return
-
-        feedback = None
-        if getattr(self._resource_manager, "needs_channel_feedback", False):
-            num_tx = self.config.get("num_ut", 8)
-            fft_size = self.config.get("fft_size", 512)
-            num_ofdm_symbols = self.config.get("num_ofdm_symbols", 14)
-            num_streams_per_tx = self.config.get("num_ut_ant", 1)
-
-            dummy_shape = [
-                batch_size,
-                num_tx,
-                num_streams_per_tx,
-                num_ofdm_symbols,
-                fft_size,
-            ]
-            dummy_x = tf.zeros(dummy_shape, dtype=tf.complex64)
-            _, h_peek = self._channel(dummy_x, tf.convert_to_tensor(0.0, dtype=tf.float32))
-            feedback = {"h_hat": h_peek}
-
-        directives: ResourceDirectives = self._resource_manager.get_runtime_directives(
-            self.config, ebno_db, feedback=feedback
-        )
-        if directives.active_ut_mask is not None:
-            self.config["active_ut_mask"] = list(directives.active_ut_mask)
-        if directives.per_ut_power is not None:
-            self.config["per_ut_power"] = list(directives.per_ut_power)
-        if directives.pilot_reuse_factor is not None:
-            self.config["pilot_reuse_factor"] = int(directives.pilot_reuse_factor)
-
-    def new_topology(self, batch_size: int):
-        """
-        Generate and set new topology for the channel.
-        
-        Args:
-            batch_size: Batch size for topology generation
-        """
-        # Topology generation uses RNG internally — keep on CPU
         with tf.device("/CPU:0"):
-            self._channel.set_topology(batch_size)
-    
-    # @tf.function
-    def call(self, batch_size: int, ebno_db: float) -> tuple:
-        """
-        Simulate transmission through the complete system.
-        
-        Args:
-            batch_size: Batch size for simulation
-            ebno_db: Energy per bit to noise ratio in dB
-            
-        Returns:
-            Tuple of (transmitted bits, received bits)
-        """
-        # Generate new topology
-        self.new_topology(batch_size)
-        
-        # Apply resource manager directives (if any)
-        self._apply_resource_directives(batch_size, ebno_db)
-        
-        # Calculate noise variance
-        no = ebnodb2no(
-            ebno_db,
-            self.config.get("num_bits_per_symbol", 2),
-            self.config.get("coderate", 0.5),
-            self._rg
-        )
-        
-        # Transmitter: CPU-only (RNG + encoding tightly coupled)
+            self._rg = ResourceGrid(
+                num_ofdm_symbols=num_ofdm_symbols,
+                fft_size=fft_size,
+                subcarrier_spacing=subcarrier_spacing,
+                num_tx=num_tx,
+                num_streams_per_tx=num_streams_per_tx,
+                cyclic_prefix_length=cyclic_prefix_length,
+                pilot_pattern="kronecker",
+                pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices,
+            )
+
+        self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
+
         with tf.device("/CPU:0"):
-            x_rg, b, _ = self._transmitter.call(batch_size)
-        
-        # Channel: CPU-only (Metal GPU corrupts OFDM/FFT ops)
-        with tf.device("/CPU:0"):
-            y, h = self._channel(x_rg, no)
-        
-        # Receiver: GPU-accelerated (LMMSE equalizer, LDPC decoder, demapper)
+            self._antenna_config = AntennaConfig(self.config)
+            self._transmitter = Transmitter(self.config, self._rg)
+            self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
+            self._receiver = Receiver(
+                self.config,
+                self._rg,
+                self._sm,
+                self._transmitter._encoder,
+                perfect_csi=perfect_csi,
+                channel_estimator=self._build_channel_estimator(),
+            )
+
+    def _build_channel_estimator(self):
         if self.perfect_csi:
-            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
-        else:
-            h_hat, err_var = self._receiver.estimate_channel(y, no)
-            b_hat = self._receiver(y, h_hat, err_var, no)
-        
-        return b, b_hat
-    
-    def get_config(self) -> dict:
-        """Get system configuration"""
-        return self.config
-    
-    def get_transmitter(self) -> Transmitter:
-        """Get transmitter component"""
-        return self._transmitter
-    
-    def get_channel(self) -> ChannelModel:
-        """Get channel model component"""
-        return self._channel
-    
-    def get_receiver(self) -> Receiver:
-        """Get receiver component"""
-        return self._receiver
+            return None
+        estimator_type = self.estimator_type.lower()
+        if estimator_type in {"ls", "ls_nn", "ls-nn"}:
+            return LSChannelEstimator(self._rg, interpolation_type="nn")
+        if estimator_type in {"ls_lin", "ls-lin", "ls_linear"}:
+            return LSChannelEstimator(self._rg, interpolation_type="lin")
+        if estimator_type in {"pso", "dso"}:
+            return PSOChannelEstimator(self.config, self._rg, **self.estimator_kwargs)
+        if estimator_type in {"dft", "dft-based"}:
+            from ..components.estimators import DFTChannelEstimator
 
-    def __call__(self, batch_size: int, ebno_db: float) -> tuple:
-        """Alias to support Sionna sim_ber(mc_fun, ...) expectations."""
-        return self.call(batch_size, ebno_db)
-    
+            return DFTChannelEstimator(self._rg)
+        if estimator_type in {"lmmse", "approx_lmmse"}:
+            from ..components.estimators import LMMSEChannelEstimator
 
+            return LMMSEChannelEstimator(self._rg)
+        if estimator_type == "perfect":
+            return None
+        raise ValueError(f"Unsupported estimator_type '{self.estimator_type}'.")
 
-    def run_batch(
+    def default_directives(self) -> ResourceDirectives:
+        num_ut = int(self.config.get("num_ut", 8))
+        return ResourceDirectives(
+            active_ut_mask=[1] * num_ut,
+            per_ut_power=[1.0] * num_ut,
+            pilot_reuse_factor=1,
+        )
+
+    def prepare_batch_context(
         self,
         batch_size: int,
         ebno_db: float,
-        include_details: bool = True,
-        regenerate_topology: bool = True
-    ) -> dict:
-        """
-        Run a batch simulation and return detailed results.
-        
-        Args:
-            batch_size: Batch size for simulation
-            ebno_db: Energy per bit to noise ratio in dB
-            include_details: If True, return detailed metrics for analysis
-            regenerate_topology: If True, generate new channel topology.
-                                 If False, reuse existing topology (must match batch_size).
-            
-        Returns:
-            Dictionary with simulation results
-        """
-        # Generate new topology if requested.
-        if regenerate_topology:
+        include_feedback: bool,
+    ) -> BatchContext:
+        with tf.device("/CPU:0"):
+            self._channel.set_topology(batch_size)
+            h_freq = self._channel.sample_frequency_response(batch_size)
+
+        noise_variance = tf.cast(
+            ebnodb2no(
+                ebno_db,
+                self.config.get("num_bits_per_symbol", 2),
+                self.config.get("coderate", 0.5),
+                self._rg,
+            ),
+            tf.float32,
+        )
+        y_shape = self._channel.received_shape_from_response(h_freq)
+        probe_noise = self._channel.sample_noise(y_shape, noise_variance)
+        data_noise = self._channel.sample_noise(y_shape, noise_variance)
+        source_bits = self._transmitter.sample_information_bits(batch_size)
+
+        feedback = None
+        if include_feedback:
+            probe_directives = self.default_directives()
             with tf.device("/CPU:0"):
-                self.new_topology(batch_size)
+                x_probe, _, _ = self._transmitter.call(batch_size, directives=probe_directives)
+                y_probe = self._channel.apply_frequency_response(x_probe, h_freq) + probe_noise
+            if self.perfect_csi:
+                feedback = ResourceManagerFeedback(
+                    h_hat=h_freq,
+                    err_var=tf.zeros(tf.shape(h_freq), dtype=noise_variance.dtype),
+                )
+            else:
+                h_hat, err_var = self._receiver.estimate_channel(y_probe, noise_variance)
+                feedback = ResourceManagerFeedback(h_hat=h_hat, err_var=err_var)
 
-        self._apply_resource_directives(batch_size, ebno_db)
-
-        no = ebnodb2no(
-            ebno_db,
-            self.config.get("num_bits_per_symbol", 2),
-            self.config.get("coderate", 0.5),
-            self._rg,
+        return BatchContext(
+            batch_size=batch_size,
+            ebno_db=float(ebno_db),
+            noise_variance=noise_variance,
+            h_freq=h_freq,
+            probe_noise=probe_noise,
+            data_noise=data_noise,
+            source_bits=source_bits,
+            feedback=feedback,
         )
 
-        with tf.device("/CPU:0"):
-            x_rg, b, x_qam = self._transmitter.call(batch_size)
+    def run_batch(
+        self,
+        batch_context: BatchContext,
+        directives: ResourceDirectives | None = None,
+        include_details: bool = True,
+    ) -> dict:
+        active_directives = directives or self.default_directives()
 
         with tf.device("/CPU:0"):
-            y_cpu, h_cpu = self._channel(tf.identity(x_rg), tf.identity(no))
-            y = tf.identity(y_cpu)
-            h = tf.identity(h_cpu)
+            x_rg, bits, qam_symbols = self._transmitter.call(
+                batch_context.batch_size,
+                directives=active_directives,
+                bits=batch_context.source_bits,
+            )
+            y = self._channel.apply_frequency_response(x_rg, batch_context.h_freq) + batch_context.data_noise
 
         if self.perfect_csi:
-            h_hat = h
-            err_var = tf.zeros_like(h)
+            h_hat = batch_context.h_freq
+            err_var = 0.0
         else:
-            h_hat, err_var = self._receiver.estimate_channel(y, no)
+            h_hat, err_var = self._receiver.estimate_channel(y, batch_context.noise_variance)
 
         if include_details:
-            # Do a single receiver pass and reuse intermediate outputs.
-            t_start = time.perf_counter()
-            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, no)
+            start = time.perf_counter()
+            x_hat, no_eff = self._receiver.equalize(y, h_hat, err_var, batch_context.noise_variance)
             llr = self._receiver.demap(x_hat, no_eff)
-            b_hat, decoder_iter = self._receiver.decode(llr)
-            processing_latency_sec = time.perf_counter() - t_start
-
-            subcarrier_spacing = self.config.get("subcarrier_spacing", 30e3)
-            symbol_duration = 1.0 / subcarrier_spacing
-            cyclic_prefix_ratio = self.config.get("cyclic_prefix_length", 20) / self.config.get("fft_size", 512)
-            frame_transmission_time = symbol_duration * (1 + cyclic_prefix_ratio) * self.config.get("num_ofdm_symbols", 14)
-            runtime_latency_sec = processing_latency_sec + frame_transmission_time
-            air_interface_latency_sec = frame_transmission_time
-
-            num_info_bits = self._transmitter.num_info_bits
-            safe_latency = max(runtime_latency_sec, 1e-12)
-            encoding_power_watts = 10e-3 * (num_info_bits / safe_latency) / 1e6
-            encoding_energy = encoding_power_watts * safe_latency * 0.1
-
-            tx_power_watts = 0.2
-            rx_power_watts = 0.1
-            tx_energy = tx_power_watts * frame_transmission_time
-            rx_energy = rx_power_watts * frame_transmission_time
-
-            avg_iterations = float(tf.reduce_mean(decoder_iter))
-            decoding_power_watts = 50e-3 * (num_info_bits / safe_latency) / 1e6 * (1 + avg_iterations / 10)
-            decoding_energy = decoding_power_watts * safe_latency * 0.3
-            total_energy_joules = encoding_energy + tx_energy + rx_energy + decoding_energy
-
-            if hasattr(no, "numpy"):
-                noise_power = float(no.numpy()) if no.shape == () else no.numpy()
-            else:
-                noise_power = float(no) if np.isscalar(no) else np.array(no)
-            if isinstance(noise_power, np.ndarray):
-                noise_power = float(noise_power.item()) if noise_power.size == 1 else float(np.mean(noise_power))
-
+            bits_hat, decoder_iter = self._receiver.decode(llr)
+            processing_latency_sec = time.perf_counter() - start
+            air_interface_latency_sec = self._estimate_air_interface_latency()
+            runtime_latency_sec = processing_latency_sec + air_interface_latency_sec
+            total_energy_joules = self._estimate_energy(runtime_latency_sec, air_interface_latency_sec, decoder_iter)
+            noise_power = self._noise_power_value(batch_context.noise_variance)
             return {
-                "bits": b.numpy(),
-                "bits_hat": b_hat.numpy(),
+                "bits": bits.numpy(),
+                "bits_hat": bits_hat.numpy(),
                 "decoder_iterations": decoder_iter.numpy(),
-                "channel": h.numpy(),
-                "channel_hat": h_hat.numpy(),
-                "qam": x_qam.numpy(),
+                "channel": batch_context.h_freq.numpy(),
+                "channel_hat": h_hat.numpy() if hasattr(h_hat, "numpy") else h_hat,
+                "qam": qam_symbols.numpy(),
                 "qam_hat": x_hat.numpy(),
                 "no_eff": no_eff.numpy(),
                 "noise_power": noise_power,
@@ -469,10 +200,59 @@ class Model:
             }
 
         if self.perfect_csi:
-            b_hat = self._receiver.process_with_perfect_csi(y, h, no)
+            bits_hat = self._receiver.process_with_perfect_csi(y, batch_context.h_freq, batch_context.noise_variance)
         else:
-            b_hat = self._receiver(y, h_hat, err_var, no)
+            bits_hat = self._receiver(y, h_hat, err_var, batch_context.noise_variance)
         return {
-            "bits": b.numpy(),
-            "bits_hat": b_hat.numpy(),
+            "bits": bits.numpy(),
+            "bits_hat": bits_hat.numpy(),
         }
+
+    def _estimate_air_interface_latency(self) -> float:
+        subcarrier_spacing = float(self.config.get("subcarrier_spacing", 30e3))
+        fft_size = float(self.config.get("fft_size", 512))
+        cyclic_prefix_length = float(self.config.get("cyclic_prefix_length", 20))
+        num_ofdm_symbols = float(self.config.get("num_ofdm_symbols", 14))
+        symbol_duration = 1.0 / subcarrier_spacing
+        cyclic_prefix_ratio = cyclic_prefix_length / max(fft_size, 1.0)
+        return symbol_duration * (1.0 + cyclic_prefix_ratio) * num_ofdm_symbols
+
+    def _estimate_energy(
+        self,
+        runtime_latency_sec: float,
+        air_interface_latency_sec: float,
+        decoder_iter: tf.Tensor,
+    ) -> float:
+        num_info_bits = self._transmitter.num_info_bits
+        safe_latency = max(runtime_latency_sec, 1e-12)
+        encoding_power_watts = 10e-3 * (num_info_bits / safe_latency) / 1e6
+        encoding_energy = encoding_power_watts * safe_latency * 0.1
+        tx_energy = 0.2 * air_interface_latency_sec
+        rx_energy = 0.1 * air_interface_latency_sec
+        avg_iterations = float(tf.reduce_mean(decoder_iter))
+        decoding_power_watts = 50e-3 * (num_info_bits / safe_latency) / 1e6 * (1.0 + avg_iterations / 10.0)
+        decoding_energy = decoding_power_watts * safe_latency * 0.3
+        return encoding_energy + tx_energy + rx_energy + decoding_energy
+
+    @staticmethod
+    def _noise_power_value(noise_variance: tf.Tensor) -> float:
+        if hasattr(noise_variance, "numpy"):
+            value = noise_variance.numpy()
+        else:
+            value = noise_variance
+        if np.isscalar(value):
+            return float(value)
+        arr = np.array(value)
+        return float(arr.item()) if arr.size == 1 else float(np.mean(arr))
+
+    def get_config(self) -> dict:
+        return self.config.copy()
+
+    def get_transmitter(self) -> Transmitter:
+        return self._transmitter
+
+    def get_channel(self) -> ChannelModel:
+        return self._channel
+
+    def get_receiver(self) -> Receiver:
+        return self._receiver

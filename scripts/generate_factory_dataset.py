@@ -1,51 +1,18 @@
 
 import os
 import argparse
-import json
 import csv
+import sys
 import numpy as np
 import tensorflow as tf
 import h5py
 from sionna.rt import load_scene, SceneObject, Transmitter, Receiver, PlanarArray, RadioMaterial, PathSolver
-# We need the path to box.xml to find box.ply
 from sionna.rt.scene import box as box_xml_path
 
-def load_config(config_path="config.json"):
-    with open(config_path, 'r', encoding="utf-8") as f:
-        raw = f.read()
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
 
-    # Support JSON with // comments in config.json
-    cleaned = []
-    in_string = False
-    escaped = False
-    i = 0
-    while i < len(raw):
-        ch = raw[i]
-        nxt = raw[i + 1] if i + 1 < len(raw) else ""
-        if in_string:
-            cleaned.append(ch)
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == "\"":
-                in_string = False
-            i += 1
-            continue
-        if ch == "\"":
-            in_string = True
-            cleaned.append(ch)
-            i += 1
-            continue
-        if ch == "/" and nxt == "/":
-            i += 2
-            while i < len(raw) and raw[i] != "\n":
-                i += 1
-            continue
-        cleaned.append(ch)
-        i += 1
-
-    return json.loads("".join(cleaned))
+from src.sim.config import load_config
 
 def generate_factory_dataset(args):
     """
@@ -54,12 +21,12 @@ def generate_factory_dataset(args):
     
     # Load configuration
     config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
-    config = load_config(config_path)
+    config = load_config(config_path).to_dict()
     
     factory_params = config.get("factory_scenario", {})
-    system_params = config.get("system_params", {})
-    rt_params = config.get("ray_tracing_params", {})
-    tr_params = config.get("transceiver_params", {})
+    system_params = config.get("system", {})
+    rt_params = config.get("ray_tracing", {})
+    tr_params = config.get("transceiver", {})
     
     # Check GPU availability
     gpu_num = config.get("simulation", {}).get("gpu_id", 0)
