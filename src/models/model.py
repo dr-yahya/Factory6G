@@ -84,11 +84,15 @@ class Model:
         if estimator_type in {"dft", "dft-based"}:
             from ..components.estimators import DFTChannelEstimator
 
-            return DFTChannelEstimator(self._rg)
+            return DFTChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
         if estimator_type in {"lmmse", "approx_lmmse"}:
             from ..components.estimators import LMMSEChannelEstimator
 
-            return LMMSEChannelEstimator(self._rg)
+            return LMMSEChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
+        if estimator_type in {"adaptive", "adaptive_hybrid"}:
+            from ..components.estimators import AdaptiveHybridChannelEstimator
+
+            return AdaptiveHybridChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
         if estimator_type == "perfect":
             return None
         raise ValueError(f"Unsupported estimator_type '{self.estimator_type}'.")

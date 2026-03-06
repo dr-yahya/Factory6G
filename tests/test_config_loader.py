@@ -31,9 +31,47 @@ def test_unknown_keys_fail_fast(tmp_path):
         load_config(config_path)
 
 
-def test_system_scenario_survives_normalization(tmp_path):
+def test_locked_5g_scenario_rejects_other_values(tmp_path):
     config_data = make_tiny_config(str(tmp_path / "results"))
     config_data["system"]["scenario"] = "rma"
     config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_simulation_targets_are_rejected(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["simulation"]["targets"] = ["estimators"]
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_non_5g_radio_preset_values_are_rejected(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["channel_model_type"] = "rayleigh"
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_non_5g_tx_pattern_is_rejected(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["transceiver"]["tx_pattern"] = "dipole"
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_resource_manager_kwargs_and_model_paths_parse(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["resource_managers"]["drl_model_path"] = "models/drl_policy.h5"
+    config_data["resource_managers"]["kwargs"] = {
+        "wmmse": {"iterations": 8},
+        "queue_aware": {"arrival_rate": 0.4},
+    }
+    config_path = write_config(tmp_path, config_data)
     config = load_config(config_path)
-    assert config.system.scenario == "rma"
+    assert config.resource_managers.drl_model_path == "models/drl_policy.h5"
+    assert config.resource_managers.kwargs["wmmse"]["iterations"] == 8
+    assert config.resource_managers.kwargs["queue_aware"]["arrival_rate"] == 0.4

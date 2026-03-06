@@ -24,7 +24,6 @@ def set_all_seeds(seed: int = 1234) -> None:
 def make_tiny_config(output_dir: str) -> dict:
     return {
         "simulation": {
-            "targets": ["estimators"],
             "gpu_id": 0,
             "force_cpu": True,
             "log_level": "INFO",
@@ -51,7 +50,9 @@ def make_tiny_config(output_dir: str) -> dict:
         "resource_managers": {
             "enabled": ["static", "round_robin"],
             "cnn_model_path": None,
+            "drl_model_path": None,
             "num_active_users": 1,
+            "kwargs": {},
         },
         "factory_scenario": {
             "room_dimensions": [10.0, 10.0, 4.0],
@@ -83,7 +84,7 @@ def make_tiny_config(output_dir: str) -> dict:
             "num_bits_per_symbol": 2,
             "coderate": 0.5,
             "num_decoding_iter": 2,
-            "channel_model_type": "rayleigh",
+            "channel_model_type": "tr38901",
             "scenario": "umi",
             "direction": "uplink",
             "o2i_model": "low",

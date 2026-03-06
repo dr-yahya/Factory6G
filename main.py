@@ -62,7 +62,7 @@ def main() -> int:
     import sionna.phy
     import tensorflow as tf
 
-    from src.sim.simulation import run_simulation_loop
+    from src.sim.flow import run_simulation_flow
 
     logging.basicConfig(level=getattr(logging, sim_config.log_level, logging.INFO))
     level = getattr(logging, sim_config.log_level, logging.INFO)
@@ -81,8 +81,8 @@ def main() -> int:
     sionna.phy.config.seed = sim_config.seed
 
     print(f"Loaded configuration for scenario: {config.system.scenario}")
-    print(f"Starting execution for targets: {config.simulation.targets}")
-    run_simulation_loop(config)
+    print("Starting execution for fixed flow: estimators -> resource_managers")
+    run_simulation_flow(config)
     return 0
 
 

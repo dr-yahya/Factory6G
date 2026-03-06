@@ -1,0 +1,91 @@
+{
+  "profiles": {
+    "S": {
+      "factory_scale": "S",
+      "scenario_label": "Electronics Workcell",
+      "real_world_archetype": "Electronics cell",
+      "narrative": "Compact electronics cell with dense robot arms and short-range links dominated by local scatterers.",
+      "factory_scenario_overrides": {
+        "room_dimensions": [20.0, 15.0, 5.0],
+        "num_machines": 6,
+        "machine_size_range": [
+          [0.8, 1.8],
+          [0.8, 1.8],
+          [1.0, 2.0]
+        ]
+      },
+      "transceiver_overrides": {
+        "room_padding": 1.0,
+        "rx_boundary_padding": 1.0,
+        "tx_height_offset": 0.8,
+        "rx_height": 1.0
+      },
+      "ray_tracing_overrides": {
+        "max_depth": 5,
+        "samples_per_src": 8000,
+        "max_paths": 80
+      },
+      "dataset_defaults": {
+        "seed_offset": 0
+      }
+    },
+    "M": {
+      "factory_scale": "M",
+      "scenario_label": "Automotive Assembly Zone",
+      "real_world_archetype": "Automotive assembly zone",
+      "narrative": "Mid-size assembly floor with mixed fixed machinery and vehicle lanes requiring balanced coverage and reliability.",
+      "factory_scenario_overrides": {
+        "room_dimensions": [45.0, 30.0, 8.0],
+        "num_machines": 14,
+        "machine_size_range": [
+          [1.5, 3.5],
+          [1.0, 3.0],
+          [1.5, 3.5]
+        ]
+      },
+      "transceiver_overrides": {
+        "room_padding": 2.0,
+        "rx_boundary_padding": 1.5,
+        "tx_height_offset": 1.0,
+        "rx_height": 1.0
+      },
+      "ray_tracing_overrides": {
+        "max_depth": 5,
+        "samples_per_src": 12000,
+        "max_paths": 100
+      },
+      "dataset_defaults": {
+        "seed_offset": 1000
+      }
+    },
+    "L": {
+      "factory_scale": "L",
+      "scenario_label": "Logistics Fulfillment Hall",
+      "real_world_archetype": "Logistics fulfillment hall",
+      "narrative": "Large warehouse-like hall with rack-style blockers and long corridors creating richer multipath and distance variation.",
+      "factory_scenario_overrides": {
+        "room_dimensions": [90.0, 60.0, 12.0],
+        "num_machines": 28,
+        "machine_size_range": [
+          [2.0, 6.0],
+          [1.5, 4.0],
+          [2.0, 5.0]
+        ]
+      },
+      "transceiver_overrides": {
+        "room_padding": 3.0,
+        "rx_boundary_padding": 2.0,
+        "tx_height_offset": 1.5,
+        "rx_height": 1.2
+      },
+      "ray_tracing_overrides": {
+        "max_depth": 6,
+        "samples_per_src": 16000,
+        "max_paths": 120
+      },
+      "dataset_defaults": {
+        "seed_offset": 2000
+      }
+    }
+  }
+}

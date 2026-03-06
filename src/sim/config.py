@@ -175,7 +175,6 @@ def _ensure_dict_of_dicts(value: Any, name: str) -> dict[str, dict[str, Any]]:
 
 @dataclass(frozen=True)
 class SimulationConfig:
-    targets: list[str]
     gpu_id: int
     force_cpu: bool
     log_level: str
@@ -185,8 +184,12 @@ class SimulationConfig:
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SimulationConfig":
+        if "targets" in raw:
+            raise ConfigError(
+                "'simulation.targets' is not supported. The simulation flow is fixed to "
+                "['estimators', 'resource_managers']."
+            )
         allowed = {
-            "targets",
             "gpu_id",
             "force_cpu",
             "log_level",
@@ -194,22 +197,13 @@ class SimulationConfig:
             "output_dir",
             "plot_results",
         }
-        required = {"targets"}
+        required: set[str] = set()
         _validate_keys("simulation", raw, allowed)
         _require_keys("simulation", raw, required)
-        targets = [item.lower() for item in _ensure_string_list(raw["targets"], "simulation.targets")]
-        if not targets:
-            raise ConfigError("'simulation.targets' must not be empty.")
-        invalid = sorted(set(targets) - {"estimators", "resource_managers"})
-        if invalid:
-            raise ConfigError(
-                f"'simulation.targets' contains unsupported targets: {', '.join(invalid)}"
-            )
         log_level = str(raw.get("log_level", "INFO")).upper()
         if log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             raise ConfigError("'simulation.log_level' must be one of DEBUG, INFO, WARNING, ERROR, CRITICAL.")
         return cls(
-            targets=targets,
             gpu_id=_ensure_int(raw.get("gpu_id", 0), "simulation.gpu_id"),
             force_cpu=_ensure_bool(raw.get("force_cpu", False), "simulation.force_cpu"),
             log_level=log_level,
@@ -314,11 +308,13 @@ class EstimatorsConfig:
 class ResourceManagersConfig:
     enabled: list[str]
     cnn_model_path: str | None
+    drl_model_path: str | None
     num_active_users: int
+    kwargs: dict[str, dict[str, Any]]
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "ResourceManagersConfig":
-        allowed = {"enabled", "cnn_model_path", "num_active_users"}
+        allowed = {"enabled", "cnn_model_path", "drl_model_path", "num_active_users", "kwargs"}
         required = {"enabled", "num_active_users"}
         _validate_keys("resource_managers", raw, allowed)
         _require_keys("resource_managers", raw, required)
@@ -331,10 +327,15 @@ class ResourceManagersConfig:
         model_path = raw.get("cnn_model_path")
         if model_path is not None and not isinstance(model_path, str):
             raise ConfigError("'resource_managers.cnn_model_path' must be a string or null.")
+        drl_model_path = raw.get("drl_model_path")
+        if drl_model_path is not None and not isinstance(drl_model_path, str):
+            raise ConfigError("'resource_managers.drl_model_path' must be a string or null.")
         return cls(
             enabled=enabled,
             cnn_model_path=model_path,
+            drl_model_path=drl_model_path,
             num_active_users=num_active_users,
+            kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "resource_managers.kwargs"),
         )
 
 
@@ -360,6 +361,19 @@ class SystemConfig:
     enable_shadow_fading: bool
     min_ut_velocity: float
     max_ut_velocity: float
+
+    _LOCKED_5G_VALUES = {
+        "carrier_frequency": 3.5e9,
+        "subcarrier_spacing": 30000.0,
+        "num_ofdm_symbols": 14,
+        "cyclic_prefix_length": 20,
+        "num_bits_per_symbol": 2,
+        "coderate": 0.5,
+        "channel_model_type": "tr38901",
+        "scenario": "umi",
+        "direction": "uplink",
+        "pilot_ofdm_symbol_indices": [2, 11],
+    }
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SystemConfig":
@@ -413,13 +427,7 @@ class SystemConfig:
         normalized_pilot_indices: list[int] = []
         for idx, item in enumerate(pilot_indices):
             normalized_pilot_indices.append(_ensure_int(item, f"system.pilot_ofdm_symbol_indices[{idx}]"))
-        scenario = str(raw["scenario"]).lower()
-        if scenario not in {"umi", "uma", "rma"}:
-            raise ConfigError("'system.scenario' must be one of umi, uma, rma.")
-        direction = str(raw["direction"]).lower()
-        if direction not in {"uplink", "downlink"}:
-            raise ConfigError("'system.direction' must be either uplink or downlink.")
-        return cls(
+        parsed = cls(
             carrier_frequency=_ensure_float(raw["carrier_frequency"], "system.carrier_frequency"),
             fft_size=_ensure_int(raw["fft_size"], "system.fft_size"),
             subcarrier_spacing=_ensure_float(raw["subcarrier_spacing"], "system.subcarrier_spacing"),
@@ -433,8 +441,8 @@ class SystemConfig:
             coderate=_ensure_float(raw["coderate"], "system.coderate"),
             num_decoding_iter=_ensure_int(raw["num_decoding_iter"], "system.num_decoding_iter"),
             channel_model_type=str(raw["channel_model_type"]).lower(),
-            scenario=scenario,
-            direction=direction,
+            scenario=str(raw["scenario"]).lower(),
+            direction=str(raw["direction"]).lower(),
             o2i_model=str(raw["o2i_model"]).lower(),
             enable_pathloss=_ensure_bool(raw["enable_pathloss"], "system.enable_pathloss"),
             enable_shadow_fading=_ensure_bool(
@@ -444,6 +452,46 @@ class SystemConfig:
             min_ut_velocity=_ensure_float(raw["min_ut_velocity"], "system.min_ut_velocity"),
             max_ut_velocity=_ensure_float(raw["max_ut_velocity"], "system.max_ut_velocity"),
         )
+        parsed._validate_locked_5g_profile()
+        return parsed
+
+    def _validate_locked_5g_profile(self) -> None:
+        self._assert_locked_float("system.carrier_frequency", self.carrier_frequency)
+        self._assert_locked_float("system.subcarrier_spacing", self.subcarrier_spacing)
+        self._assert_locked_int("system.num_ofdm_symbols", self.num_ofdm_symbols)
+        self._assert_locked_int("system.cyclic_prefix_length", self.cyclic_prefix_length)
+        self._assert_locked_int("system.num_bits_per_symbol", self.num_bits_per_symbol)
+        self._assert_locked_float("system.coderate", self.coderate)
+        self._assert_locked_str("system.channel_model_type", self.channel_model_type)
+        self._assert_locked_str("system.scenario", self.scenario)
+        self._assert_locked_str("system.direction", self.direction)
+        expected_pilots = self._LOCKED_5G_VALUES["pilot_ofdm_symbol_indices"]
+        if list(self.pilot_ofdm_symbol_indices) != list(expected_pilots):
+            raise ConfigError(
+                f"'system.pilot_ofdm_symbol_indices' must be exactly {expected_pilots} "
+                f"for locked 5G profile."
+            )
+
+    def _assert_locked_float(self, field_name: str, actual: float) -> None:
+        expected = float(self._LOCKED_5G_VALUES[field_name.split(".")[-1]])
+        if not np.isclose(actual, expected, rtol=1e-9, atol=1e-9):
+            raise ConfigError(
+                f"'{field_name}' must be {expected} for locked 5G profile (got {actual})."
+            )
+
+    def _assert_locked_int(self, field_name: str, actual: int) -> None:
+        expected = int(self._LOCKED_5G_VALUES[field_name.split(".")[-1]])
+        if int(actual) != expected:
+            raise ConfigError(
+                f"'{field_name}' must be {expected} for locked 5G profile (got {actual})."
+            )
+
+    def _assert_locked_str(self, field_name: str, actual: str) -> None:
+        expected = str(self._LOCKED_5G_VALUES[field_name.split(".")[-1]])
+        if str(actual).lower() != expected.lower():
+            raise ConfigError(
+                f"'{field_name}' must be '{expected}' for locked 5G profile (got '{actual}')."
+            )
 
 
 @dataclass(frozen=True)
@@ -476,7 +524,7 @@ class TransceiverConfig:
         required = allowed
         _validate_keys("transceiver", raw, allowed)
         _require_keys("transceiver", raw, required)
-        return cls(
+        parsed = cls(
             tx_height_offset=_ensure_float(raw["tx_height_offset"], "transceiver.tx_height_offset"),
             rx_height=_ensure_float(raw["rx_height"], "transceiver.rx_height"),
             antenna_spacing=_ensure_float(raw["antenna_spacing"], "transceiver.antenna_spacing"),
@@ -491,6 +539,11 @@ class TransceiverConfig:
                 "transceiver.rx_boundary_padding",
             ),
         )
+        if parsed.tx_pattern.lower() != "tr38901":
+            raise ConfigError(
+                "'transceiver.tx_pattern' must be 'tr38901' for locked 5G profile."
+            )
+        return parsed
 
 
 @dataclass(frozen=True)

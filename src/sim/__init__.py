@@ -9,6 +9,7 @@ __all__ = [
     "load_config",
     "load_baseline_results",
     "run_simulation_loop",
+    "run_simulation_flow",
     "save_results_as_csv",
     "save_simulation_results",
     "setup_gpu",
@@ -47,4 +48,8 @@ def __getattr__(name: str):
         from .simulation import run_simulation_loop
 
         return run_simulation_loop
+    if name == "run_simulation_flow":
+        from .flow import run_simulation_flow
+
+        return run_simulation_flow
     raise AttributeError(name)

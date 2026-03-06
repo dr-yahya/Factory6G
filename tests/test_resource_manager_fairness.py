@@ -15,7 +15,6 @@ from .conftest import make_tiny_config, write_config
 @pytest.mark.slow
 def test_rm_loop_prepares_one_shared_context_per_point(monkeypatch, tmp_path):
     config_data = make_tiny_config(str(tmp_path / "results"))
-    config_data["simulation"]["targets"] = ["resource_managers"]
     config_data["resource_managers"]["enabled"] = ["static", "max_throughput"]
     config_path = write_config(tmp_path, config_data)
     config = load_config(config_path)
@@ -30,13 +29,17 @@ def test_rm_loop_prepares_one_shared_context_per_point(monkeypatch, tmp_path):
 
     def counted_prepare(self, *args, **kwargs):
         nonlocal prepare_calls
-        prepare_calls += 1
+        include_feedback = kwargs.get("include_feedback")
+        if include_feedback is None and len(args) >= 3:
+            include_feedback = args[2]
+        if include_feedback:
+            prepare_calls += 1
         return original_prepare(self, *args, **kwargs)
 
     def recording_run_batch(self, batch_context, *args, **kwargs):
-        context_h_ids.append(id(batch_context.h_freq))
-        context_noise_ids.append(id(batch_context.data_noise))
         if batch_context.feedback is not None:
+            context_h_ids.append(id(batch_context.h_freq))
+            context_noise_ids.append(id(batch_context.data_noise))
             feedback_ids.append(id(batch_context.feedback.h_hat))
         return original_run_batch(self, batch_context, *args, **kwargs)
 

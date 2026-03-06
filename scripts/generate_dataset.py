@@ -54,8 +54,13 @@ def _score_candidate(res: dict, latency_weight: float) -> tuple[float, float, fl
 
 def _load_runtime_config(config_path: str, scenario: str) -> dict:
     app_config = load_config(config_path)
+    requested_scenario = scenario.lower()
+    if requested_scenario != app_config.system.scenario:
+        raise ValueError(
+            f"Scenario override '{scenario}' is not supported. Locked 5G preset requires "
+            f"scenario='{app_config.system.scenario}'."
+        )
     runtime_config = app_config.system_runtime_config
-    runtime_config["scenario"] = scenario.lower()
     return runtime_config
 
 

@@ -1,9 +1,5 @@
 {
   "simulation": {
-    "targets": [
-      "estimators",
-      "resource_managers"
-    ],
     "gpu_id": 0,
     "force_cpu": true,
     "log_level": "INFO",
@@ -28,10 +24,22 @@
       "ls",
       "dft",
       "lmmse",
+      "adaptive",
       "pso",
       "perfect"
     ],
     "kwargs": {
+      "adaptive": {
+        "quality_low": 3.0,
+        "quality_high": 12.0,
+        "blend_mid_weight": 0.5,
+        "dft_tap_ratio": 1.0,
+        "lmmse_r_freq": 0.98
+      },
+      "lmmse": {
+        "r_freq": 0.98,
+        "noise_bin_db": 0.5
+      },
       "pso": {
         "swarm_size": 8,
         "iters": 12,
@@ -45,10 +53,28 @@
       "static",
       "round_robin",
       "max_throughput",
-      "pf"
+      "pf",
+      "wmmse",
+      "queue_aware",
+      "drl"
     ],
     "cnn_model_path": "models/cnn_resource_manager_1k.h5",
-    "num_active_users": 2
+    "drl_model_path": "models/drl_resource_manager_policy",
+    "num_active_users": 2,
+    "kwargs": {
+      "wmmse": {
+        "iterations": 12,
+        "damping": 0.5
+      },
+      "queue_aware": {
+        "arrival_rate": 0.35,
+        "utility_weight": 0.2
+      },
+      "drl": {
+        "temperature": 0.75,
+        "fairness_weight": 0.35
+      }
+    }
   },
   "factory_scenario": {
     "room_dimensions": [

@@ -1,0 +1,30 @@
+{
+  "format": "factory6g_drl_policy_v1",
+  "version": 1,
+  "created_at_utc": "2026-03-04T19:12:18.174754+00:00",
+  "model_filename": "policy.keras",
+  "normalization_filename": "normalization.npz",
+  "history_filename": "history.json",
+  "config_path": "config.json",
+  "data_path": "data\\rm_training_data_sim_config_300.parquet",
+  "num_samples": 300,
+  "num_ut": 4,
+  "fft_size": 128,
+  "state_dim": 130,
+  "checkpoint_type": "offline_actor_pretraining",
+  "policy_outputs": [
+    "schedule_output",
+    "power_output",
+    "value_output"
+  ],
+  "training_args": {
+    "epochs": 20,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "validation_split": 0.2,
+    "hidden_dim": 128,
+    "dropout": 0.2,
+    "value_loss_weight": 0.1,
+    "seed": 42
+  }
+}
