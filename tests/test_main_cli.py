@@ -31,13 +31,19 @@ def test_main_cli_runs_fixed_flow_without_plots(tmp_path):
     summary_csv_files = list(output_dir.rglob("summary_v2.csv"))
     stage_json_files = list(output_dir.rglob("stage_results_v2.json"))
     stage_csv_files = list(output_dir.rglob("stage_results_v2.csv"))
+    log_files = list(output_dir.rglob("simulation.log"))
     png_files = list(output_dir.rglob("*.png"))
 
     assert summary_json_files, "Expected summary JSON output."
     assert summary_csv_files, "Expected summary CSV output."
     assert len(stage_json_files) == 2, "Expected per-stage v2 JSON outputs."
     assert len(stage_csv_files) == 2, "Expected per-stage v2 CSV outputs."
+    assert len(log_files) == 1, "Expected exactly one run log file."
     assert not png_files, "plot_results=False should not generate PNG plots."
+    log_text = log_files[0].read_text(encoding="utf-8")
+    assert log_text.strip(), "Run log file must not be empty."
+    assert "Starting execution for fixed flow: estimators -> resource_managers" in log_text
+    assert "Stage order: estimators -> resource_managers" in log_text
 
     stage_payload = json.loads(stage_json_files[0].read_text(encoding="utf-8"))
     assert {

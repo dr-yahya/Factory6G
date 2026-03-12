@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -239,20 +240,211 @@ def _plot_metric_vs_ebno(
     for idx, (name, metric_map) in enumerate(methods.items()):
         if metric not in metric_map:
             continue
-        values = metric_map[metric]
+        raw_values = np.asarray(metric_map[metric], dtype=float)
+        smooth_values = _smooth_metric_curve(
+            metric=metric,
+            raw_values=raw_values,
+            metric_map=metric_map,
+        )
         if ylog:
-            values = [max(float(v), 1e-12) for v in values]
-            ax.semilogy(ebno_range, values, marker=markers[idx % len(markers)], label=name, linewidth=2)
+            raw_plot = np.clip(raw_values, 1e-12, np.inf)
+            smooth_plot = np.clip(smooth_values, 1e-12, np.inf)
+            raw_handle = ax.semilogy(
+                ebno_range,
+                raw_plot,
+                linestyle="None",
+                marker=markers[idx % len(markers)],
+                markersize=6,
+                alpha=0.25,
+                label="_nolegend_",
+            )
+            color = raw_handle[0].get_color()
+            ax.semilogy(
+                ebno_range,
+                smooth_plot,
+                color=color,
+                linewidth=2.2,
+                label=name,
+            )
         else:
-            ax.plot(ebno_range, values, marker=markers[idx % len(markers)], label=name, linewidth=2)
+            raw_handle = ax.plot(
+                ebno_range,
+                raw_values,
+                linestyle="None",
+                marker=markers[idx % len(markers)],
+                markersize=6,
+                alpha=0.25,
+                label="_nolegend_",
+            )
+            color = raw_handle[0].get_color()
+            ax.plot(
+                ebno_range,
+                smooth_values,
+                color=color,
+                linewidth=2.2,
+                label=name,
+            )
     ax.set_xlabel("Eb/No (dB)")
     ax.set_ylabel(ylabel)
     ax.set_title(title)
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
+    ax.text(
+        0.01,
+        0.02,
+        "solid=smoothed, markers=raw",
+        transform=ax.transAxes,
+        fontsize=9,
+        alpha=0.7,
+    )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
+
+
+def _smooth_metric_curve(
+    *,
+    metric: str,
+    raw_values: np.ndarray,
+    metric_map: dict[str, list[float]],
+) -> np.ndarray:
+    if raw_values.size == 0:
+        return raw_values
+    if metric == "ber":
+        return _smooth_ber_curve(metric_map=metric_map, raw_values=raw_values)
+    if metric == "throughput_bits_per_batch":
+        weights = _metric_weights(metric_map, fallback_len=raw_values.size)
+        return _weighted_isotonic(raw_values, weights, increasing=True)
+    if metric == "latency_ms":
+        weights = _metric_weights(metric_map, fallback_len=raw_values.size)
+        return _weighted_isotonic(raw_values, weights, increasing=False)
+    if metric == "avg_power_w":
+        return _ema_smooth(raw_values, alpha=0.35)
+    return raw_values
+
+
+def _smooth_ber_curve(
+    *,
+    metric_map: dict[str, list[float]],
+    raw_values: np.ndarray,
+) -> np.ndarray:
+    n = _coerce_array(metric_map.get("total_bits", []), fallback_len=raw_values.size, default=1.0)
+    k = _coerce_array(metric_map.get("bit_errors", []), fallback_len=raw_values.size, default=0.0)
+    n = np.maximum(n, 0.0)
+    k = np.maximum(k, 0.0)
+
+    if n.size != raw_values.size or k.size != raw_values.size:
+        p = np.clip(raw_values, 1e-12, 1.0)
+        weights = np.maximum(_metric_weights(metric_map, fallback_len=raw_values.size), 1.0)
+    else:
+        p = (k + 0.5) / (n + 1.0)
+        p = np.clip(p, 1e-12, 1.0)
+        weights = np.maximum(n, 1.0)
+
+    y = np.log10(p)
+    y_smooth = _weighted_isotonic(y, weights, increasing=False)
+    return np.clip(np.power(10.0, y_smooth), 1e-12, 1.0)
+
+
+def _metric_weights(metric_map: dict[str, list[float]], fallback_len: int) -> np.ndarray:
+    if "total_bits" in metric_map:
+        weights = _coerce_array(metric_map["total_bits"], fallback_len=fallback_len, default=1.0)
+    elif "num_batches" in metric_map:
+        weights = _coerce_array(metric_map["num_batches"], fallback_len=fallback_len, default=1.0)
+    else:
+        weights = np.ones(fallback_len, dtype=float)
+    weights = np.where(np.isfinite(weights) & (weights > 0.0), weights, 1.0)
+    return weights
+
+
+def _coerce_array(values: list[float], *, fallback_len: int, default: float) -> np.ndarray:
+    arr = np.asarray(values, dtype=float)
+    if arr.size == fallback_len:
+        return arr
+    if arr.size == 0:
+        return np.full(fallback_len, default, dtype=float)
+    if arr.size > fallback_len:
+        return arr[:fallback_len]
+    padded = np.full(fallback_len, default, dtype=float)
+    padded[: arr.size] = arr
+    return padded
+
+
+def _ema_smooth(values: np.ndarray, alpha: float) -> np.ndarray:
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0:
+        return arr
+    out = np.array(arr, copy=True)
+    first_idx = None
+    for idx, val in enumerate(out):
+        if math.isfinite(float(val)):
+            first_idx = idx
+            break
+    if first_idx is None:
+        return out
+    for idx in range(first_idx + 1, out.size):
+        current = out[idx]
+        prev = out[idx - 1]
+        if not math.isfinite(float(current)):
+            out[idx] = prev
+        else:
+            out[idx] = alpha * current + (1.0 - alpha) * prev
+    return out
+
+
+def _weighted_isotonic(values: np.ndarray, weights: np.ndarray, *, increasing: bool) -> np.ndarray:
+    y = np.asarray(values, dtype=float)
+    w = np.asarray(weights, dtype=float)
+    if y.size == 0:
+        return y
+    if y.size != w.size:
+        raise ValueError(
+            f"values and weights must have same length (got {y.size} vs {w.size})."
+        )
+
+    valid = np.isfinite(y) & np.isfinite(w) & (w > 0.0)
+    if not np.any(valid):
+        return y
+
+    y_work = y[valid]
+    if not increasing:
+        y_work = -y_work
+    w_work = w[valid]
+
+    block_starts: list[int] = []
+    block_ends: list[int] = []
+    block_means: list[float] = []
+    block_weights: list[float] = []
+
+    for idx, (val, wt) in enumerate(zip(y_work, w_work)):
+        block_starts.append(idx)
+        block_ends.append(idx)
+        block_means.append(float(val))
+        block_weights.append(float(wt))
+
+        while len(block_means) >= 2 and block_means[-2] > block_means[-1]:
+            merged_weight = block_weights[-2] + block_weights[-1]
+            merged_mean = (
+                (block_means[-2] * block_weights[-2]) + (block_means[-1] * block_weights[-1])
+            ) / merged_weight
+            merged_start = block_starts[-2]
+            merged_end = block_ends[-1]
+
+            block_starts = block_starts[:-2] + [merged_start]
+            block_ends = block_ends[:-2] + [merged_end]
+            block_means = block_means[:-2] + [float(merged_mean)]
+            block_weights = block_weights[:-2] + [float(merged_weight)]
+
+    fitted_valid = np.empty_like(y_work, dtype=float)
+    for start, end, mean in zip(block_starts, block_ends, block_means):
+        fitted_valid[start : end + 1] = mean
+
+    if not increasing:
+        fitted_valid = -fitted_valid
+
+    fitted = np.array(y, copy=True)
+    fitted[valid] = fitted_valid
+    return fitted
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
