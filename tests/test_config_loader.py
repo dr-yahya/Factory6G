@@ -12,6 +12,7 @@ def test_valid_config_parses_into_normalized_object(tmp_path):
     config = load_config(config_path)
     assert config.system.scenario == "umi"
     assert config.monte_carlo.ebno_db_range == [0.0]
+    assert config.monte_carlo.stop_policy == "sweep"
     assert config.system_runtime_config["tx_pattern"] == "tr38901"
 
 
@@ -75,3 +76,22 @@ def test_resource_manager_kwargs_and_model_paths_parse(tmp_path):
     assert config.resource_managers.drl_model_path == "models/drl_policy.h5"
     assert config.resource_managers.kwargs["wmmse"]["iterations"] == 8
     assert config.resource_managers.kwargs["queue_aware"]["arrival_rate"] == 0.4
+
+
+def test_threshold_stop_policy_requires_target_ber(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["monte_carlo"]["stop_policy"] = "threshold"
+    config_data["monte_carlo"]["target_ber"] = None
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_threshold_stop_policy_with_target_ber_parses(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["monte_carlo"]["stop_policy"] = "threshold"
+    config_data["monte_carlo"]["target_ber"] = 1e-5
+    config_path = write_config(tmp_path, config_data)
+    config = load_config(config_path)
+    assert config.monte_carlo.stop_policy == "threshold"
+    assert config.monte_carlo.target_ber == 1e-5

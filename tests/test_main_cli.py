@@ -83,6 +83,7 @@ def test_main_cli_generates_required_stage_plots(tmp_path):
 
     required = [
         "ber_vs_ebno.png",
+        "ber_raw_vs_ebno.png",
         "latency_vs_ebno.png",
         "throughput_vs_ebno.png",
         "power_vs_ebno.png",

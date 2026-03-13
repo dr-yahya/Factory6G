@@ -220,6 +220,7 @@ class MonteCarloConfig:
     max_batches: int
     target_block_errors: int | None
     target_ber: float | None
+    stop_policy: str
     confidence_level: float
     min_total_bits: int
     ebno_min: float
@@ -234,6 +235,7 @@ class MonteCarloConfig:
             "max_batches",
             "target_block_errors",
             "target_ber",
+            "stop_policy",
             "confidence_level",
             "min_total_bits",
             "ebno_min",
@@ -262,6 +264,14 @@ class MonteCarloConfig:
         confidence_level = _ensure_float(raw.get("confidence_level", 0.95), "monte_carlo.confidence_level")
         if not (0.0 < confidence_level < 1.0):
             raise ConfigError("'monte_carlo.confidence_level' must be between 0 and 1.")
+        stop_policy = str(raw.get("stop_policy", "sweep")).lower()
+        if stop_policy not in {"sweep", "threshold"}:
+            raise ConfigError("'monte_carlo.stop_policy' must be either 'sweep' or 'threshold'.")
+        target_ber = _ensure_optional_float(raw.get("target_ber"), "monte_carlo.target_ber")
+        if stop_policy == "threshold" and target_ber is None:
+            raise ConfigError(
+                "'monte_carlo.target_ber' must be set when 'monte_carlo.stop_policy' is 'threshold'."
+            )
         return cls(
             batch_size=batch_size,
             min_batches=min_batches,
@@ -270,7 +280,8 @@ class MonteCarloConfig:
                 raw.get("target_block_errors", 1000),
                 "monte_carlo.target_block_errors",
             ),
-            target_ber=_ensure_optional_float(raw.get("target_ber"), "monte_carlo.target_ber"),
+            target_ber=target_ber,
+            stop_policy=stop_policy,
             confidence_level=confidence_level,
             min_total_bits=_ensure_int(raw.get("min_total_bits", 0), "monte_carlo.min_total_bits"),
             ebno_min=ebno_min,

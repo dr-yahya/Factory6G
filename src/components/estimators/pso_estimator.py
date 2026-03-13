@@ -1,187 +1,106 @@
-"""PSO-based channel estimator that fits a low-order polynomial across frequency.
+"""PSO-tuned structured channel estimator.
 
-This estimator runs a lightweight Particle Swarm Optimization (PSO) per OFDM
-symbol to fit a complex-valued polynomial in subcarrier index that best
-approximates an initial LS estimate. The idea is to denoise and regularize
-the frequency response while being robust to non-convexities in the objective.
+This estimator keeps the public ``pso`` estimator name, but replaces the
+previous global polynomial fit with a constrained search over physically
+meaningful denoisers:
 
-Notes:
-- Uses LSChannelEstimator to obtain an initial estimate and error variance.
-- Per-OFDM-symbol, per (rx, tx, ut, stream), we fit degree-d complex polynomial:
-    H_hat[k] ≈ Σ_{m=0..d} c_m k^m,  k ∈ {0, ..., fft_size-1}
-- PSO minimizes squared error against the initial LS estimate across all
-  subcarriers for the symbol (acts like a smooth regression).
+- DFT delay-domain truncation
+- Frequency-domain LMMSE smoothing
+- A blend of the two
+
+Particle Swarm Optimization (PSO) searches for three global hyperparameters
+per call:
+
+- ``tap_ratio``: delay support for DFT truncation
+- ``r_freq``: frequency correlation parameter for LMMSE smoothing
+- ``blend``: interpolation between DFT and LMMSE candidates
+
+The objective is an unsupervised LS-consistency loss with channel-structure
+regularization:
+
+- pilot-symbol consistency with the LS estimate
+- delay-domain tail energy beyond the chosen support
+- frequency roughness penalty
 """
 
 from __future__ import annotations
 
-import numpy as np
-import tensorflow as tf
 from typing import Tuple
 
+import numpy as np
+import tensorflow as tf
 from sionna.phy import Block
 from sionna.phy.ofdm import LSChannelEstimator, ResourceGrid
 
 
-def _poly_eval_vec(k: np.ndarray, coeffs_real_imag: np.ndarray) -> np.ndarray:
-    """Evaluate complex polynomial with real-imag coefficients on k (vectorized).
-    
-    Args:
-        k: Subcarrier indices [SC]
-        coeffs_real_imag: Coefficients [N, Swarm, (degree+1)*2]
-        
-    Returns:
-        y: Evaluated polynomial [N, Swarm, SC]
-    """
-    # coeffs_real_imag shape: [N, Swarm, Dim]
-    # k shape: [SC]
-    
-    dim = coeffs_real_imag.shape[-1]
-    degree = dim // 2 - 1
-    
-    # Extract real and imag parts
-    # coeffs_real_imag is [..., 2*(degree+1)]
-    # real parts at 0, 2, 4...
-    real = coeffs_real_imag[..., 0::2] # [N, Swarm, degree+1]
-    imag = coeffs_real_imag[..., 1::2] # [N, Swarm, degree+1]
-    
-    coeffs = real + 1j * imag  # [N, Swarm, degree+1]
-    
-    # Horner's method vectorized
-    # We want output [N, Swarm, SC]
-    # Initialize y with zeros
-    shape = coeffs.shape[:-1] + (k.shape[0],) # [N, Swarm, SC]
-    y = np.zeros(shape, dtype=np.complex64)
-    
-    # Reshape k for broadcasting: [1, 1, SC]
-    k_reshaped = k.reshape(1, 1, -1)
-    
-    # Iterate through coefficients from highest degree
-    for i in range(degree, -1, -1):
-        c = coeffs[..., i] # [N, Swarm]
-        c = c[..., np.newaxis] # [N, Swarm, 1]
-        y = y * k_reshaped + c
-        
-    return y
+def _clip(value: float, lower: float, upper: float) -> float:
+    return float(min(max(value, lower), upper))
 
 
-def _pso_optimize_vec(
-    target: np.ndarray,
-    k: np.ndarray,
-    degree: int,
-    swarm_size: int,
-    iters: int,
-    w_start: float,
-    w_end: float,
-    c1: float,
-    c2: float,
-    early_stop_patience: int,
-    min_rel_improvement: float,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Run PSO to fit complex polynomial to target (complex) vs k (float) - Vectorized.
-    
-    Args:
-        target: Target values [N, SC]
-        k: Subcarrier indices [SC]
-        
-    Returns:
-        best_coeffs: [N, Dim]
-    """
-    num_problems = target.shape[0]
-    dim = (degree + 1) * 2
-    
-    # Initialize swarm
-    # [N, Swarm, Dim]
-    # Initialize within bounds based on target magnitude
-    # Compute median magnitude per problem: [N, 1, 1]
-    mag = np.maximum(1e-6, np.median(np.abs(target), axis=1))
-    mag = mag.reshape(num_problems, 1, 1)
-    
-    pos = rng.uniform(low=-1.0, high=1.0, size=(num_problems, swarm_size, dim)).astype(np.float32)
-    pos = pos * mag # Scale by magnitude
-    
-    vel = np.zeros_like(pos, dtype=np.float32)
-    
-    # Target reshaping for broadcasting: [N, 1, SC]
-    target_expanded = target.reshape(num_problems, 1, -1)
-    
-    def evaluate_fitness(p):
-        # p: [N, Swarm, Dim]
-        # Returns: [N, Swarm]
-        pred = _poly_eval_vec(k, p) # [N, Swarm, SC]
-        err = target_expanded - pred
-        # Mean squared error over subcarriers
-        mse = np.mean(err.real**2 + err.imag**2, axis=-1)
-        return mse.astype(np.float32)
+def _delay_truncate(h_ls: np.ndarray, tap_count: int) -> np.ndarray:
+    h_delay = np.fft.ifft(h_ls, axis=-1)
+    h_delay[..., tap_count:] = 0.0
+    return np.fft.fft(h_delay, axis=-1).astype(np.complex64)
 
-    # Initial evaluation
-    fvals = evaluate_fitness(pos) # [N, Swarm]
-    
-    pbest = pos.copy()
-    pbest_val = fvals.copy()
-    
-    # Find global best per problem
-    # argmin over swarm dimension
-    g_idx = np.argmin(pbest_val, axis=1) # [N]
-    
-    # Extract gbest: [N, Dim]
-    # We need advanced indexing
-    row_indices = np.arange(num_problems)
-    gbest = pbest[row_indices, g_idx, :].copy() # [N, Dim]
-    gbest_val = pbest_val[row_indices, g_idx].copy() # [N]
-    
-    # Reshape gbest for broadcasting: [N, 1, Dim]
-    gbest_expanded = gbest.reshape(num_problems, 1, dim)
-    stagnant_steps = 0
 
-    for t in range(iters):
-        w = w_start + (w_end - w_start) * (t / max(1, iters - 1))
-        
-        r1 = rng.random(size=(num_problems, swarm_size, dim), dtype=np.float32)
-        r2 = rng.random(size=(num_problems, swarm_size, dim), dtype=np.float32)
-        
-        # Update velocity
-        # gbest_expanded: [N, 1, Dim] broadcasts to [N, Swarm, Dim]
-        vel = w * vel + c1 * r1 * (pbest - pos) + c2 * r2 * (gbest_expanded - pos)
-        pos = pos + vel
-        
-        # Evaluate
-        fvals = evaluate_fitness(pos)
-        
-        # Update pbest
-        improved = fvals < pbest_val # [N, Swarm]
-        pbest[improved] = pos[improved]
-        pbest_val[improved] = fvals[improved]
-        
-        # Update gbest
-        # Find best in current pbest
-        current_best_idx = np.argmin(pbest_val, axis=1) # [N]
-        current_best_val = pbest_val[row_indices, current_best_idx] # [N]
-        
-        improved_g = current_best_val < gbest_val # [N]
-        
-        if np.any(improved_g):
-            prev_best = gbest_val.copy()
-            gbest[improved_g] = pbest[improved_g, current_best_idx[improved_g], :]
-            gbest_val[improved_g] = current_best_val[improved_g]
-            gbest_expanded = gbest.reshape(num_problems, 1, dim)
-            rel_gain = (prev_best - gbest_val) / np.maximum(prev_best, 1e-12)
-            if np.mean(rel_gain) < min_rel_improvement:
-                stagnant_steps += 1
-            else:
-                stagnant_steps = 0
-        else:
-            stagnant_steps += 1
+def _lmmse_smooth(
+    h_ls: np.ndarray,
+    *,
+    noise_linear: float,
+    r_freq: float,
+    fft_size: int,
+    eig_cache: dict[float, tuple[np.ndarray, np.ndarray]],
+) -> tuple[np.ndarray, float]:
+    key = round(float(r_freq), 3)
+    cached = eig_cache.get(key)
+    if cached is None:
+        k_indices = np.arange(fft_size)
+        delta_k = np.abs(k_indices[:, None] - k_indices[None, :])
+        correlation = (key ** delta_k).astype(np.float32)
+        eigvals, eigvecs = np.linalg.eigh(correlation.astype(np.float64))
+        eigvals = np.maximum(eigvals.astype(np.float32), 1e-9)
+        eigvecs = eigvecs.astype(np.complex64)
+        eig_cache[key] = (eigvals, eigvecs)
+    eigvals, eigvecs = eig_cache[key]
 
-        if stagnant_steps >= early_stop_patience:
-            break
-            
-    return gbest
+    shrinkage = eigvals / (eigvals + max(float(noise_linear), 1e-9))
+    flat = h_ls.reshape(-1, fft_size)
+    projected = flat @ eigvecs
+    smoothed = (projected * shrinkage) @ np.conjugate(eigvecs.T)
+    return smoothed.reshape(h_ls.shape).astype(np.complex64), float(np.mean(shrinkage))
+
+
+def _pilot_consistency_loss(
+    candidate: np.ndarray,
+    reference: np.ndarray,
+    pilot_symbol_indices: tuple[int, ...],
+) -> float:
+    if pilot_symbol_indices:
+        candidate = candidate[..., list(pilot_symbol_indices), :]
+        reference = reference[..., list(pilot_symbol_indices), :]
+    signal_power = max(float(np.mean(np.abs(reference) ** 2)), 1e-9)
+    return float(np.mean(np.abs(candidate - reference) ** 2) / signal_power)
+
+
+def _tail_energy_ratio(candidate: np.ndarray, tap_count: int) -> float:
+    h_delay = np.fft.ifft(candidate, axis=-1)
+    total = max(float(np.mean(np.abs(h_delay) ** 2)), 1e-9)
+    if tap_count >= h_delay.shape[-1]:
+        return 0.0
+    tail = float(np.mean(np.abs(h_delay[..., tap_count:]) ** 2))
+    return tail / total
+
+
+def _roughness_penalty(candidate: np.ndarray) -> float:
+    if candidate.shape[-1] < 3:
+        return 0.0
+    signal_power = max(float(np.mean(np.abs(candidate) ** 2)), 1e-9)
+    second_diff = np.diff(candidate, n=2, axis=-1)
+    return float(np.mean(np.abs(second_diff) ** 2) / signal_power)
 
 
 class PSOChannelEstimator(Block):
-    """PSO-regularized estimator that smooths LS estimates across frequency."""
+    """Search a structured DFT/LMMSE blend instead of fitting a polynomial."""
 
     def __init__(
         self,
@@ -197,80 +116,172 @@ class PSOChannelEstimator(Block):
         early_stop_patience: int = 3,
         min_rel_improvement: float = 1e-3,
         seed: int = 42,
+        tap_ratio_min: float = 0.35,
+        tap_ratio_max: float = 1.0,
+        r_freq_min: float = 0.92,
+        r_freq_max: float = 0.995,
+        tail_weight: float = 2.0,
+        roughness_weight: float = 0.05,
     ) -> None:
         super().__init__()
         self._base = LSChannelEstimator(resource_grid, interpolation_type="nn")
         self._rg = resource_grid
-        self.degree = int(degree)
-        self.swarm_size = int(swarm_size)
-        self.iters = int(iters)
+        self.swarm_size = int(max(2, swarm_size))
+        self.iters = int(max(1, iters))
         self.inertia_start = float(inertia_start)
         self.inertia_end = float(inertia_end)
         self.c1 = float(c1)
         self.c2 = float(c2)
-        self.early_stop_patience = int(early_stop_patience)
-        self.min_rel_improvement = float(min_rel_improvement)
+        self.early_stop_patience = int(max(1, early_stop_patience))
+        self.min_rel_improvement = float(max(min_rel_improvement, 0.0))
         self._rng = np.random.default_rng(seed)
+        self.fft_size = int(resource_grid.fft_size)
+        self.cp_length = int(resource_grid.cyclic_prefix_length)
+        self.pilot_symbol_indices = tuple(int(v) for v in config.get("pilot_ofdm_symbol_indices", []))
+        self.tap_ratio_min = float(tap_ratio_min)
+        self.tap_ratio_max = float(max(tap_ratio_min, tap_ratio_max))
+        self.r_freq_min = float(r_freq_min)
+        self.r_freq_max = float(max(r_freq_min, r_freq_max))
+        self.tail_weight = float(tail_weight)
+        self.roughness_weight = float(roughness_weight)
+        self._eig_cache: dict[float, tuple[np.ndarray, np.ndarray]] = {}
+        self.last_params = {
+            "tap_ratio": 1.0,
+            "r_freq": 0.98,
+            "blend": 0.5,
+        }
 
-        # Precompute k index normalized to [-1, 1] for numerical stability
-        n_sc = int(self._rg.fft_size)
-        k = np.linspace(-1.0, 1.0, num=n_sc, dtype=np.float32)
-        self._k = k
+    def _tap_count(self, tap_ratio: float) -> int:
+        ratio = _clip(tap_ratio, self.tap_ratio_min, self.tap_ratio_max)
+        raw = int(round(self.cp_length * ratio))
+        return int(min(max(raw, 1), self.fft_size))
+
+    def _candidate_from_params(
+        self,
+        h_ls: np.ndarray,
+        *,
+        noise_linear: float,
+        tap_ratio: float,
+        r_freq: float,
+        blend: float,
+        dft_cache: dict[int, np.ndarray],
+        lmmse_cache: dict[float, tuple[np.ndarray, float]],
+    ) -> tuple[np.ndarray, float, int]:
+        tap_count = self._tap_count(tap_ratio)
+        if tap_count not in dft_cache:
+            dft_cache[tap_count] = _delay_truncate(h_ls, tap_count=tap_count)
+        r_key = round(_clip(r_freq, self.r_freq_min, self.r_freq_max), 3)
+        if r_key not in lmmse_cache:
+            lmmse_cache[r_key] = _lmmse_smooth(
+                h_ls,
+                noise_linear=noise_linear,
+                r_freq=r_key,
+                fft_size=self.fft_size,
+                eig_cache=self._eig_cache,
+            )
+        h_dft = dft_cache[tap_count]
+        h_lmmse, shrinkage = lmmse_cache[r_key]
+        blend_weight = _clip(blend, 0.0, 1.0)
+        candidate = (
+            blend_weight * h_lmmse
+            + (1.0 - blend_weight) * h_dft
+        ).astype(np.complex64)
+        err_scale = (
+            blend_weight * shrinkage
+            + (1.0 - blend_weight) * (float(tap_count) / float(self.fft_size))
+        )
+        return candidate, float(err_scale), tap_count
+
+    def _objective(
+        self,
+        candidate: np.ndarray,
+        reference: np.ndarray,
+        *,
+        tap_count: int,
+    ) -> float:
+        consistency = _pilot_consistency_loss(candidate, reference, self.pilot_symbol_indices)
+        tail = _tail_energy_ratio(candidate, tap_count=tap_count)
+        roughness = _roughness_penalty(candidate)
+        return consistency + self.tail_weight * tail + self.roughness_weight * roughness
 
     def call(self, y: tf.Tensor, noise_variance: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        """Estimate channel with PSO smoothing.
-        Args:
-            y: Received resource grid (complex tensor), shape
-               [B, rx, stream, n_sym, n_sc]
-            noise_variance: Noise variance tensor (unused here beyond LS).
-        Returns:
-            (h_hat, err_var): Smoothed channel and LS-derived error variance.
-        """
-        # Initial LS estimate (already interpolated to all REs)
         h_ls, err_var = self._base(y, noise_variance)
 
-        # Expect shape: [B, rx, tx, ut, stream, n_sym, n_sc]
-        shape = tf.shape(h_ls)
-        # We need concrete values for reshaping
-        
-        h_np = h_ls.numpy()
-        orig_shape = h_np.shape
-        n_sc = orig_shape[-1]
-        
-        # Flatten all dimensions except subcarriers
-        # [N_problems, SC]
-        h_flat = h_np.reshape(-1, n_sc)
-        
-        k = self._k
-        assert n_sc == k.shape[0], "Resource grid FFT size mismatch."
+        h_ls_np = h_ls.numpy().astype(np.complex64)
+        avg_no = float(tf.reduce_mean(tf.cast(noise_variance, tf.float32)).numpy())
+        dft_cache: dict[int, np.ndarray] = {}
+        lmmse_cache: dict[float, tuple[np.ndarray, float]] = {}
 
-        # Run vectorized PSO
-        best_coeffs = _pso_optimize_vec(
-            target=h_flat,
-            k=k,
-            degree=self.degree,
-            swarm_size=self.swarm_size,
-            iters=self.iters,
-            w_start=self.inertia_start,
-            w_end=self.inertia_end,
-            c1=self.c1,
-            c2=self.c2,
-            early_stop_patience=self.early_stop_patience,
-            min_rel_improvement=self.min_rel_improvement,
-            rng=self._rng,
+        lower = np.array([self.tap_ratio_min, self.r_freq_min, 0.0], dtype=np.float32)
+        upper = np.array([self.tap_ratio_max, self.r_freq_max, 1.0], dtype=np.float32)
+        span = upper - lower
+
+        particles = lower + self._rng.random((self.swarm_size, 3), dtype=np.float32) * span
+        velocities = np.zeros_like(particles, dtype=np.float32)
+        personal_best = particles.copy()
+        personal_values = np.full(self.swarm_size, np.inf, dtype=np.float32)
+        global_best = particles[0].copy()
+        global_value = float("inf")
+        stagnant_steps = 0
+
+        def evaluate(position: np.ndarray) -> tuple[float, float]:
+            candidate, err_scale, tap_count = self._candidate_from_params(
+                h_ls_np,
+                noise_linear=avg_no,
+                tap_ratio=float(position[0]),
+                r_freq=float(position[1]),
+                blend=float(position[2]),
+                dft_cache=dft_cache,
+                lmmse_cache=lmmse_cache,
+            )
+            return self._objective(candidate, h_ls_np, tap_count=tap_count), err_scale
+
+        for step in range(self.iters):
+            for idx in range(self.swarm_size):
+                value, _ = evaluate(particles[idx])
+                if value < personal_values[idx]:
+                    personal_values[idx] = value
+                    personal_best[idx] = particles[idx].copy()
+                if value < global_value:
+                    prev = global_value
+                    global_value = value
+                    global_best = particles[idx].copy()
+                    if np.isfinite(prev):
+                        rel_gain = (prev - value) / max(abs(prev), 1e-12)
+                        stagnant_steps = stagnant_steps + 1 if rel_gain < self.min_rel_improvement else 0
+                    else:
+                        stagnant_steps = 0
+
+            if stagnant_steps >= self.early_stop_patience:
+                break
+
+            inertia = self.inertia_start + (self.inertia_end - self.inertia_start) * (
+                step / max(1, self.iters - 1)
+            )
+            r1 = self._rng.random((self.swarm_size, 3), dtype=np.float32)
+            r2 = self._rng.random((self.swarm_size, 3), dtype=np.float32)
+            velocities = (
+                inertia * velocities
+                + self.c1 * r1 * (personal_best - particles)
+                + self.c2 * r2 * (global_best - particles)
+            )
+            particles = np.clip(particles + velocities, lower, upper)
+
+        best_candidate, best_err_scale, _ = self._candidate_from_params(
+            h_ls_np,
+            noise_linear=avg_no,
+            tap_ratio=float(global_best[0]),
+            r_freq=float(global_best[1]),
+            blend=float(global_best[2]),
+            dft_cache=dft_cache,
+            lmmse_cache=lmmse_cache,
         )
-        
-        # Evaluate polynomial with best coefficients
-        # best_coeffs: [N_problems, Dim]
-        # We need to reshape for _poly_eval_vec which expects [N, Swarm, Dim]
-        # Here we just have 1 "particle" (the best one) per problem
-        best_coeffs_expanded = best_coeffs[:, np.newaxis, :] # [N_problems, 1, Dim]
-        
-        pred = _poly_eval_vec(k, best_coeffs_expanded) # [N_problems, 1, SC]
-        pred = pred.squeeze(axis=1) # [N_problems, SC]
-        
-        # Reshape back to original
-        h_out = pred.reshape(orig_shape)
+        self.last_params = {
+            "tap_ratio": float(global_best[0]),
+            "r_freq": float(global_best[1]),
+            "blend": float(global_best[2]),
+        }
 
-        h_pred = tf.convert_to_tensor(h_out)
-        return h_pred, err_var
+        h_hat = tf.convert_to_tensor(best_candidate, dtype=h_ls.dtype)
+        err_var_out = err_var * tf.cast(best_err_scale, err_var.dtype)
+        return h_hat, err_var_out

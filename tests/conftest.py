@@ -37,6 +37,7 @@ def make_tiny_config(output_dir: str) -> dict:
             "max_batches": 1,
             "target_block_errors": None,
             "target_ber": None,
+            "stop_policy": "sweep",
             "confidence_level": 0.95,
             "min_total_bits": 0,
             "ebno_min": 0.0,

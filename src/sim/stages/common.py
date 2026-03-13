@@ -13,6 +13,11 @@ if TYPE_CHECKING:
     from src.models.model import Model
 
 
+MIN_RESOLVED_BIT_ERRORS = 30
+POINT_STATUS_RESOLVED = "resolved"
+POINT_STATUS_UPPER_BOUND_ONLY = "upper_bound_only"
+
+
 METRIC_KEYS = (
     "ber",
     "ber_upper_confidence",
@@ -26,11 +31,19 @@ METRIC_KEYS = (
     "block_errors",
     "total_blocks",
     "num_batches",
+    "stop_reason",
+    "point_status",
 )
 
 
-def initialize_stage_metrics(methods: list[str]) -> dict[str, dict[str, list[float]]]:
+def initialize_stage_metrics(methods: list[str]) -> dict[str, dict[str, list[Any]]]:
     return {method: {key: [] for key in METRIC_KEYS} for method in methods}
+
+
+def classify_point_status(bit_errors: float) -> str:
+    if float(bit_errors) < float(MIN_RESOLVED_BIT_ERRORS):
+        return POINT_STATUS_UPPER_BOUND_ONLY
+    return POINT_STATUS_RESOLVED
 
 
 def transmitted_ut_mask(
@@ -113,12 +126,19 @@ def mc_stop_reason(
     target_block_errors: int | None,
     total_bit_errors: int,
     target_ber: float | None,
+    stop_policy: str,
     confidence_level: float,
     min_batches: int,
     min_total_bits: int,
 ) -> str | None:
     if num_batches < min_batches or total_bits < min_total_bits:
         return None
+    if stop_policy == "sweep":
+        if target_block_errors is not None and total_block_errors >= target_block_errors:
+            return "target_block_errors"
+        return None
+    if stop_policy != "threshold":
+        raise ValueError(f"Unsupported monte carlo stop policy '{stop_policy}'.")
     if target_block_errors is None and target_ber is None:
         return "min_evidence"
     if target_block_errors is not None and total_block_errors >= target_block_errors:
@@ -131,10 +151,10 @@ def mc_stop_reason(
 
 
 def append_point_metrics(
-    aggregate: dict[str, list[float]],
+    aggregate: dict[str, list[Any]],
     *,
     confidence_level: float,
-    point: dict[str, float],
+    point: dict[str, Any],
 ) -> None:
     aggregate["ber"].append(float(point["ber"]))
     aggregate["ber_upper_confidence"].append(
@@ -154,6 +174,10 @@ def append_point_metrics(
     aggregate["block_errors"].append(float(point["block_errors"]))
     aggregate["total_blocks"].append(float(point["total_blocks"]))
     aggregate["num_batches"].append(float(point["num_batches"]))
+    aggregate["stop_reason"].append(str(point.get("stop_reason", "unknown")))
+    aggregate["point_status"].append(
+        str(point.get("point_status", classify_point_status(float(point["bit_errors"]))))
+    )
 
 
 def run_monte_carlo_point(
@@ -165,11 +189,12 @@ def run_monte_carlo_point(
     max_mc_batches: int,
     target_block_errors: int | None,
     target_ber: float | None,
+    stop_policy: str,
     confidence_level: float,
     min_total_bits: int,
     include_feedback: bool,
     directives_fn: Callable[[Any], ResourceDirectives | None] | None = None,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     total_errors = 0
     total_bits = 0
     total_block_errors = 0
@@ -180,6 +205,7 @@ def run_monte_carlo_point(
     num_batches_run = 0
 
     runtime_start = time.perf_counter()
+    final_stop_reason = "max_batches"
     for _ in range(max_mc_batches):
         context = model.prepare_batch_context(
             batch_size=batch_size,
@@ -206,11 +232,13 @@ def run_monte_carlo_point(
             target_block_errors=target_block_errors,
             total_bit_errors=total_errors,
             target_ber=target_ber,
+            stop_policy=stop_policy,
             confidence_level=confidence_level,
             min_batches=min_batches,
             min_total_bits=min_total_bits,
         )
         if stop_reason is not None:
+            final_stop_reason = stop_reason
             break
 
     runtime_sec = time.perf_counter() - runtime_start
@@ -230,6 +258,8 @@ def run_monte_carlo_point(
         "block_errors": float(total_block_errors),
         "total_blocks": float(total_blocks),
         "num_batches": float(num_batches_run),
+        "stop_reason": final_stop_reason,
+        "point_status": classify_point_status(float(total_errors)),
     }
 
 

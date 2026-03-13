@@ -9,6 +9,7 @@ from src.sim.config import Factory6GConfig
 
 from .common import (
     append_point_metrics,
+    classify_point_status,
     initialize_stage_metrics,
     mc_stop_reason,
     resolve_kwargs,
@@ -29,6 +30,7 @@ def _new_rm_point_state() -> dict[str, Any]:
         "runtime_sec": 0.0,
         "num_batches": 0,
         "done": False,
+        "stop_reason": None,
     }
 
 
@@ -129,12 +131,14 @@ def run_resource_manager_stage(config: Factory6GConfig) -> dict[str, Any]:
                     target_block_errors=config.monte_carlo.target_block_errors,
                     total_bit_errors=stats["errors"],
                     target_ber=config.monte_carlo.target_ber,
+                    stop_policy=config.monte_carlo.stop_policy,
                     confidence_level=config.monte_carlo.confidence_level,
                     min_batches=config.monte_carlo.min_batches,
                     min_total_bits=config.monte_carlo.min_total_bits,
                 )
                 if stop_reason is not None:
                     stats["done"] = True
+                    stats["stop_reason"] = stop_reason
         print(f"Done ({time.time() - batch_start:.2f}s)")
 
     for method in methods:
@@ -155,6 +159,8 @@ def run_resource_manager_stage(config: Factory6GConfig) -> dict[str, Any]:
                 "block_errors": float(stats["block_errors"]),
                 "total_blocks": float(stats["blocks"]),
                 "num_batches": float(stats["num_batches"]),
+                "stop_reason": str(stats["stop_reason"] or "max_batches"),
+                "point_status": classify_point_status(float(stats["errors"])),
             }
             append_point_metrics(
                 aggregated[method],
