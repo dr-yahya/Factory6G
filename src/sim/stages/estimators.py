@@ -81,6 +81,7 @@ def run_estimator_stage(config: Factory6GConfig) -> dict[str, Any]:
         for ebno_index, ebno_db in enumerate(ebno_db_range):
             if all(point_state[method][ebno_index]["done"] for method in methods):
                 continue
+            print(f"  snr={ebno_db:+.1f}dB ", end="", flush=True)
             context = shared_context_model.prepare_batch_context(
                 batch_size=config.monte_carlo.batch_size,
                 ebno_db=ebno_db,
@@ -91,6 +92,7 @@ def run_estimator_stage(config: Factory6GConfig) -> dict[str, Any]:
                 if stats["done"]:
                     continue
 
+                print(f"[{method}]", end="", flush=True)
                 method_start = time.perf_counter()
                 result = model.run_batch(context, include_details=True)
                 elapsed = time.perf_counter() - method_start

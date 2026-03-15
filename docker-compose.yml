@@ -1,0 +1,22 @@
+services:
+
+  simulation:          # CPU-only (set force_cpu: true in config.json)
+    build: .
+    image: factory6g:latest
+    volumes:
+      - ./results:/app/results
+      - ./config.json:/app/config.json:ro
+
+  simulation-gpu:      # GPU-accelerated (set force_cpu: false in config.json)
+    build: .
+    image: factory6g:latest
+    volumes:
+      - ./results:/app/results
+      - ./config.json:/app/config.json:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

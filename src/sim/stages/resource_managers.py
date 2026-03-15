@@ -91,6 +91,7 @@ def run_resource_manager_stage(config: Factory6GConfig) -> dict[str, Any]:
         for ebno_index, ebno_db in enumerate(ebno_db_range):
             if all(point_state[method][ebno_index]["done"] for method in methods):
                 continue
+            print(f"  snr={ebno_db:+.1f}dB ", end="", flush=True)
             context = shared_model.prepare_batch_context(
                 batch_size=config.monte_carlo.batch_size,
                 ebno_db=ebno_db,
@@ -101,6 +102,7 @@ def run_resource_manager_stage(config: Factory6GConfig) -> dict[str, Any]:
                 if stats["done"]:
                     continue
 
+                print(f"[{method}]", end="", flush=True)
                 method_start = time.perf_counter()
                 feedback = context.feedback if manager.needs_channel_feedback else None
                 directives = manager.get_runtime_directives(system_config, ebno_db, feedback=feedback)

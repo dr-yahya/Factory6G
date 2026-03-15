@@ -1,7 +1,7 @@
 {
   "simulation": {
     "gpu_id": 0,
-    "force_cpu": true,
+    "force_cpu": false,
     "log_level": "INFO",
     "seed": 42,
     "output_dir": "results",

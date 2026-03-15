@@ -44,32 +44,30 @@ class Model:
         rx_tx_association = np.zeros([1, num_tx], dtype=np.int32)
         rx_tx_association[0, :] = 1
 
-        with tf.device("/CPU:0"):
-            self._rg = ResourceGrid(
-                num_ofdm_symbols=num_ofdm_symbols,
-                fft_size=fft_size,
-                subcarrier_spacing=subcarrier_spacing,
-                num_tx=num_tx,
-                num_streams_per_tx=num_streams_per_tx,
-                cyclic_prefix_length=cyclic_prefix_length,
-                pilot_pattern="kronecker",
-                pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices,
-            )
+        self._rg = ResourceGrid(
+            num_ofdm_symbols=num_ofdm_symbols,
+            fft_size=fft_size,
+            subcarrier_spacing=subcarrier_spacing,
+            num_tx=num_tx,
+            num_streams_per_tx=num_streams_per_tx,
+            cyclic_prefix_length=cyclic_prefix_length,
+            pilot_pattern="kronecker",
+            pilot_ofdm_symbol_indices=pilot_ofdm_symbol_indices,
+        )
 
         self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
 
-        with tf.device("/CPU:0"):
-            self._antenna_config = AntennaConfig(self.config)
-            self._transmitter = Transmitter(self.config, self._rg)
-            self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
-            self._receiver = Receiver(
-                self.config,
-                self._rg,
-                self._sm,
-                self._transmitter._encoder,
-                perfect_csi=perfect_csi,
-                channel_estimator=self._build_channel_estimator(),
-            )
+        self._antenna_config = AntennaConfig(self.config)
+        self._transmitter = Transmitter(self.config, self._rg)
+        self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
+        self._receiver = Receiver(
+            self.config,
+            self._rg,
+            self._sm,
+            self._transmitter._encoder,
+            perfect_csi=perfect_csi,
+            channel_estimator=self._build_channel_estimator(),
+        )
 
     def _build_channel_estimator(self):
         if self.perfect_csi:
@@ -111,9 +109,8 @@ class Model:
         ebno_db: float,
         include_feedback: bool,
     ) -> BatchContext:
-        with tf.device("/CPU:0"):
-            self._channel.set_topology(batch_size)
-            h_freq = self._channel.sample_frequency_response(batch_size)
+        self._channel.set_topology(batch_size)
+        h_freq = self._channel.sample_frequency_response(batch_size)
 
         noise_variance = tf.cast(
             ebnodb2no(
@@ -132,9 +129,8 @@ class Model:
         feedback = None
         if include_feedback:
             probe_directives = self.default_directives()
-            with tf.device("/CPU:0"):
-                x_probe, _, _ = self._transmitter.call(batch_size, directives=probe_directives)
-                y_probe = self._channel.apply_frequency_response(x_probe, h_freq) + probe_noise
+            x_probe, _, _ = self._transmitter.call(batch_size, directives=probe_directives)
+            y_probe = self._channel.apply_frequency_response(x_probe, h_freq) + probe_noise
             if self.perfect_csi:
                 feedback = ResourceManagerFeedback(
                     h_hat=h_freq,
@@ -163,13 +159,12 @@ class Model:
     ) -> dict:
         active_directives = directives or self.default_directives()
 
-        with tf.device("/CPU:0"):
-            x_rg, bits, qam_symbols = self._transmitter.call(
-                batch_context.batch_size,
-                directives=active_directives,
-                bits=batch_context.source_bits,
-            )
-            y = self._channel.apply_frequency_response(x_rg, batch_context.h_freq) + batch_context.data_noise
+        x_rg, bits, qam_symbols = self._transmitter.call(
+            batch_context.batch_size,
+            directives=active_directives,
+            bits=batch_context.source_bits,
+        )
+        y = self._channel.apply_frequency_response(x_rg, batch_context.h_freq) + batch_context.data_noise
 
         if self.perfect_csi:
             h_hat = batch_context.h_freq
