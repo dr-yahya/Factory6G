@@ -1,0 +1,266 @@
+{
+  "config": {
+    "system_config": {
+      "carrier_frequency": 3500000000.0,
+      "fft_size": 128,
+      "subcarrier_spacing": 30000,
+      "num_ofdm_symbols": 14,
+      "cyclic_prefix_length": 20,
+      "pilot_ofdm_symbol_indices": [
+        2,
+        11
+      ],
+      "num_bs_ant": 8,
+      "num_ut": 4,
+      "num_ut_ant": 1,
+      "num_bits_per_symbol": 2,
+      "coderate": 0.5,
+      "num_decoding_iter": 20,
+      "channel_model_type": "tr38901",
+      "scenario": "umi",
+      "direction": "uplink",
+      "o2i_model": "low",
+      "enable_pathloss": false,
+      "enable_shadow_fading": false,
+      "min_ut_velocity": 0.0,
+      "max_ut_velocity": 0.0,
+      "antenna_spacing": 0.5,
+      "tx_pattern": "tr38901",
+      "tx_polarization": "cross",
+      "rx_pattern": "iso",
+      "rx_polarization": "V",
+      "active_ut_mask": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "per_ut_power": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "pilot_reuse_factor": 1,
+      "target_bler": 0.001
+    },
+    "output_dir": "results",
+    "batch_size": 1,
+    "total_batches": 2,
+    "plot_results": true,
+    "target_ber": null,
+    "confidence_level": 0.95,
+    "confidence_max_batches": 2000,
+    "ebno_db_range": [
+      0.0,
+      5.0,
+      10.0,
+      15.0,
+      20.0
+    ],
+    "resource_managers": [
+      "static",
+      "round_robin",
+      "max_throughput",
+      "pf"
+    ],
+    "num_active_users": 2,
+    "cnn_model_path": "models/cnn_resource_manager_1k.h5"
+  },
+  "results": {
+    "static": {
+      "ber": [
+        0.038411458333333336,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ber_upper_confidence": [
+        0.04136631497479344,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404
+      ],
+      "throughput": [
+        5908.0,
+        6144.0,
+        6144.0,
+        6144.0,
+        6144.0
+      ],
+      "latency": [
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334
+      ],
+      "bit_errors": [
+        472,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        12288,
+        12288,
+        12288,
+        12288,
+        12288
+      ]
+    },
+    "round_robin": {
+      "ber": [
+        0.011393229166666666,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ber_upper_confidence": [
+        0.013079068749576218,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404
+      ],
+      "throughput": [
+        6074.0,
+        6144.0,
+        6144.0,
+        6144.0,
+        6144.0
+      ],
+      "latency": [
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334
+      ],
+      "bit_errors": [
+        140,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        12288,
+        12288,
+        12288,
+        12288,
+        12288
+      ]
+    },
+    "max_throughput": {
+      "ber": [
+        0.0,
+        0.026936848958333332,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ber_upper_confidence": [
+        0.00024379331653271404,
+        0.029445294135044254,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404
+      ],
+      "throughput": [
+        6144.0,
+        5978.5,
+        6144.0,
+        6144.0,
+        6144.0
+      ],
+      "latency": [
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334
+      ],
+      "bit_errors": [
+        0,
+        331,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        12288,
+        12288,
+        12288,
+        12288,
+        12288
+      ]
+    },
+    "pf": {
+      "ber": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "ber_upper_confidence": [
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404,
+        0.00024379331653271404
+      ],
+      "throughput": [
+        6144.0,
+        6144.0,
+        6144.0,
+        6144.0,
+        6144.0
+      ],
+      "latency": [
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334,
+        0.0005395833333333334
+      ],
+      "bit_errors": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        12288,
+        12288,
+        12288,
+        12288,
+        12288
+      ]
+    }
+  },
+  "ebno_db_range": [
+    0.0,
+    5.0,
+    10.0,
+    15.0,
+    20.0
+  ],
+  "timestamp": "20260302_113658",
+  "run_label": "resource_managers",
+  "run_dir": "results\\20260302_113658_resource_managers",
+  "mode": "resource_manager_comparison",
+  "confidence_level": 0.95,
+  "method_runtime_sec": {
+    "static": 4.773458499999833,
+    "round_robin": 4.864517200010596,
+    "max_throughput": 6.117188600008376,
+    "pf": 6.070823199974257
+  }
+}

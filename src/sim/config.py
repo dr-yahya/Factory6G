@@ -268,9 +268,9 @@ class MonteCarloConfig:
         if stop_policy not in {"sweep", "threshold"}:
             raise ConfigError("'monte_carlo.stop_policy' must be either 'sweep' or 'threshold'.")
         target_ber = _ensure_optional_float(raw.get("target_ber"), "monte_carlo.target_ber")
-        if stop_policy == "threshold" and target_ber is None:
+        if stop_policy == "threshold" and target_ber is None and raw.get("target_block_errors") is None:
             raise ConfigError(
-                "'monte_carlo.target_ber' must be set when 'monte_carlo.stop_policy' is 'threshold'."
+                "'monte_carlo.stop_policy' is 'threshold' but neither 'target_ber' nor 'target_block_errors' is set."
             )
         return cls(
             batch_size=batch_size,

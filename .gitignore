@@ -50,5 +50,4 @@ models/saved_model/
 # Sionna cache
 .sionna_cache/
 
-# Simulation outputs
-results/
+

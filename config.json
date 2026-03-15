@@ -8,16 +8,16 @@
     "plot_results": true
   },
   "monte_carlo": {
-    "batch_size": 16,
-    "min_batches": 4,
-    "max_batches": 128,
-    "target_block_errors": 1000,
+    "batch_size": 64,
+    "min_batches": 10,
+    "max_batches": 1000,
+    "target_block_errors": 100,
     "target_ber": null,
-    "stop_policy": "sweep",
+    "stop_policy": "threshold",
     "confidence_level": 0.95,
     "min_total_bits": 1000000,
     "ebno_min": -5.0,
-    "ebno_max": 10.0,
+    "ebno_max": 8.0,
     "ebno_step": 0.5
   },
   "estimators": {

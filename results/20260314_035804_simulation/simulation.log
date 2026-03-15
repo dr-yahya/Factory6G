@@ -1,0 +1,396 @@
+Log file: C:\Users\ysabe\Developer\personal\Factory6G\results\20260314_035804_simulation\simulation.log
+Loaded configuration for scenario: umi
+Starting execution for fixed flow: estimators -> resource_managers
+======================================================================
+  6G Smart Factory Simulation Flow
+======================================================================
+Stage order: estimators -> resource_managers
+Scenario: umi
+Eb/No Range: [-5.0, -4.5, -4.0, -3.5, -3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]
+Run directory: results\20260314_035804_simulation
+----------------------------------------------------------------------
+Estimator batch 1/128 (active points 186/186) ... Done (396.35s)
+Estimator batch 2/128 (active points 186/186) ... Done (413.62s)
+Estimator batch 3/128 (active points 186/186) ... Done (377.11s)
+Estimator batch 4/128 (active points 186/186) ... Done (243.22s)
+Estimator batch 5/128 (active points 186/186) ... Done (237.02s)
+Estimator batch 6/128 (active points 186/186) ... Done (234.27s)
+Estimator batch 7/128 (active points 186/186) ... Done (242.06s)
+Estimator batch 8/128 (active points 186/186) ... Done (242.32s)
+Estimator batch 9/128 (active points 186/186) ... Done (238.91s)
+Estimator batch 10/128 (active points 186/186) ... Done (247.11s)
+Estimator batch 11/128 (active points 186/186) ... Done (238.53s)
+Estimator batch 12/128 (active points 186/186) ... Done (228.06s)
+Estimator batch 13/128 (active points 186/186) ... Done (233.88s)
+Estimator batch 14/128 (active points 186/186) ... Done (246.52s)
+Estimator batch 15/128 (active points 186/186) ... Done (270.41s)
+Estimator batch 16/128 (active points 186/186) ... Done (260.11s)
+Estimator batch 17/128 (active points 176/186) ... Done (248.51s)
+Estimator batch 18/128 (active points 175/186) ... Done (257.39s)
+Estimator batch 19/128 (active points 173/186) ... Done (235.71s)
+Estimator batch 20/128 (active points 171/186) ... Done (221.16s)
+Estimator batch 21/128 (active points 171/186) ... Done (216.53s)
+Estimator batch 22/128 (active points 168/186) ... Done (202.37s)
+Estimator batch 23/128 (active points 166/186) ... Done (204.81s)
+Estimator batch 24/128 (active points 166/186) ... Done (249.85s)
+Estimator batch 25/128 (active points 166/186) ... Done (308.29s)
+Estimator batch 26/128 (active points 166/186) ... Done (280.98s)
+Estimator batch 27/128 (active points 166/186) ... Done (195.71s)
+Estimator batch 28/128 (active points 165/186) ... Done (191.20s)
+Estimator batch 29/128 (active points 162/186) ... Done (189.63s)
+Estimator batch 30/128 (active points 161/186) ... Done (182.60s)
+Estimator batch 31/128 (active points 161/186) ... Done (187.51s)
+Estimator batch 32/128 (active points 161/186) ... Done (179.35s)
+Estimator batch 33/128 (active points 161/186) ... Done (180.99s)
+Estimator batch 34/128 (active points 161/186) ... Done (185.46s)
+Estimator batch 35/128 (active points 161/186) ... Done (181.59s)
+Estimator batch 36/128 (active points 161/186) ... Done (186.04s)
+Estimator batch 37/128 (active points 161/186) ... Done (188.43s)
+Estimator batch 38/128 (active points 159/186) ... Done (182.95s)
+Estimator batch 39/128 (active points 159/186) ... Done (185.37s)
+Estimator batch 40/128 (active points 158/186) ... Done (186.69s)
+Estimator batch 41/128 (active points 158/186) ... Done (182.10s)
+Estimator batch 42/128 (active points 158/186) ... Done (181.84s)
+Estimator batch 43/128 (active points 158/186) ... Done (180.06s)
+Estimator batch 44/128 (active points 157/186) ... Done (180.87s)
+Estimator batch 45/128 (active points 156/186) ... Done (175.77s)
+Estimator batch 46/128 (active points 156/186) ... Done (175.95s)
+Estimator batch 47/128 (active points 156/186) ... Done (178.93s)
+Estimator batch 48/128 (active points 156/186) ... Done (170.91s)
+Estimator batch 49/128 (active points 156/186) ... Done (181.32s)
+Estimator batch 50/128 (active points 155/186) ... Done (178.97s)
+Estimator batch 51/128 (active points 155/186) ... Done (173.38s)
+Estimator batch 52/128 (active points 153/186) ... Done (174.59s)
+Estimator batch 53/128 (active points 153/186) ... Done (171.81s)
+Estimator batch 54/128 (active points 153/186) ... Done (173.97s)
+Estimator batch 55/128 (active points 153/186) ... Done (174.82s)
+Estimator batch 56/128 (active points 153/186) ... Done (175.78s)
+Estimator batch 57/128 (active points 153/186) ... Done (174.14s)
+Estimator batch 58/128 (active points 152/186) ... Done (172.76s)
+Estimator batch 59/128 (active points 152/186) ... Done (170.10s)
+Estimator batch 60/128 (active points 151/186) ... Done (171.70s)
+Estimator batch 61/128 (active points 151/186) ... Done (172.88s)
+Estimator batch 62/128 (active points 151/186) ... Done (175.59s)
+Estimator batch 63/128 (active points 151/186) ... Done (174.57s)
+Estimator batch 64/128 (active points 151/186) ... Done (171.17s)
+Estimator batch 65/128 (active points 151/186) ... Done (173.51s)
+Estimator batch 66/128 (active points 151/186) ... Done (173.90s)
+Estimator batch 67/128 (active points 151/186) ... Done (177.26s)
+Estimator batch 68/128 (active points 151/186) ... Done (171.23s)
+Estimator batch 69/128 (active points 151/186) ... Done (172.06s)
+Estimator batch 70/128 (active points 150/186) ... Done (171.28s)
+Estimator batch 71/128 (active points 150/186) ... Done (172.47s)
+Estimator batch 72/128 (active points 150/186) ... Done (166.81s)
+Estimator batch 73/128 (active points 150/186) ... Done (166.23s)
+Estimator batch 74/128 (active points 150/186) ... Done (171.15s)
+Estimator batch 75/128 (active points 150/186) ... Done (170.34s)
+Estimator batch 76/128 (active points 148/186) ... Done (166.43s)
+Estimator batch 77/128 (active points 148/186) ... Done (166.87s)
+Estimator batch 78/128 (active points 148/186) ... Done (164.29s)
+Estimator batch 79/128 (active points 148/186) ... Done (166.94s)
+Estimator batch 80/128 (active points 148/186) ... Done (171.97s)
+Estimator batch 81/128 (active points 148/186) ... Done (170.46s)
+Estimator batch 82/128 (active points 148/186) ... Done (171.62s)
+Estimator batch 83/128 (active points 148/186) ... Done (167.24s)
+Estimator batch 84/128 (active points 148/186) ... Done (165.48s)
+Estimator batch 85/128 (active points 148/186) ... Done (168.36s)
+Estimator batch 86/128 (active points 147/186) ... Done (165.69s)
+Estimator batch 87/128 (active points 147/186) ... Done (165.18s)
+Estimator batch 88/128 (active points 147/186) ... Done (167.44s)
+Estimator batch 89/128 (active points 147/186) ... Done (170.55s)
+Estimator batch 90/128 (active points 147/186) ... Done (165.99s)
+Estimator batch 91/128 (active points 147/186) ... Done (169.51s)
+Estimator batch 92/128 (active points 147/186) ... Done (168.59s)
+Estimator batch 93/128 (active points 147/186) ... Done (169.89s)
+Estimator batch 94/128 (active points 146/186) ... Done (170.10s)
+Estimator batch 95/128 (active points 146/186) ... Done (161.76s)
+Estimator batch 96/128 (active points 146/186) ... Done (166.14s)
+Estimator batch 97/128 (active points 146/186) ... Done (168.67s)
+Estimator batch 98/128 (active points 146/186) ... Done (167.39s)
+Estimator batch 99/128 (active points 146/186) ... Done (164.79s)
+Estimator batch 100/128 (active points 146/186) ... Done (166.78s)
+Estimator batch 101/128 (active points 145/186) ... Done (165.28s)
+Estimator batch 102/128 (active points 145/186) ... Done (166.20s)
+Estimator batch 103/128 (active points 145/186) ... Done (170.56s)
+Estimator batch 104/128 (active points 145/186) ... Done (165.04s)
+Estimator batch 105/128 (active points 145/186) ... Done (169.67s)
+Estimator batch 106/128 (active points 145/186) ... Done (164.24s)
+Estimator batch 107/128 (active points 144/186) ... Done (159.14s)
+Estimator batch 108/128 (active points 142/186) ... Done (164.96s)
+Estimator batch 109/128 (active points 142/186) ... Done (160.80s)
+Estimator batch 110/128 (active points 142/186) ... Done (159.81s)
+Estimator batch 111/128 (active points 142/186) ... Done (159.70s)
+Estimator batch 112/128 (active points 142/186) ... Done (162.16s)
+Estimator batch 113/128 (active points 142/186) ... Done (162.09s)
+Estimator batch 114/128 (active points 142/186) ... Done (157.52s)
+Estimator batch 115/128 (active points 142/186) ... Done (156.31s)
+Estimator batch 116/128 (active points 142/186) ... Done (159.90s)
+Estimator batch 117/128 (active points 142/186) ... Done (162.30s)
+Estimator batch 118/128 (active points 142/186) ... Done (164.62s)
+Estimator batch 119/128 (active points 142/186) ... Done (159.83s)
+Estimator batch 120/128 (active points 142/186) ... Done (161.03s)
+Estimator batch 121/128 (active points 142/186) ... Done (164.73s)
+Estimator batch 122/128 (active points 142/186) ... Done (162.07s)
+Estimator batch 123/128 (active points 142/186) ... Done (164.94s)
+Estimator batch 124/128 (active points 142/186) ... Done (162.55s)
+Estimator batch 125/128 (active points 142/186) ... Done (161.86s)
+Estimator batch 126/128 (active points 142/186) ... Done (161.37s)
+Estimator batch 127/128 (active points 142/186) ... Done (162.28s)
+Estimator batch 128/128 (active points 142/186) ... Done (163.83s)
+Estimator: ls
+  Eb/No=-5.0 dB | BER=2.873e-01 | BERub=2.879e-01 | Status=resolved | Stop=target_block_errors | Latency=695.056 ms
+  Eb/No=-4.5 dB | BER=2.711e-01 | BERub=2.717e-01 | Status=resolved | Stop=target_block_errors | Latency=671.485 ms
+  Eb/No=-4.0 dB | BER=2.520e-01 | BERub=2.526e-01 | Status=resolved | Stop=target_block_errors | Latency=698.829 ms
+  Eb/No=-3.5 dB | BER=2.346e-01 | BERub=2.352e-01 | Status=resolved | Stop=target_block_errors | Latency=675.224 ms
+  Eb/No=-3.0 dB | BER=2.072e-01 | BERub=2.077e-01 | Status=resolved | Stop=target_block_errors | Latency=687.648 ms
+  Eb/No=-2.5 dB | BER=1.717e-01 | BERub=1.722e-01 | Status=resolved | Stop=target_block_errors | Latency=675.736 ms
+  Eb/No=-2.0 dB | BER=1.239e-01 | BERub=1.243e-01 | Status=resolved | Stop=target_block_errors | Latency=679.456 ms
+  Eb/No=-1.5 dB | BER=9.301e-02 | BERub=9.330e-02 | Status=resolved | Stop=target_block_errors | Latency=670.683 ms
+  Eb/No=-1.0 dB | BER=5.703e-02 | BERub=5.722e-02 | Status=resolved | Stop=target_block_errors | Latency=622.512 ms
+  Eb/No=-0.5 dB | BER=3.545e-02 | BERub=3.558e-02 | Status=resolved | Stop=target_block_errors | Latency=585.089 ms
+  Eb/No= 0.0 dB | BER=2.239e-02 | BERub=2.247e-02 | Status=resolved | Stop=target_block_errors | Latency=566.328 ms
+  Eb/No= 0.5 dB | BER=1.463e-02 | BERub=1.469e-02 | Status=resolved | Stop=max_batches | Latency=556.772 ms
+  Eb/No= 1.0 dB | BER=1.143e-02 | BERub=1.148e-02 | Status=resolved | Stop=max_batches | Latency=556.388 ms
+  Eb/No= 1.5 dB | BER=6.413e-03 | BERub=6.450e-03 | Status=resolved | Stop=max_batches | Latency=556.561 ms
+  Eb/No= 2.0 dB | BER=3.383e-03 | BERub=3.410e-03 | Status=resolved | Stop=max_batches | Latency=556.201 ms
+  Eb/No= 2.5 dB | BER=3.014e-03 | BERub=3.039e-03 | Status=resolved | Stop=max_batches | Latency=555.727 ms
+  Eb/No= 3.0 dB | BER=2.096e-03 | BERub=2.117e-03 | Status=resolved | Stop=max_batches | Latency=557.990 ms
+  Eb/No= 3.5 dB | BER=1.279e-03 | BERub=1.295e-03 | Status=resolved | Stop=max_batches | Latency=558.995 ms
+  Eb/No= 4.0 dB | BER=8.205e-04 | BERub=8.339e-04 | Status=resolved | Stop=max_batches | Latency=557.672 ms
+  Eb/No= 4.5 dB | BER=9.857e-04 | BERub=1.000e-03 | Status=resolved | Stop=max_batches | Latency=556.725 ms
+  Eb/No= 5.0 dB | BER=7.365e-04 | BERub=7.492e-04 | Status=resolved | Stop=max_batches | Latency=557.225 ms
+  Eb/No= 5.5 dB | BER=6.068e-04 | BERub=6.183e-04 | Status=resolved | Stop=max_batches | Latency=555.627 ms
+  Eb/No= 6.0 dB | BER=5.858e-04 | BERub=5.971e-04 | Status=resolved | Stop=max_batches | Latency=557.458 ms
+  Eb/No= 6.5 dB | BER=4.610e-04 | BERub=4.711e-04 | Status=resolved | Stop=max_batches | Latency=559.346 ms
+  Eb/No= 7.0 dB | BER=3.294e-04 | BERub=3.379e-04 | Status=resolved | Stop=max_batches | Latency=560.788 ms
+  Eb/No= 7.5 dB | BER=3.220e-04 | BERub=3.305e-04 | Status=resolved | Stop=max_batches | Latency=560.245 ms
+  Eb/No= 8.0 dB | BER=2.364e-04 | BERub=2.436e-04 | Status=resolved | Stop=max_batches | Latency=556.379 ms
+  Eb/No= 8.5 dB | BER=3.567e-04 | BERub=3.655e-04 | Status=resolved | Stop=max_batches | Latency=556.512 ms
+  Eb/No= 9.0 dB | BER=5.128e-04 | BERub=5.234e-04 | Status=resolved | Stop=max_batches | Latency=557.165 ms
+  Eb/No= 9.5 dB | BER=3.060e-04 | BERub=3.143e-04 | Status=resolved | Stop=max_batches | Latency=553.543 ms
+  Eb/No=10.0 dB | BER=1.240e-04 | BERub=1.292e-04 | Status=resolved | Stop=max_batches | Latency=555.156 ms
+Estimator: dft
+  Eb/No=-5.0 dB | BER=2.477e-01 | BERub=2.483e-01 | Status=resolved | Stop=target_block_errors | Latency=695.099 ms
+  Eb/No=-4.5 dB | BER=2.289e-01 | BERub=2.294e-01 | Status=resolved | Stop=target_block_errors | Latency=680.251 ms
+  Eb/No=-4.0 dB | BER=2.021e-01 | BERub=2.027e-01 | Status=resolved | Stop=target_block_errors | Latency=687.696 ms
+  Eb/No=-3.5 dB | BER=1.683e-01 | BERub=1.688e-01 | Status=resolved | Stop=target_block_errors | Latency=679.038 ms
+  Eb/No=-3.0 dB | BER=1.272e-01 | BERub=1.275e-01 | Status=resolved | Stop=target_block_errors | Latency=674.062 ms
+  Eb/No=-2.5 dB | BER=8.709e-02 | BERub=8.737e-02 | Status=resolved | Stop=target_block_errors | Latency=671.239 ms
+  Eb/No=-2.0 dB | BER=5.573e-02 | BERub=5.592e-02 | Status=resolved | Stop=target_block_errors | Latency=618.737 ms
+  Eb/No=-1.5 dB | BER=4.004e-02 | BERub=4.018e-02 | Status=resolved | Stop=target_block_errors | Latency=588.090 ms
+  Eb/No=-1.0 dB | BER=2.244e-02 | BERub=2.252e-02 | Status=resolved | Stop=target_block_errors | Latency=573.278 ms
+  Eb/No=-0.5 dB | BER=1.370e-02 | BERub=1.375e-02 | Status=resolved | Stop=max_batches | Latency=551.473 ms
+  Eb/No= 0.0 dB | BER=8.702e-03 | BERub=8.745e-03 | Status=resolved | Stop=max_batches | Latency=554.610 ms
+  Eb/No= 0.5 dB | BER=5.697e-03 | BERub=5.732e-03 | Status=resolved | Stop=max_batches | Latency=557.790 ms
+  Eb/No= 1.0 dB | BER=4.595e-03 | BERub=4.626e-03 | Status=resolved | Stop=max_batches | Latency=556.936 ms
+  Eb/No= 1.5 dB | BER=2.417e-03 | BERub=2.440e-03 | Status=resolved | Stop=max_batches | Latency=554.900 ms
+  Eb/No= 2.0 dB | BER=1.269e-03 | BERub=1.285e-03 | Status=resolved | Stop=max_batches | Latency=554.943 ms
+  Eb/No= 2.5 dB | BER=1.095e-03 | BERub=1.111e-03 | Status=resolved | Stop=max_batches | Latency=553.510 ms
+  Eb/No= 3.0 dB | BER=8.470e-04 | BERub=8.606e-04 | Status=resolved | Stop=max_batches | Latency=554.866 ms
+  Eb/No= 3.5 dB | BER=4.014e-04 | BERub=4.108e-04 | Status=resolved | Stop=max_batches | Latency=558.248 ms
+  Eb/No= 4.0 dB | BER=3.073e-04 | BERub=3.156e-04 | Status=resolved | Stop=max_batches | Latency=555.177 ms
+  Eb/No= 4.5 dB | BER=3.096e-04 | BERub=3.179e-04 | Status=resolved | Stop=max_batches | Latency=554.993 ms
+  Eb/No= 5.0 dB | BER=1.868e-04 | BERub=1.932e-04 | Status=resolved | Stop=max_batches | Latency=555.982 ms
+  Eb/No= 5.5 dB | BER=1.235e-04 | BERub=1.288e-04 | Status=resolved | Stop=max_batches | Latency=554.155 ms
+  Eb/No= 6.0 dB | BER=1.073e-04 | BERub=1.122e-04 | Status=resolved | Stop=max_batches | Latency=556.064 ms
+  Eb/No= 6.5 dB | BER=1.482e-04 | BERub=1.540e-04 | Status=resolved | Stop=max_batches | Latency=556.531 ms
+  Eb/No= 7.0 dB | BER=6.000e-05 | BERub=6.370e-05 | Status=resolved | Stop=max_batches | Latency=557.576 ms
+  Eb/No= 7.5 dB | BER=1.589e-07 | BERub=4.803e-07 | Status=upper_bound_only | Stop=max_batches | Latency=556.396 ms
+  Eb/No= 8.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=554.575 ms
+  Eb/No= 8.5 dB | BER=2.154e-05 | BERub=2.380e-05 | Status=resolved | Stop=max_batches | Latency=552.109 ms
+  Eb/No= 9.0 dB | BER=1.642e-04 | BERub=1.702e-04 | Status=resolved | Stop=max_batches | Latency=554.622 ms
+  Eb/No= 9.5 dB | BER=4.657e-05 | BERub=4.984e-05 | Status=resolved | Stop=max_batches | Latency=551.780 ms
+  Eb/No=10.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=553.387 ms
+Estimator: lmmse
+  Eb/No=-5.0 dB | BER=1.519e-01 | BERub=1.523e-01 | Status=resolved | Stop=target_block_errors | Latency=670.287 ms
+  Eb/No=-4.5 dB | BER=1.188e-01 | BERub=1.192e-01 | Status=resolved | Stop=target_block_errors | Latency=665.614 ms
+  Eb/No=-4.0 dB | BER=8.480e-02 | BERub=8.507e-02 | Status=resolved | Stop=target_block_errors | Latency=658.927 ms
+  Eb/No=-3.5 dB | BER=6.118e-02 | BERub=6.138e-02 | Status=resolved | Stop=target_block_errors | Latency=640.181 ms
+  Eb/No=-3.0 dB | BER=4.516e-02 | BERub=4.531e-02 | Status=resolved | Stop=target_block_errors | Latency=611.720 ms
+  Eb/No=-2.5 dB | BER=2.928e-02 | BERub=2.939e-02 | Status=resolved | Stop=target_block_errors | Latency=575.824 ms
+  Eb/No=-2.0 dB | BER=2.054e-02 | BERub=2.062e-02 | Status=resolved | Stop=target_block_errors | Latency=564.120 ms
+  Eb/No=-1.5 dB | BER=1.498e-02 | BERub=1.504e-02 | Status=resolved | Stop=max_batches | Latency=554.391 ms
+  Eb/No=-1.0 dB | BER=9.668e-03 | BERub=9.714e-03 | Status=resolved | Stop=max_batches | Latency=560.907 ms
+  Eb/No=-0.5 dB | BER=6.014e-03 | BERub=6.050e-03 | Status=resolved | Stop=max_batches | Latency=552.692 ms
+  Eb/No= 0.0 dB | BER=4.803e-03 | BERub=4.835e-03 | Status=resolved | Stop=max_batches | Latency=553.778 ms
+  Eb/No= 0.5 dB | BER=3.039e-03 | BERub=3.065e-03 | Status=resolved | Stop=max_batches | Latency=558.985 ms
+  Eb/No= 1.0 dB | BER=2.723e-03 | BERub=2.747e-03 | Status=resolved | Stop=max_batches | Latency=557.711 ms
+  Eb/No= 1.5 dB | BER=1.583e-03 | BERub=1.602e-03 | Status=resolved | Stop=max_batches | Latency=555.515 ms
+  Eb/No= 2.0 dB | BER=7.804e-04 | BERub=7.935e-04 | Status=resolved | Stop=max_batches | Latency=555.801 ms
+  Eb/No= 2.5 dB | BER=9.173e-04 | BERub=9.314e-04 | Status=resolved | Stop=max_batches | Latency=556.113 ms
+  Eb/No= 3.0 dB | BER=6.077e-04 | BERub=6.193e-04 | Status=resolved | Stop=max_batches | Latency=557.815 ms
+  Eb/No= 3.5 dB | BER=4.163e-04 | BERub=4.258e-04 | Status=resolved | Stop=max_batches | Latency=558.898 ms
+  Eb/No= 4.0 dB | BER=1.961e-04 | BERub=2.027e-04 | Status=resolved | Stop=max_batches | Latency=554.911 ms
+  Eb/No= 4.5 dB | BER=3.495e-04 | BERub=3.583e-04 | Status=resolved | Stop=max_batches | Latency=555.967 ms
+  Eb/No= 5.0 dB | BER=3.191e-04 | BERub=3.275e-04 | Status=resolved | Stop=max_batches | Latency=556.666 ms
+  Eb/No= 5.5 dB | BER=2.037e-04 | BERub=2.104e-04 | Status=resolved | Stop=max_batches | Latency=555.330 ms
+  Eb/No= 6.0 dB | BER=2.069e-04 | BERub=2.136e-04 | Status=resolved | Stop=max_batches | Latency=559.408 ms
+  Eb/No= 6.5 dB | BER=1.640e-04 | BERub=1.700e-04 | Status=resolved | Stop=max_batches | Latency=560.096 ms
+  Eb/No= 7.0 dB | BER=1.136e-04 | BERub=1.186e-04 | Status=resolved | Stop=max_batches | Latency=561.655 ms
+  Eb/No= 7.5 dB | BER=1.562e-04 | BERub=1.621e-04 | Status=resolved | Stop=max_batches | Latency=559.822 ms
+  Eb/No= 8.0 dB | BER=1.342e-04 | BERub=1.397e-04 | Status=resolved | Stop=max_batches | Latency=553.559 ms
+  Eb/No= 8.5 dB | BER=1.763e-04 | BERub=1.825e-04 | Status=resolved | Stop=max_batches | Latency=551.436 ms
+  Eb/No= 9.0 dB | BER=2.313e-04 | BERub=2.385e-04 | Status=resolved | Stop=max_batches | Latency=556.667 ms
+  Eb/No= 9.5 dB | BER=1.270e-04 | BERub=1.323e-04 | Status=resolved | Stop=max_batches | Latency=554.207 ms
+  Eb/No=10.0 dB | BER=1.748e-06 | BERub=2.478e-06 | Status=upper_bound_only | Stop=max_batches | Latency=555.430 ms
+Estimator: adaptive
+  Eb/No=-5.0 dB | BER=1.519e-01 | BERub=1.523e-01 | Status=resolved | Stop=target_block_errors | Latency=676.682 ms
+  Eb/No=-4.5 dB | BER=1.188e-01 | BERub=1.192e-01 | Status=resolved | Stop=target_block_errors | Latency=656.513 ms
+  Eb/No=-4.0 dB | BER=8.480e-02 | BERub=8.507e-02 | Status=resolved | Stop=target_block_errors | Latency=650.525 ms
+  Eb/No=-3.5 dB | BER=6.118e-02 | BERub=6.138e-02 | Status=resolved | Stop=target_block_errors | Latency=637.470 ms
+  Eb/No=-3.0 dB | BER=4.516e-02 | BERub=4.531e-02 | Status=resolved | Stop=target_block_errors | Latency=609.499 ms
+  Eb/No=-2.5 dB | BER=2.928e-02 | BERub=2.939e-02 | Status=resolved | Stop=target_block_errors | Latency=576.010 ms
+  Eb/No=-2.0 dB | BER=2.054e-02 | BERub=2.062e-02 | Status=resolved | Stop=target_block_errors | Latency=562.810 ms
+  Eb/No=-1.5 dB | BER=1.498e-02 | BERub=1.504e-02 | Status=resolved | Stop=max_batches | Latency=552.044 ms
+  Eb/No=-1.0 dB | BER=9.668e-03 | BERub=9.714e-03 | Status=resolved | Stop=max_batches | Latency=557.369 ms
+  Eb/No=-0.5 dB | BER=6.014e-03 | BERub=6.050e-03 | Status=resolved | Stop=max_batches | Latency=552.315 ms
+  Eb/No= 0.0 dB | BER=4.803e-03 | BERub=4.835e-03 | Status=resolved | Stop=max_batches | Latency=554.296 ms
+  Eb/No= 0.5 dB | BER=3.039e-03 | BERub=3.065e-03 | Status=resolved | Stop=max_batches | Latency=557.703 ms
+  Eb/No= 1.0 dB | BER=2.723e-03 | BERub=2.747e-03 | Status=resolved | Stop=max_batches | Latency=559.218 ms
+  Eb/No= 1.5 dB | BER=1.583e-03 | BERub=1.602e-03 | Status=resolved | Stop=max_batches | Latency=555.301 ms
+  Eb/No= 2.0 dB | BER=7.804e-04 | BERub=7.935e-04 | Status=resolved | Stop=max_batches | Latency=559.329 ms
+  Eb/No= 2.5 dB | BER=9.173e-04 | BERub=9.314e-04 | Status=resolved | Stop=max_batches | Latency=556.668 ms
+  Eb/No= 3.0 dB | BER=6.077e-04 | BERub=6.193e-04 | Status=resolved | Stop=max_batches | Latency=558.415 ms
+  Eb/No= 3.5 dB | BER=4.163e-04 | BERub=4.258e-04 | Status=resolved | Stop=max_batches | Latency=555.743 ms
+  Eb/No= 4.0 dB | BER=1.961e-04 | BERub=2.027e-04 | Status=resolved | Stop=max_batches | Latency=553.859 ms
+  Eb/No= 4.5 dB | BER=3.495e-04 | BERub=3.583e-04 | Status=resolved | Stop=max_batches | Latency=559.036 ms
+  Eb/No= 5.0 dB | BER=3.191e-04 | BERub=3.275e-04 | Status=resolved | Stop=max_batches | Latency=558.109 ms
+  Eb/No= 5.5 dB | BER=2.037e-04 | BERub=2.104e-04 | Status=resolved | Stop=max_batches | Latency=554.698 ms
+  Eb/No= 6.0 dB | BER=8.496e-05 | BERub=8.934e-05 | Status=resolved | Stop=max_batches | Latency=561.529 ms
+  Eb/No= 6.5 dB | BER=6.183e-05 | BERub=6.559e-05 | Status=resolved | Stop=max_batches | Latency=562.031 ms
+  Eb/No= 7.0 dB | BER=6.779e-05 | BERub=7.172e-05 | Status=resolved | Stop=max_batches | Latency=560.047 ms
+  Eb/No= 7.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=563.497 ms
+  Eb/No= 8.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=557.580 ms
+  Eb/No= 8.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=555.384 ms
+  Eb/No= 9.0 dB | BER=1.663e-04 | BERub=1.724e-04 | Status=resolved | Stop=max_batches | Latency=555.077 ms
+  Eb/No= 9.5 dB | BER=2.440e-05 | BERub=2.680e-05 | Status=resolved | Stop=max_batches | Latency=557.450 ms
+  Eb/No=10.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=557.085 ms
+Estimator: pso
+  Eb/No=-5.0 dB | BER=2.264e-01 | BERub=2.270e-01 | Status=resolved | Stop=target_block_errors | Latency=695.908 ms
+  Eb/No=-4.5 dB | BER=1.994e-01 | BERub=2.000e-01 | Status=resolved | Stop=target_block_errors | Latency=682.715 ms
+  Eb/No=-4.0 dB | BER=1.609e-01 | BERub=1.614e-01 | Status=resolved | Stop=target_block_errors | Latency=684.346 ms
+  Eb/No=-3.5 dB | BER=1.206e-01 | BERub=1.209e-01 | Status=resolved | Stop=target_block_errors | Latency=690.401 ms
+  Eb/No=-3.0 dB | BER=8.011e-02 | BERub=8.037e-02 | Status=resolved | Stop=target_block_errors | Latency=679.940 ms
+  Eb/No=-2.5 dB | BER=4.908e-02 | BERub=4.925e-02 | Status=resolved | Stop=target_block_errors | Latency=641.279 ms
+  Eb/No=-2.0 dB | BER=3.157e-02 | BERub=3.168e-02 | Status=resolved | Stop=target_block_errors | Latency=585.226 ms
+  Eb/No=-1.5 dB | BER=2.001e-02 | BERub=2.008e-02 | Status=resolved | Stop=target_block_errors | Latency=565.558 ms
+  Eb/No=-1.0 dB | BER=1.083e-02 | BERub=1.087e-02 | Status=resolved | Stop=max_batches | Latency=559.068 ms
+  Eb/No=-0.5 dB | BER=6.506e-03 | BERub=6.543e-03 | Status=resolved | Stop=max_batches | Latency=559.697 ms
+  Eb/No= 0.0 dB | BER=4.242e-03 | BERub=4.272e-03 | Status=resolved | Stop=max_batches | Latency=559.460 ms
+  Eb/No= 0.5 dB | BER=2.883e-03 | BERub=2.908e-03 | Status=resolved | Stop=max_batches | Latency=562.532 ms
+  Eb/No= 1.0 dB | BER=1.988e-03 | BERub=2.009e-03 | Status=resolved | Stop=max_batches | Latency=559.265 ms
+  Eb/No= 1.5 dB | BER=1.097e-03 | BERub=1.113e-03 | Status=resolved | Stop=max_batches | Latency=562.228 ms
+  Eb/No= 2.0 dB | BER=6.303e-04 | BERub=6.420e-04 | Status=resolved | Stop=max_batches | Latency=561.788 ms
+  Eb/No= 2.5 dB | BER=5.759e-04 | BERub=5.872e-04 | Status=resolved | Stop=max_batches | Latency=559.867 ms
+  Eb/No= 3.0 dB | BER=4.231e-04 | BERub=4.328e-04 | Status=resolved | Stop=max_batches | Latency=560.984 ms
+  Eb/No= 3.5 dB | BER=2.399e-04 | BERub=2.472e-04 | Status=resolved | Stop=max_batches | Latency=562.380 ms
+  Eb/No= 4.0 dB | BER=1.681e-04 | BERub=1.742e-04 | Status=resolved | Stop=max_batches | Latency=560.815 ms
+  Eb/No= 4.5 dB | BER=2.222e-04 | BERub=2.292e-04 | Status=resolved | Stop=max_batches | Latency=561.799 ms
+  Eb/No= 5.0 dB | BER=1.163e-04 | BERub=1.215e-04 | Status=resolved | Stop=max_batches | Latency=559.324 ms
+  Eb/No= 5.5 dB | BER=9.576e-05 | BERub=1.004e-04 | Status=resolved | Stop=max_batches | Latency=562.199 ms
+  Eb/No= 6.0 dB | BER=1.001e-04 | BERub=1.049e-04 | Status=resolved | Stop=max_batches | Latency=563.947 ms
+  Eb/No= 6.5 dB | BER=7.447e-05 | BERub=7.858e-05 | Status=resolved | Stop=max_batches | Latency=566.802 ms
+  Eb/No= 7.0 dB | BER=6.421e-05 | BERub=6.804e-05 | Status=resolved | Stop=max_batches | Latency=564.468 ms
+  Eb/No= 7.5 dB | BER=2.146e-05 | BERub=2.372e-05 | Status=resolved | Stop=max_batches | Latency=562.542 ms
+  Eb/No= 8.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=559.431 ms
+  Eb/No= 8.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=562.914 ms
+  Eb/No= 9.0 dB | BER=1.592e-04 | BERub=1.651e-04 | Status=resolved | Stop=max_batches | Latency=559.011 ms
+  Eb/No= 9.5 dB | BER=2.352e-05 | BERub=2.588e-05 | Status=resolved | Stop=max_batches | Latency=560.203 ms
+  Eb/No=10.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=559.247 ms
+Estimator: perfect
+  Eb/No=-5.0 dB | BER=3.319e-02 | BERub=3.332e-02 | Status=resolved | Stop=target_block_errors | Latency=613.814 ms
+  Eb/No=-4.5 dB | BER=1.662e-02 | BERub=1.670e-02 | Status=resolved | Stop=target_block_errors | Latency=582.254 ms
+  Eb/No=-4.0 dB | BER=7.728e-03 | BERub=7.769e-03 | Status=resolved | Stop=max_batches | Latency=564.135 ms
+  Eb/No=-3.5 dB | BER=4.011e-03 | BERub=4.040e-03 | Status=resolved | Stop=max_batches | Latency=564.965 ms
+  Eb/No=-3.0 dB | BER=2.509e-03 | BERub=2.532e-03 | Status=resolved | Stop=max_batches | Latency=559.653 ms
+  Eb/No=-2.5 dB | BER=1.276e-03 | BERub=1.292e-03 | Status=resolved | Stop=max_batches | Latency=559.916 ms
+  Eb/No=-2.0 dB | BER=8.361e-04 | BERub=8.496e-04 | Status=resolved | Stop=max_batches | Latency=556.156 ms
+  Eb/No=-1.5 dB | BER=4.102e-04 | BERub=4.197e-04 | Status=resolved | Stop=max_batches | Latency=558.549 ms
+  Eb/No=-1.0 dB | BER=1.685e-04 | BERub=1.746e-04 | Status=resolved | Stop=max_batches | Latency=555.136 ms
+  Eb/No=-0.5 dB | BER=1.297e-04 | BERub=1.351e-04 | Status=resolved | Stop=max_batches | Latency=557.826 ms
+  Eb/No= 0.0 dB | BER=6.819e-05 | BERub=7.213e-05 | Status=resolved | Stop=max_batches | Latency=558.904 ms
+  Eb/No= 0.5 dB | BER=1.026e-04 | BERub=1.074e-04 | Status=resolved | Stop=max_batches | Latency=559.075 ms
+  Eb/No= 1.0 dB | BER=7.971e-05 | BERub=8.396e-05 | Status=resolved | Stop=max_batches | Latency=557.382 ms
+  Eb/No= 1.5 dB | BER=5.007e-05 | BERub=5.346e-05 | Status=resolved | Stop=max_batches | Latency=560.161 ms
+  Eb/No= 2.0 dB | BER=6.358e-07 | BERub=1.128e-06 | Status=upper_bound_only | Stop=max_batches | Latency=560.452 ms
+  Eb/No= 2.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=559.883 ms
+  Eb/No= 3.0 dB | BER=6.390e-05 | BERub=6.771e-05 | Status=resolved | Stop=max_batches | Latency=560.299 ms
+  Eb/No= 3.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=559.920 ms
+  Eb/No= 4.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=558.924 ms
+  Eb/No= 4.5 dB | BER=1.669e-06 | BERub=2.385e-06 | Status=upper_bound_only | Stop=max_batches | Latency=558.326 ms
+  Eb/No= 5.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=556.035 ms
+  Eb/No= 5.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=559.560 ms
+  Eb/No= 6.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=562.214 ms
+  Eb/No= 6.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=560.097 ms
+  Eb/No= 7.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=561.694 ms
+  Eb/No= 7.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=558.679 ms
+  Eb/No= 8.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=555.815 ms
+  Eb/No= 8.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=557.861 ms
+  Eb/No= 9.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=555.139 ms
+  Eb/No= 9.5 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=557.125 ms
+  Eb/No=10.0 dB | BER=0.000e+00 | BERub=2.381e-07 | Status=upper_bound_only | Stop=max_batches | Latency=553.405 ms
+Loaded DRL Resource Manager checkpoint from models/drl_resource_manager_policy
+Batch 1/128 (active points 217/217) ... Done (137.25s)
+Batch 2/128 (active points 217/217) ... Done (137.41s)
+Batch 3/128 (active points 217/217) ... Done (137.05s)
+Batch 4/128 (active points 217/217) ... Done (137.39s)
+Batch 5/128 (active points 217/217) ... Done (137.96s)
+Batch 6/128 (active points 217/217) ... Done (138.24s)
+Batch 7/128 (active points 217/217) ... Done (138.04s)
+Batch 8/128 (active points 217/217) ... Done (137.80s)
+Batch 9/128 (active points 217/217) ... Done (137.35s)
+Batch 10/128 (active points 217/217) ... Done (137.36s)
+Batch 11/128 (active points 217/217) ... Done (137.99s)
+Batch 12/128 (active points 217/217) ... Done (137.55s)
+Batch 13/128 (active points 217/217) ... Done (137.53s)
+Batch 14/128 (active points 217/217) ... Done (137.51s)
+Batch 15/128 (active points 217/217) ... Done (138.14s)
+Batch 16/128 (active points 217/217) ... Done (137.98s)
+Batch 17/128 (active points 217/217) ... Done (138.07s)
+Batch 18/128 (active points 217/217) ... Done (138.52s)
+Batch 19/128 (active points 216/217) ... Done (137.91s)
+Batch 20/128 (active points 216/217) ... Done (137.15s)
+Batch 21/128 (active points 216/217) ... Done (137.27s)
+Batch 22/128 (active points 216/217) ... Done (137.29s)
+Batch 23/128 (active points 215/217) ... Done (136.91s)
+Batch 24/128 (active points 215/217) ... Done (138.20s)
+Batch 25/128 (active points 215/217) ... Done (137.35s)
+Batch 26/128 (active points 215/217) ... Done (137.22s)
+Batch 27/128 (active points 215/217) ... Done (137.31s)
+Batch 28/128 (active points 214/217) ... Done (136.93s)
+Batch 29/128 (active points 214/217) ... Done (136.41s)
+Batch 30/128 (active points 214/217) ... Done (137.03s)
+Batch 31/128 (active points 214/217) ... Done (136.68s)
+Batch 32/128 (active points 214/217) ... Done (136.45s)
+Batch 33/128 (active points 214/217) ... Done (137.01s)
+Batch 34/128 (active points 214/217) ... Done (136.70s)
+Batch 35/128 (active points 214/217) ... Done (137.59s)
+Batch 36/128 (active points 214/217) ... Done (136.86s)
+Batch 37/128 (active points 214/217) ... Done (137.58s)
+Batch 38/128 (active points 214/217) ... Done (136.87s)
+Batch 39/128 (active points 214/217) ... Done (137.42s)
+Batch 40/128 (active points 214/217) ... Done (137.44s)
+Batch 41/128 (active points 213/217) ... Done (137.35s)
+Batch 42/128 (active points 213/217) ... Done (137.28s)
+Batch 43/128 (active points 213/217) ... Done (137.08s)
+Batch 44/128 (active points 213/217) ... Done (137.02s)
+Batch 45/128 (active points 213/217) ... Done (137.13s)
+Batch 46/128 (active points 213/217) ... Done (137.19s)
+Batch 47/128 (active points 213/217) ... Done (136.86s)
+Batch 48/128 (active points 213/217) ... Done (137.07s)
+Batch 49/128 (active points 213/217) ... Done (136.85s)
+Batch 50/128 (active points 212/217) ... Done (136.21s)
+Batch 51/128 (active points 212/217) ... Done (135.82s)
+Batch 52/128 (active points 212/217) ... Done (135.31s)
+Batch 53/128 (active points 212/217) ... Done (135.62s)
+Batch 54/128 (active points 212/217) ... Done (135.67s)
+Batch 55/128 (active points 212/217) ... Done (135.17s)
+Batch 56/128 (active points 212/217) ... Done (134.71s)
+Batch 57/128 (active points 212/217) ... Done (135.12s)
+Batch 58/128 (active points 212/217) ... Done (135.22s)
+Batch 59/128 (active points 212/217) ... Done (135.76s)
+Batch 60/128 (active points 212/217) ... Done (135.02s)
+Batch 61/128 (active points 212/217) ... Done (134.83s)
+Batch 62/128 (active points 211/217) ... Done (143.66s)
+Batch 63/128 (active points 208/217) ... Done (141.14s)
+Batch 64/128 (active points 208/217) ... 
