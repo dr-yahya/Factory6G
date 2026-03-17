@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 import random
 import re
@@ -89,6 +90,24 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Factory6G simulations.")
     parser.add_argument("--config", default="config.json", help="Path to the simulation config JSON file.")
+    parser.add_argument(
+        "--resume",
+        metavar="RUN_DIR",
+        default=None,
+        help="Resume an interrupted run from an existing run directory (e.g. results/20260315_092517_simulation).",
+    )
+    parser.add_argument(
+        "--estimators",
+        metavar="METHODS",
+        default=None,
+        help="Comma-separated estimator methods to run, e.g. --estimators ls,pso. Overrides config. Skips resource-manager stage unless --resource-managers is also given.",
+    )
+    parser.add_argument(
+        "--resource-managers",
+        metavar="METHODS",
+        default=None,
+        help="Comma-separated resource-manager methods to run, e.g. --resource-managers wmmse,drl. Overrides config. Skips estimator stage unless --estimators is also given.",
+    )
     return parser.parse_args()
 
 
@@ -104,14 +123,43 @@ def main() -> int:
         print(f"Error loading configuration: {exc}")
         return 1
 
+    # CLI method overrides: --estimators / --resource-managers filter which methods run.
+    # If only one flag is given, the other stage is skipped (enabled=[]).
+    if args.estimators is not None or args.resource_managers is not None:
+        est_enabled = (
+            [m.strip().lower() for m in args.estimators.split(",") if m.strip()]
+            if args.estimators is not None
+            else []
+        )
+        rm_enabled = (
+            [m.strip().lower() for m in args.resource_managers.split(",") if m.strip()]
+            if args.resource_managers is not None
+            else []
+        )
+        config = dataclasses.replace(
+            config,
+            estimators=dataclasses.replace(config.estimators, enabled=est_enabled),
+            resource_managers=dataclasses.replace(config.resource_managers, enabled=rm_enabled),
+        )
+
     try:
         sim_config = config.simulation
-        run_id, run_dir = create_run_context(sim_config.output_dir)
+        if args.resume:
+            run_dir = Path(args.resume)
+            suffix = "_simulation"
+            if run_dir.name.endswith(suffix) and len(run_dir.name) > len(suffix):
+                run_id = run_dir.name[: -len(suffix)]
+            else:
+                run_id = run_dir.name
+            log_mode = "a"
+        else:
+            run_id, run_dir = create_run_context(sim_config.output_dir)
+            log_mode = "w"
         run_dir.mkdir(parents=True, exist_ok=True)
         log_path = run_dir / "simulation.log"
 
         try:
-            log_handle = log_path.open("w", encoding="utf-8")
+            log_handle = log_path.open(log_mode, encoding="utf-8")
         except OSError as exc:
             original_stderr.write(f"Error opening log file '{log_path}': {exc}\n")
             original_stderr.flush()
@@ -145,7 +193,6 @@ def main() -> int:
         sionna.phy.config.seed = sim_config.seed
 
         print(f"Loaded configuration for scenario: {config.system.scenario}")
-        print("Starting execution for fixed flow: estimators -> resource_managers")
         run_simulation_flow(config, run_id=run_id, run_dir=run_dir)
         return 0
     finally:

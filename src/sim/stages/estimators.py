@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from src.models.model import Model
 from src.sim.config import Factory6GConfig
 
+from .checkpoint import delete_checkpoint, load_checkpoint, save_checkpoint
 from .common import (
     append_point_metrics,
     classify_point_status,
@@ -32,7 +34,11 @@ def _new_estimator_point_state() -> dict[str, Any]:
     }
 
 
-def run_estimator_stage(config: Factory6GConfig) -> dict[str, Any]:
+def run_estimator_stage(
+    config: Factory6GConfig,
+    *,
+    checkpoint_dir: Path | None = None,
+) -> dict[str, Any]:
     system_config = config.system_runtime_config
     methods = config.estimators.enabled
     ebno_db_range = [float(v) for v in config.monte_carlo.ebno_db_range]
@@ -59,8 +65,20 @@ def run_estimator_stage(config: Factory6GConfig) -> dict[str, Any]:
         for method in methods
     }
 
+    start_batch_index = 0
+    if checkpoint_dir is not None:
+        ckpt = load_checkpoint(checkpoint_dir)
+        if ckpt is not None:
+            point_state = ckpt["point_state"]
+            runtime_totals_sec = ckpt["runtime_totals_sec"]
+            start_batch_index = int(ckpt["batch_index"]) + 1
+            print(
+                f"[checkpoint] Resuming estimator from batch "
+                f"{start_batch_index + 1}/{config.monte_carlo.max_batches}"
+            )
+
     total_points = len(methods) * len(ebno_db_range)
-    for batch_index in range(config.monte_carlo.max_batches):
+    for batch_index in range(start_batch_index, config.monte_carlo.max_batches):
         remaining = sum(
             1
             for method in methods
@@ -125,6 +143,18 @@ def run_estimator_stage(config: Factory6GConfig) -> dict[str, Any]:
                     stats["done"] = True
                     stats["stop_reason"] = stop_reason
         print(f"Done ({time.time() - batch_start:.2f}s)")
+        if checkpoint_dir is not None:
+            save_checkpoint(
+                checkpoint_dir,
+                {
+                    "batch_index": batch_index,
+                    "point_state": point_state,
+                    "runtime_totals_sec": runtime_totals_sec,
+                },
+            )
+
+    if checkpoint_dir is not None:
+        delete_checkpoint(checkpoint_dir)
 
     for method in methods:
         print(f"Estimator: {method}")

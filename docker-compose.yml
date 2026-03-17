@@ -20,3 +20,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  # To resume an interrupted run, override the command on the existing service:
+  #   CPU: docker compose run simulation --config config.json --resume /app/results/20260315_092517_simulation
+  #   GPU: docker compose run simulation-gpu --config config.json --resume /app/results/20260315_092517_simulation

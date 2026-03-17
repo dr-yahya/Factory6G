@@ -307,8 +307,6 @@ class EstimatorsConfig:
         _validate_keys("estimators", raw, allowed)
         _require_keys("estimators", raw, required)
         enabled = [item.lower() for item in _ensure_string_list(raw["enabled"], "estimators.enabled")]
-        if not enabled:
-            raise ConfigError("'estimators.enabled' must not be empty.")
         return cls(
             enabled=enabled,
             kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "estimators.kwargs"),
@@ -330,8 +328,6 @@ class ResourceManagersConfig:
         _validate_keys("resource_managers", raw, allowed)
         _require_keys("resource_managers", raw, required)
         enabled = [item.lower() for item in _ensure_string_list(raw["enabled"], "resource_managers.enabled")]
-        if not enabled:
-            raise ConfigError("'resource_managers.enabled' must not be empty.")
         num_active_users = _ensure_int(raw["num_active_users"], "resource_managers.num_active_users")
         if num_active_users <= 0:
             raise ConfigError("'resource_managers.num_active_users' must be positive.")
