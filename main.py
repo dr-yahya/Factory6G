@@ -88,18 +88,54 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
     root.addHandler(file_handler)
 
 
+_MODULATION_MAP = {"low": 2, "mid": 4, "high": 6}
+_MODULATION_LABEL_MAP = {2: "qpsk", 4: "16qam", 6: "64qam", 1: "bpsk"}
+_VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn"}
+
+
+def _parse_modulation_list(raw: str) -> list[tuple[str, int]]:
+    result: list[tuple[str, int]] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _MODULATION_MAP:
+            raise ValueError(
+                f"Unknown modulation level '{token}'. Choose from: {', '.join(sorted(_MODULATION_MAP))}."
+            )
+        result.append((token, _MODULATION_MAP[token]))
+    if not result:
+        raise ValueError("--modulation requires at least one level.")
+    return result
+
+
+def _parse_channel_list(raw: str) -> list[str]:
+    result: list[str] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _VALID_CHANNELS:
+            raise ValueError(
+                f"Unknown channel type '{token}'. Choose from: {', '.join(sorted(_VALID_CHANNELS))}."
+            )
+        result.append(token)
+    if not result:
+        raise ValueError("--channel requires at least one type.")
+    return result
+
+
 def _build_run_suffix(config, args: argparse.Namespace) -> str:
     all_methods = list(config.estimators.enabled) + list(config.resource_managers.enabled)
     methods_part = "_".join(all_methods) if all_methods else "run"
 
-    cmt = config.system.channel_model_type
-    channel_part = config.system.scenario if cmt == "tr38901" else cmt
+    channel_labels = []
+    for ch in args.channel_list:
+        channel_labels.append(config.system.scenario if ch == "tr38901" else ch)
+    channel_part = "_".join(channel_labels)
 
-    modulation_map = {1: "bpsk", 2: "qpsk", 4: "16qam", 6: "64qam"}
-    modulation_part = modulation_map.get(
-        config.system.num_bits_per_symbol,
-        f"{config.system.num_bits_per_symbol}bps",
-    )
+    mod_labels = [_MODULATION_LABEL_MAP.get(bits, f"{bits}bps") for _, bits in args.modulation_list]
+    modulation_part = "_".join(mod_labels)
 
     return f"{methods_part}_{channel_part}_{modulation_part}"
 
@@ -125,6 +161,18 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="Comma-separated resource-manager methods to run, e.g. --resource-managers wmmse,drl. Overrides config. Skips estimator stage unless --estimators is also given.",
     )
+    parser.add_argument(
+        "--modulation",
+        metavar="LEVELS",
+        default="low",
+        help="Comma-separated modulation levels: low=QPSK(2), mid=16-QAM(4), high=64-QAM(6). Default: low.",
+    )
+    parser.add_argument(
+        "--channel",
+        metavar="TYPES",
+        default=None,
+        help="Comma-separated channel types: rayleigh, rician, tr38901, awgn. Default: from config.",
+    )
     return parser.parse_args()
 
 
@@ -133,6 +181,12 @@ def main() -> int:
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     log_handle: TextIO | None = None
+
+    try:
+        args.modulation_list = _parse_modulation_list(args.modulation)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
 
     try:
         config = load_config(args.config)
@@ -158,6 +212,16 @@ def main() -> int:
             estimators=dataclasses.replace(config.estimators, enabled=est_enabled),
             resource_managers=dataclasses.replace(config.resource_managers, enabled=rm_enabled),
         )
+
+    # Parse channel list; default to channel from config if not specified
+    if args.channel is not None:
+        try:
+            args.channel_list = _parse_channel_list(args.channel)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            return 1
+    else:
+        args.channel_list = [config.system.channel_model_type]
 
     try:
         sim_config = config.simulation
@@ -214,7 +278,7 @@ def main() -> int:
 
         print(f"Loaded configuration for scenario: {config.system.scenario}")
         _wall_start = time.perf_counter()
-        run_simulation_flow(config, run_id=run_id, run_dir=run_dir)
+        run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list)
         print(f"Wall-clock time (incl. setup): {fmt_elapsed(time.perf_counter() - _wall_start)}")
         return 0
     finally:

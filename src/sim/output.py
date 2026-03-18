@@ -168,6 +168,76 @@ def _write_summary_csv(path: Path, payload: dict[str, Any]) -> None:
         writer.writerows(rows)
 
 
+def write_combined_modulation_plot(
+    run_dir: Path,
+    entries: list[tuple[str, str, dict[str, Any], list[float]]],
+) -> None:
+    """Plot BER for all (method, modulation) combinations on one chart.
+
+    entries: list of (mod_display_name, stage_name, methods_dict, ebno_db_range)
+    """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
+    markers = ["o", "s", "D", "^", "v", "x", "*", "+", "p", "h"]
+    linestyles = ["-", "--", ":", "-."]
+
+    plot_idx = 0
+    for mod_display, stage_name, methods, ebno_range in entries:
+        x = np.asarray(ebno_range, dtype=float)
+        for method_name, metric_map in methods.items():
+            if "ber" not in metric_map:
+                continue
+            ber = _coerce_float_array(metric_map["ber"])
+            upper = _coerce_float_array(metric_map.get("ber_upper_confidence", metric_map["ber"]))
+            statuses = _point_status_array(metric_map, fallback_len=ber.size)
+
+            label = f"{method_name} – {mod_display}"
+            marker = markers[plot_idx % len(markers)]
+            ls = linestyles[plot_idx % len(linestyles)]
+            upper_mask = statuses == POINT_STATUS_UPPER_BOUND_ONLY
+            valid_mask = ber > 0
+
+            color = None
+            if np.any(valid_mask):
+                handle = ax.semilogy(
+                    x[valid_mask], ber[valid_mask],
+                    marker=marker, linestyle=ls, linewidth=2,
+                    label=label,
+                )
+                color = handle[0].get_color()
+
+            upper_show = upper_mask & ~valid_mask
+            if np.any(upper_show):
+                handle = ax.semilogy(
+                    x[upper_show], upper[upper_show],
+                    marker=marker, linestyle="--", linewidth=1.5,
+                    markerfacecolor="none",
+                    color=color,
+                    label=label if color is None else "_nolegend_",
+                )
+            plot_idx += 1
+
+    ax.set_xlabel("Eb/No (dB)")
+    ax.set_ylabel("BER")
+    ax.set_title("BER vs Eb/No — All Modulations")
+    ax.grid(True, which="both", alpha=0.3)
+    ax.legend(fontsize=9)
+    ax.text(
+        0.01, 0.02,
+        "dashed/open = 95% BER upper bound (zero observed errors)",
+        transform=ax.transAxes, fontsize=9, alpha=0.75,
+    )
+    fig.tight_layout()
+    out_path = run_dir / "combined_ber.png"
+    fig.savefig(out_path, dpi=300)
+    plt.close(fig)
+    print(f"[plot] Combined BER plot: {out_path}")
+
+
 def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
     import matplotlib
 
@@ -329,14 +399,6 @@ def _plot_ber_raw(
     ax.set_title(title)
     ax.grid(True, which="both", alpha=0.3)
     ax.legend()
-    ax.text(
-        0.01,
-        0.02,
-        "stored BER values only; zero BER points omitted on log axis",
-        transform=ax.transAxes,
-        fontsize=9,
-        alpha=0.75,
-    )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)

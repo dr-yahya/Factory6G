@@ -375,12 +375,13 @@ class SystemConfig:
         "subcarrier_spacing": 30000.0,
         "num_ofdm_symbols": 14,
         "cyclic_prefix_length": 20,
-        "num_bits_per_symbol": 2,
         "coderate": 0.5,
         "scenario": "umi",
         "direction": "uplink",
         "pilot_ofdm_symbol_indices": [2, 11],
     }
+
+    _VALID_MODULATIONS = {1, 2, 4, 6}
 
     _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn"}
 
@@ -469,6 +470,11 @@ class SystemConfig:
                 f"'system.channel_model_type' must be one of {sorted(cls._VALID_CHANNEL_MODELS)} "
                 f"(got '{channel_model_type}')."
             )
+        if parsed.num_bits_per_symbol not in cls._VALID_MODULATIONS:
+            raise ConfigError(
+                f"'system.num_bits_per_symbol' must be one of {sorted(cls._VALID_MODULATIONS)} "
+                f"(got {parsed.num_bits_per_symbol})."
+            )
         parsed._validate_locked_5g_profile()
         return parsed
 
@@ -477,7 +483,6 @@ class SystemConfig:
         self._assert_locked_float("system.subcarrier_spacing", self.subcarrier_spacing)
         self._assert_locked_int("system.num_ofdm_symbols", self.num_ofdm_symbols)
         self._assert_locked_int("system.cyclic_prefix_length", self.cyclic_prefix_length)
-        self._assert_locked_int("system.num_bits_per_symbol", self.num_bits_per_symbol)
         self._assert_locked_float("system.coderate", self.coderate)
         self._assert_locked_str("system.scenario", self.scenario)
         self._assert_locked_str("system.direction", self.direction)
