@@ -244,38 +244,34 @@ def _plot_ber_publication(
     fig, ax = plt.subplots(1, 1, figsize=(9, 6))
     markers = ["o", "s", "D", "^", "v", "x", "*", "+"]
     x = np.asarray(ebno_range, dtype=float)
-    omitted_methods: list[str] = []
-
     for idx, (name, metric_map) in enumerate(methods.items()):
         if "ber" not in metric_map:
-            continue
-        if _should_omit_experimental_method(name=name, metric_map=metric_map, ebno_range=x):
-            omitted_methods.append(name)
             continue
 
         ber = _coerce_float_array(metric_map["ber"])
         upper = _coerce_float_array(metric_map.get("ber_upper_confidence", metric_map["ber"]))
         statuses = _point_status_array(metric_map, fallback_len=ber.size)
 
-        resolved_mask = statuses == POINT_STATUS_RESOLVED
         upper_mask = statuses == POINT_STATUS_UPPER_BOUND_ONLY
+        valid_mask = ber > 0
         marker = markers[idx % len(markers)]
         color = None
 
-        if np.any(resolved_mask):
+        if np.any(valid_mask):
             handle = ax.semilogy(
-                x[resolved_mask],
-                np.clip(ber[resolved_mask], 1e-12, np.inf),
+                x[valid_mask],
+                ber[valid_mask],
                 marker=marker,
                 linewidth=2,
                 label=name,
             )
             color = handle[0].get_color()
 
-        if np.any(upper_mask):
+        upper_show = upper_mask & ~valid_mask
+        if np.any(upper_show):
             handle = ax.semilogy(
-                x[upper_mask],
-                np.clip(upper[upper_mask], 1e-12, np.inf),
+                x[upper_show],
+                upper[upper_show],
                 marker=marker,
                 markerfacecolor="none",
                 linestyle="--",
@@ -294,24 +290,11 @@ def _plot_ber_publication(
     ax.text(
         0.01,
         0.02,
-        (
-            f"solid/filled = BER with >= {MIN_RESOLVED_BIT_ERRORS} bit errors; "
-            "dashed/open = 95% BER upper bound"
-        ),
+        "dashed/open = 95% BER upper bound (zero observed errors)",
         transform=ax.transAxes,
         fontsize=9,
         alpha=0.75,
     )
-    if omitted_methods:
-        ax.text(
-            0.99,
-            0.02,
-            f"experimental omitted: {', '.join(omitted_methods)}",
-            transform=ax.transAxes,
-            fontsize=9,
-            alpha=0.75,
-            ha="right",
-        )
     fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
@@ -333,7 +316,6 @@ def _plot_ber_raw(
         if "ber" not in metric_map:
             continue
         values = _coerce_float_array(metric_map["ber"])
-        values = np.where(values > 0.0, values, np.nan)
         ax.semilogy(
             x,
             values,
@@ -392,22 +374,6 @@ def _plot_metric_vs_ebno(
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
 
-
-def _should_omit_experimental_method(
-    *,
-    name: str,
-    metric_map: dict[str, list[Any]],
-    ebno_range: np.ndarray,
-) -> bool:
-    if name.lower() != "pso" or "ber" not in metric_map:
-        return False
-    ber = _coerce_float_array(metric_map["ber"])
-    if ber.size != ebno_range.size:
-        return False
-    mask = ebno_range <= 5.0
-    if int(np.sum(mask)) < 3:
-        return False
-    return bool(np.all(ber[mask] > 1.0e-2))
 
 
 def _point_status_array(metric_map: dict[str, list[Any]], *, fallback_len: int) -> np.ndarray:

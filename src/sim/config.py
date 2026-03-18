@@ -361,6 +361,7 @@ class SystemConfig:
     coderate: float
     num_decoding_iter: int
     channel_model_type: str
+    rician_k_factor: float
     scenario: str
     direction: str
     o2i_model: str
@@ -376,11 +377,12 @@ class SystemConfig:
         "cyclic_prefix_length": 20,
         "num_bits_per_symbol": 2,
         "coderate": 0.5,
-        "channel_model_type": "tr38901",
         "scenario": "umi",
         "direction": "uplink",
         "pilot_ofdm_symbol_indices": [2, 11],
     }
+
+    _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn"}
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SystemConfig":
@@ -398,6 +400,7 @@ class SystemConfig:
             "coderate",
             "num_decoding_iter",
             "channel_model_type",
+            "rician_k_factor",
             "scenario",
             "direction",
             "o2i_model",
@@ -448,6 +451,7 @@ class SystemConfig:
             coderate=_ensure_float(raw["coderate"], "system.coderate"),
             num_decoding_iter=_ensure_int(raw["num_decoding_iter"], "system.num_decoding_iter"),
             channel_model_type=str(raw["channel_model_type"]).lower(),
+            rician_k_factor=_ensure_float(raw.get("rician_k_factor", 1.0), "system.rician_k_factor"),
             scenario=str(raw["scenario"]).lower(),
             direction=str(raw["direction"]).lower(),
             o2i_model=str(raw["o2i_model"]).lower(),
@@ -459,6 +463,12 @@ class SystemConfig:
             min_ut_velocity=_ensure_float(raw["min_ut_velocity"], "system.min_ut_velocity"),
             max_ut_velocity=_ensure_float(raw["max_ut_velocity"], "system.max_ut_velocity"),
         )
+        channel_model_type = str(raw["channel_model_type"]).lower()
+        if channel_model_type not in cls._VALID_CHANNEL_MODELS:
+            raise ConfigError(
+                f"'system.channel_model_type' must be one of {sorted(cls._VALID_CHANNEL_MODELS)} "
+                f"(got '{channel_model_type}')."
+            )
         parsed._validate_locked_5g_profile()
         return parsed
 
@@ -469,7 +479,6 @@ class SystemConfig:
         self._assert_locked_int("system.cyclic_prefix_length", self.cyclic_prefix_length)
         self._assert_locked_int("system.num_bits_per_symbol", self.num_bits_per_symbol)
         self._assert_locked_float("system.coderate", self.coderate)
-        self._assert_locked_str("system.channel_model_type", self.channel_model_type)
         self._assert_locked_str("system.scenario", self.scenario)
         self._assert_locked_str("system.direction", self.direction)
         expected_pilots = self._LOCKED_5G_VALUES["pilot_ofdm_symbol_indices"]

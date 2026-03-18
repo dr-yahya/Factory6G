@@ -87,6 +87,22 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
     root.addHandler(file_handler)
 
 
+def _build_run_suffix(config, args: argparse.Namespace) -> str:
+    all_methods = list(config.estimators.enabled) + list(config.resource_managers.enabled)
+    methods_part = "_".join(all_methods) if all_methods else "run"
+
+    cmt = config.system.channel_model_type
+    channel_part = config.system.scenario if cmt == "tr38901" else cmt
+
+    modulation_map = {1: "bpsk", 2: "qpsk", 4: "16qam", 6: "64qam"}
+    modulation_part = modulation_map.get(
+        config.system.num_bits_per_symbol,
+        f"{config.system.num_bits_per_symbol}bps",
+    )
+
+    return f"{methods_part}_{channel_part}_{modulation_part}"
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Factory6G simulations.")
     parser.add_argument("--config", default="config.json", help="Path to the simulation config JSON file.")
@@ -146,14 +162,15 @@ def main() -> int:
         sim_config = config.simulation
         if args.resume:
             run_dir = Path(args.resume)
-            suffix = "_simulation"
-            if run_dir.name.endswith(suffix) and len(run_dir.name) > len(suffix):
-                run_id = run_dir.name[: -len(suffix)]
-            else:
-                run_id = run_dir.name
+            # Extract run_id as the timestamp prefix (everything before the first _ after date)
+            parts = run_dir.name.split("_")
+            run_id = "_".join(parts[:2]) if len(parts) >= 2 else run_dir.name
             log_mode = "a"
         else:
-            run_id, run_dir = create_run_context(sim_config.output_dir)
+            run_id, run_dir = create_run_context(
+                sim_config.output_dir,
+                suffix=_build_run_suffix(config, args),
+            )
             log_mode = "w"
         run_dir.mkdir(parents=True, exist_ok=True)
         log_path = run_dir / "simulation.log"

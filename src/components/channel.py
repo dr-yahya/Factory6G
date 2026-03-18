@@ -21,16 +21,21 @@ class ChannelModel:
         self.antenna_config = antenna_config
         self.resource_grid = resource_grid
 
-        if self.config.get("channel_model_type", "tr38901") == "rayleigh":
+        channel_model_type = self.config.get("channel_model_type", "tr38901")
+        if channel_model_type == "rayleigh":
             self._channel_model = self._create_rayleigh_channel()
-        else:
+            self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
+        elif channel_model_type == "rician":
+            # Rician = deterministic LoS + Rayleigh NLoS, blended by K-factor
+            self._channel_model = self._create_rayleigh_channel()
+            self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
+            self._rician_k_factor = float(self.config.get("rician_k_factor", 1.0))
+        elif channel_model_type == "awgn":
+            self._channel_model = None
+            self._generator = None
+        else:  # tr38901
             self._channel_model = self._create_tr38901_channel()
-
-        self._generator = GenerateOFDMChannel(
-            self._channel_model,
-            resource_grid,
-            normalize_channel=True,
-        )
+            self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
         self._applier = ApplyOFDMChannel()
 
     def _create_tr38901_channel(self):
@@ -71,7 +76,7 @@ class ChannelModel:
         )
 
     def set_topology(self, batch_size: int) -> None:
-        if self.config.get("channel_model_type") == "rayleigh":
+        if self.config.get("channel_model_type", "tr38901") in ("rayleigh", "rician", "awgn"):
             return
         topology = gen_topology(
             batch_size,
@@ -84,8 +89,29 @@ class ChannelModel:
             self._channel_model.set_topology(*topology)
 
     def sample_frequency_response(self, batch_size: int) -> tf.Tensor:
+        cmt = self.config.get("channel_model_type", "tr38901")
+        if cmt == "awgn":
+            direction = self.config.get("direction", "uplink")
+            if direction == "uplink":
+                num_rx, num_rx_ant = 1, int(self.config.get("num_bs_ant", 8))
+                num_tx, num_tx_ant = int(self.config.get("num_ut", 4)), int(self.config.get("num_ut_ant", 1))
+            else:
+                num_rx, num_rx_ant = int(self.config.get("num_ut", 4)), int(self.config.get("num_ut_ant", 1))
+                num_tx, num_tx_ant = 1, int(self.config.get("num_bs_ant", 8))
+            shape = [
+                batch_size, num_rx, num_rx_ant, num_tx, num_tx_ant,
+                self.resource_grid.num_ofdm_symbols,
+                self.resource_grid.fft_size,
+            ]
+            return tf.ones(shape, dtype=tf.complex64)
         with tf.device("/CPU:0"):
-            return self._generator(batch_size)
+            h = self._generator(batch_size)
+        if cmt == "rician":
+            k = tf.cast(self._rician_k_factor, tf.float32)
+            los = tf.cast(tf.sqrt(k / (k + 1.0)), tf.complex64)
+            nlos_scale = tf.cast(tf.sqrt(1.0 / (k + 1.0)), tf.complex64)
+            h = los + nlos_scale * h
+        return h
 
     def apply_frequency_response(self, x_rg: tf.Tensor, h_freq: tf.Tensor) -> tf.Tensor:
         with tf.device("/CPU:0"):

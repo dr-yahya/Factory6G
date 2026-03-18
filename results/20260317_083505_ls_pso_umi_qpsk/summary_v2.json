@@ -1,0 +1,52 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260317_083505",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260317_083505_ls_pso_umi_qpsk/estimators",
+      "json": "results/20260317_083505_ls_pso_umi_qpsk/estimators/stage_results_v2.json",
+      "csv": "results/20260317_083505_ls_pso_umi_qpsk/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "ls": {
+        "ber": 0.0029293405281634057,
+        "ber_upper_confidence": 0.002948882836669023,
+        "latency_ms": 467.6101897030851,
+        "throughput_bits_per_batch": 392064.1364348777,
+        "energy_joules_per_batch": 0.00018645100000000005,
+        "avg_power_w": 0.00039879023671208894,
+        "runtime_sec": 73.04591909872543,
+        "bit_errors": 31459.363636363636,
+        "total_bits": 58446196.36363637,
+        "block_errors": 133.8181818181818,
+        "total_blocks": 38050.90909090909,
+        "num_batches": 148.63636363636363
+      },
+      "pso": {
+        "ber": 0.0005580624733705552,
+        "ber_upper_confidence": 0.0005641183221096753,
+        "latency_ms": 469.4497808373754,
+        "throughput_bits_per_batch": 392996.56090647116,
+        "energy_joules_per_batch": 0.00018645099999999764,
+        "avg_power_w": 0.00039721847122068635,
+        "runtime_sec": 7518.436971015294,
+        "bit_errors": 28348.090909090908,
+        "total_bits": 499098344.72727275,
+        "block_errors": 98.54545454545455,
+        "total_blocks": 324933.8181818182,
+        "num_batches": 1269.2727272727273
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "ls": 803.5051100859798,
+      "pso": 82702.80668116824
+    }
+  }
+}
