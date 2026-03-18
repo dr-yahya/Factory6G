@@ -14,6 +14,16 @@ if TYPE_CHECKING:
 
 
 MIN_RESOLVED_BIT_ERRORS = 30
+
+
+def fmt_elapsed(seconds: float) -> str:
+    h, rem = divmod(int(seconds), 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m {s:02d}s"
+    if m:
+        return f"{m}m {s:02d}s"
+    return f"{s}s"
 POINT_STATUS_RESOLVED = "resolved"
 POINT_STATUS_UPPER_BOUND_ONLY = "upper_bound_only"
 

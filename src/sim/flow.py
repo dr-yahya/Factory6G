@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
 from src.sim.config import Factory6GConfig
 from src.sim.output import write_stage_outputs, write_summary_outputs
 from src.sim.run_context import build_run_dir, create_run_context, generate_run_id
+from src.sim.stages.common import fmt_elapsed
 from src.sim.stages.estimators import run_estimator_stage
 from src.sim.stages.resource_managers import run_resource_manager_stage
 
@@ -69,6 +71,7 @@ def run_simulation_flow(
     stage_order = active_stages
     stage_payloads: dict[str, dict[str, Any]] = {}
     stage_paths: dict[str, dict[str, str]] = {}
+    flow_start = time.perf_counter()
 
     if run_estimators:
         estimator_stage_dir = run_dir / "estimators"
@@ -87,7 +90,10 @@ def run_simulation_flow(
                 "csv": str(estimator_stage_dir / "stage_results_v2.csv"),
             }
         else:
+            print("[estimators] Starting...")
+            _t = time.perf_counter()
             estimator_result = run_estimator_stage(config, checkpoint_dir=estimator_stage_dir)
+            print(f"[estimators] Done in {fmt_elapsed(time.perf_counter() - _t)}")
             estimator_paths = write_stage_outputs(
                 run_id=run_id,
                 stage_name="estimators",
@@ -120,7 +126,10 @@ def run_simulation_flow(
                 "csv": str(rm_stage_dir / "stage_results_v2.csv"),
             }
         else:
+            print("[resource_managers] Starting...")
+            _t = time.perf_counter()
             rm_result = run_resource_manager_stage(config, checkpoint_dir=rm_stage_dir)
+            print(f"[resource_managers] Done in {fmt_elapsed(time.perf_counter() - _t)}")
             rm_paths = write_stage_outputs(
                 run_id=run_id,
                 stage_name="resource_managers",
@@ -136,6 +145,7 @@ def run_simulation_flow(
         }
         stage_paths["resource_managers"] = rm_paths
 
+    print(f"Simulation complete. Total time: {fmt_elapsed(time.perf_counter() - flow_start)}")
     summary = write_summary_outputs(
         run_id=run_id,
         run_dir=run_dir,

@@ -12,6 +12,7 @@ from .common import (
     append_point_metrics,
     classify_point_status,
     extract_error_stats,
+    fmt_elapsed,
     initialize_stage_metrics,
     mc_stop_reason,
     resolve_kwargs,
@@ -78,6 +79,7 @@ def run_estimator_stage(
             )
 
     total_points = len(methods) * len(ebno_db_range)
+    stage_start = time.perf_counter()
     for batch_index in range(start_batch_index, config.monte_carlo.max_batches):
         remaining = sum(
             1
@@ -91,7 +93,8 @@ def run_estimator_stage(
         batch_start = time.time()
         print(
             f"Estimator batch {batch_index + 1}/{config.monte_carlo.max_batches} "
-            f"(active points {remaining}/{total_points}) ... ",
+            f"(active points {remaining}/{total_points}) "
+            f"[{fmt_elapsed(time.perf_counter() - stage_start)} elapsed] ... ",
             end="",
             flush=True,
         )

@@ -1,0 +1,37 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260318_094228",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260318_094228_adaptive_umi_qpsk/estimators",
+      "json": "results/20260318_094228_adaptive_umi_qpsk/estimators/stage_results_v2.json",
+      "csv": "results/20260318_094228_adaptive_umi_qpsk/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "adaptive": {
+        "ber": 0.0005850922481770034,
+        "ber_upper_confidence": 0.0005914491115191861,
+        "latency_ms": 468.1021092504295,
+        "throughput_bits_per_batch": 392985.93236654083,
+        "energy_joules_per_batch": 0.0001864509999999993,
+        "avg_power_w": 0.00039840055213931943,
+        "runtime_sec": 530.7331070444511,
+        "bit_errors": 23774.272727272728,
+        "total_bits": 406120634.1818182,
+        "block_errors": 96.81818181818181,
+        "total_blocks": 264401.45454545453,
+        "num_batches": 1032.8181818181818
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "adaptive": 5838.064177488962
+    }
+  }
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
+import time
 import random
 import re
 import sys
@@ -209,8 +210,12 @@ def main() -> int:
         tf.random.set_seed(sim_config.seed)
         sionna.phy.config.seed = sim_config.seed
 
+        from src.sim.stages.common import fmt_elapsed
+
         print(f"Loaded configuration for scenario: {config.system.scenario}")
+        _wall_start = time.perf_counter()
         run_simulation_flow(config, run_id=run_id, run_dir=run_dir)
+        print(f"Wall-clock time (incl. setup): {fmt_elapsed(time.perf_counter() - _wall_start)}")
         return 0
     finally:
         try:
