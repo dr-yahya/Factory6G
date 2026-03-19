@@ -51,9 +51,10 @@ class ISTAChannelEstimator(Block):
         Returns the refined frequency-domain estimate and an approximate
         active-tap count for error-variance scaling.
         """
-        # Broadcast noise std to complex dtype for threshold computation
-        no_scalar = tf.reduce_mean(no)
-        threshold = self.lambda_scale * tf.cast(tf.sqrt(no_scalar), h_ls.dtype)
+        # Keep threshold as float32 — tf.abs() returns float, not complex
+        no_scalar = tf.reduce_mean(tf.cast(no, tf.float32))
+        threshold = tf.cast(self.lambda_scale * tf.sqrt(no_scalar), tf.float32)
+        step = tf.cast(self.step_size, tf.float32)
 
         h_delay = tf.signal.ifft(h_ls)
         h = h_delay
@@ -62,13 +63,13 @@ class ISTAChannelEstimator(Block):
             # Gradient step: residual in frequency domain, pulled back to delay
             residual = tf.signal.ifft(h_ls - tf.signal.fft(h))
             h = self._soft_threshold(
-                h + tf.cast(self.step_size, h.dtype) * residual,
-                threshold * tf.cast(self.step_size, threshold.dtype),
+                h + tf.cast(step, h.dtype) * residual,
+                threshold * step,
             )
 
         # Estimate active taps (magnitude above threshold) for error-variance scaling
         active_fraction = tf.reduce_mean(
-            tf.cast(tf.abs(h) > tf.cast(threshold * self.step_size, tf.float32), tf.float32)
+            tf.cast(tf.abs(h) > threshold * step, tf.float32)
         )
         # Clamp to [1/fft_size, 1] to avoid degenerate scaling
         active_fraction = tf.clip_by_value(active_fraction, 1.0 / self.fft_size, 1.0)
