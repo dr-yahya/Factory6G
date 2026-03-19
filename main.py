@@ -214,8 +214,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--factory-size",
         metavar="SIZES",
-        default="m",
-        help="Comma-separated factory sizes: s (small), m (medium), l (large). Default: m.",
+        default="s",
+        help="Comma-separated factory sizes: s (small), m (medium), l (large). Default: s.",
     )
     return parser.parse_args()
 

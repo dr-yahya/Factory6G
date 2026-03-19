@@ -79,7 +79,7 @@ def run_simulation_flow(
     if not channels:
         channels = [config.system.channel_model_type]
     if not factory_sizes:
-        factory_sizes = ["m"]
+        factory_sizes = ["s"]
 
     run_estimators = bool(config.estimators.enabled)
     run_rms = bool(config.resource_managers.enabled)

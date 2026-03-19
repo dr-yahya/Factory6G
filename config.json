@@ -27,6 +27,8 @@
       "lmmse",
       "adaptive",
       "pso",
+      "ista",
+      "neural",
       "perfect"
     ],
     "kwargs": {
@@ -46,6 +48,15 @@
         "iters": 12,
         "early_stop_patience": 3,
         "min_rel_improvement": 0.001
+      },
+      "ista": {
+        "num_iterations": 10,
+        "lambda_scale": 1.0,
+        "step_size": 0.5
+      },
+      "neural": {
+        "model_path": "models/neural_estimator.keras",
+        "nn_err_var_scale": 0.5
       }
     }
   },
@@ -79,23 +90,23 @@
   },
   "factory_scenario": {
     "room_dimensions": [
-      25.0,
-      25.0,
-      6.0
+      15.0,
+      15.0,
+      5.0
     ],
-    "num_machines": 8,
+    "num_machines": 5,
     "machine_size_range": [
       [
-        1.0,
-        3.0
+        0.5,
+        2.0
       ],
       [
-        1.0,
-        3.0
+        0.5,
+        2.0
       ],
       [
-        1.0,
-        2.5
+        0.5,
+        1.5
       ]
     ],
     "materials": {

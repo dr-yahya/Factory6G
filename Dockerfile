@@ -23,6 +23,7 @@ COPY models/    models/
 COPY config/    config/
 COPY data/      data/
 COPY main.py    .
+COPY train.py   .
 COPY config.json .
 
 ENTRYPOINT ["python", "main.py"]

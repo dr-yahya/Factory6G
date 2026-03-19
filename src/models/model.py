@@ -91,6 +91,14 @@ class Model:
             from ..components.estimators import AdaptiveHybridChannelEstimator
 
             return AdaptiveHybridChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
+        if estimator_type in {"ista", "ista_sparse"}:
+            from ..components.estimators import ISTAChannelEstimator
+
+            return ISTAChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
+        if estimator_type in {"neural", "neural_net", "nn"}:
+            from ..components.estimators import NeuralChannelEstimator
+
+            return NeuralChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
         if estimator_type == "perfect":
             return None
         raise ValueError(f"Unsupported estimator_type '{self.estimator_type}'.")

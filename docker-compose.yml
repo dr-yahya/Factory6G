@@ -21,6 +21,16 @@ services:
               count: 1
               capabilities: [gpu]
 
+  train-estimator:     # Train the NeuralChannelEstimator inside Docker
+    build: .
+    image: factory6g:latest
+    volumes:
+      - ./models:/app/models          # trained weights persist on host
+      - ./data:/app/data              # generated dataset persists on host
+      - ./config.json:/app/config.json:ro
+    entrypoint: ["python", "train.py"]
+    command: ["--data", "data/channel_train.npz", "--output", "models/neural_estimator.keras"]
+
   # To resume an interrupted run, override the command on the existing service:
   #   CPU: docker compose run simulation --config config.json --resume /app/results/20260315_092517_simulation
   #   GPU: docker compose run simulation-gpu --config config.json --resume /app/results/20260315_092517_simulation
