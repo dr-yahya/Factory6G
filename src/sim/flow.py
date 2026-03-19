@@ -14,7 +14,7 @@ from src.sim.stages.estimators import run_estimator_stage
 from src.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
-_FACTORY_SIZE_DISPLAY = {"s": "Small", "m": "Medium", "l": "Large"}
+_FACTORY_SIZE_DISPLAY = {"s": "Small", "m": "Medium", "l": "Large", "apple": "Apple Factory"}
 _FACTORY_SIZE_PRESETS = {
     "s": {
         "room_dimensions": [15.0, 15.0, 5.0],
@@ -33,6 +33,16 @@ _FACTORY_SIZE_PRESETS = {
         "num_machines": 20,
         "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
         "num_ut": 16,
+    },
+    "apple": {
+        # Consumer electronics precision assembly hall (iPhone-style)
+        # 60×35m floor, 8m ceiling — rectangular assembly line layout
+        # Dense compact workstations: SMT placers, robotic arms, test stations
+        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
+        "room_dimensions": [60.0, 35.0, 8.0],
+        "num_machines": 22,
+        "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
+        "num_ut": 8,
     },
 }
 

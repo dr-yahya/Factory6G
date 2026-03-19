@@ -86,6 +86,35 @@
       "dataset_defaults": {
         "seed_offset": 2000
       }
+    },
+    "APPLE": {
+      "factory_scale": "APPLE",
+      "scenario_label": "Consumer Electronics Assembly",
+      "real_world_archetype": "Consumer electronics precision assembly line",
+      "narrative": "High-precision assembly facility modelled after an iPhone-style manufacturing cell. Dense rows of compact SMT placers, robotic arms, and automated test stations create a rich multipath environment with many small metal reflectors. Clean-room style layout with low-mounted antennas serving AGVs, wearable devices, and quality-control sensors.",
+      "factory_scenario_overrides": {
+        "room_dimensions": [60.0, 35.0, 8.0],
+        "num_machines": 22,
+        "machine_size_range": [
+          [0.8, 2.5],
+          [0.8, 2.0],
+          [1.0, 2.5]
+        ]
+      },
+      "transceiver_overrides": {
+        "room_padding": 2.0,
+        "rx_boundary_padding": 1.5,
+        "tx_height_offset": 0.9,
+        "rx_height": 1.0
+      },
+      "ray_tracing_overrides": {
+        "max_depth": 7,
+        "samples_per_src": 18000,
+        "max_paths": 140
+      },
+      "dataset_defaults": {
+        "seed_offset": 3000
+      }
     }
   }
 }

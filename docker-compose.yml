@@ -21,6 +21,15 @@ services:
               count: 1
               capabilities: [gpu]
 
+  visualize:           # Ray-tracing visualization of factory environments
+    build: .
+    image: factory6g:latest
+    volumes:
+      - ./results:/app/results
+      - ./config.json:/app/config.json:ro
+    entrypoint: ["python", "visualize.py"]
+    command: ["--factory-size", "s,m,l,apple"]
+
   train-estimator:     # Train the NeuralChannelEstimator inside Docker
     build: .
     image: factory6g:latest

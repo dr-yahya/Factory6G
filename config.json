@@ -22,14 +22,7 @@
   },
   "estimators": {
     "enabled": [
-      "ls",
-      "dft",
-      "lmmse",
-      "adaptive",
-      "pso",
-      "ista",
-      "neural",
-      "perfect"
+      "adaptive"
     ],
     "kwargs": {
       "adaptive": {
@@ -138,7 +131,7 @@
     "num_bits_per_symbol": 2,
     "coderate": 0.5,
     "num_decoding_iter": 20,
-    "channel_model_type": "tr38901",
+    "channel_model_type": "rayleigh",
     "scenario": "umi",
     "direction": "uplink",
     "o2i_model": "low",

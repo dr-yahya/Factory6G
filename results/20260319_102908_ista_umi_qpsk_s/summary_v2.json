@@ -1,0 +1,37 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260319_102908",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260319_102908_ista_umi_qpsk_s/estimators",
+      "json": "results/20260319_102908_ista_umi_qpsk_s/estimators/stage_results_v2.json",
+      "csv": "results/20260319_102908_ista_umi_qpsk_s/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "ista": {
+        "ber": 0.09009301463052405,
+        "ber_upper_confidence": 0.09024787613575679,
+        "latency_ms": 479.2546220483459,
+        "throughput_bits_per_batch": 357789.9851590438,
+        "energy_joules_per_batch": 0.000186451,
+        "avg_power_w": 0.00038905982030412853,
+        "runtime_sec": 8.338516905000047,
+        "bit_errors": 354876.0909090909,
+        "total_bits": 5290542.545454546,
+        "block_errors": 804.0909090909091,
+        "total_blocks": 3444.3636363636365,
+        "num_batches": 13.454545454545455
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "ista": 91.72368595500052
+    }
+  }
+}

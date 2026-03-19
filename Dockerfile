@@ -22,9 +22,10 @@ COPY src/       src/
 COPY models/    models/
 COPY config/    config/
 COPY data/      data/
-COPY main.py    .
-COPY train.py   .
-COPY config.json .
+COPY main.py       .
+COPY train.py      .
+COPY visualize.py  .
+COPY config.json   .
 
 ENTRYPOINT ["python", "main.py"]
 CMD ["--config", "config.json"]
