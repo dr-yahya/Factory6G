@@ -1,0 +1,87 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260318_200508",
+  "stage_order": [
+    "rayleigh/estimators",
+    "rician/estimators",
+    "tr38901/estimators"
+  ],
+  "stage_paths": {
+    "rayleigh/estimators": {
+      "dir": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rayleigh/estimators",
+      "json": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rayleigh/estimators/stage_results_v2.json",
+      "csv": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rayleigh/estimators/stage_results_v2.csv"
+    },
+    "rician/estimators": {
+      "dir": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rician/estimators",
+      "json": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rician/estimators/stage_results_v2.json",
+      "csv": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/rician/estimators/stage_results_v2.csv"
+    },
+    "tr38901/estimators": {
+      "dir": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/tr38901/estimators",
+      "json": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/tr38901/estimators/stage_results_v2.json",
+      "csv": "results/20260318_200508_ls_rayleigh_rician_umi_qpsk/tr38901/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "rayleigh/estimators": {
+      "ls": {
+        "ber": 0.0007351019839641505,
+        "ber_upper_confidence": 0.0007423270969698936,
+        "latency_ms": 484.0368605073009,
+        "throughput_bits_per_batch": 392926.9461382736,
+        "energy_joules_per_batch": 0.00018645099999999593,
+        "avg_power_w": 0.0003853465094374899,
+        "runtime_sec": 783.7737521689098,
+        "bit_errors": 6308.181818181818,
+        "total_bits": 608162164.3636364,
+        "block_errors": 35.63636363636363,
+        "total_blocks": 395938.9090909091,
+        "num_batches": 1546.6363636363637
+      }
+    },
+    "rician/estimators": {
+      "ls": {
+        "ber": 0.01025515887952966,
+        "ber_upper_confidence": 0.010289980048412615,
+        "latency_ms": 484.85100464108416,
+        "throughput_bits_per_batch": 389183.50744602684,
+        "energy_joules_per_batch": 0.0001864509999999963,
+        "avg_power_w": 0.000384597308499361,
+        "runtime_sec": 664.87242606055,
+        "bit_errors": 45193.09090909091,
+        "total_bits": 507606109.09090906,
+        "block_errors": 186.8181818181818,
+        "total_blocks": 330472.7272727273,
+        "num_batches": 1290.909090909091
+      }
+    },
+    "tr38901/estimators": {
+      "ls": {
+        "ber": 0.003037880808929809,
+        "ber_upper_confidence": 0.0030577707113244802,
+        "latency_ms": 472.794197773948,
+        "throughput_bits_per_batch": 392021.4566598358,
+        "energy_joules_per_batch": 0.00018645100000000013,
+        "avg_power_w": 0.0003943788116826542,
+        "runtime_sec": 68.89339384236403,
+        "bit_errors": 33413.454545454544,
+        "total_bits": 54299554.90909091,
+        "block_errors": 134.27272727272728,
+        "total_blocks": 35351.27272727273,
+        "num_batches": 138.0909090909091
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "rayleigh/estimators": {
+      "ls": 8621.511273858008
+    },
+    "rician/estimators": {
+      "ls": 7313.596686666032
+    },
+    "tr38901/estimators": {
+      "ls": 757.8273322660043
+    }
+  }
+}

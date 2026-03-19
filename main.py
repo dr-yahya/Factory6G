@@ -91,6 +91,26 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
 _MODULATION_MAP = {"low": 2, "mid": 4, "high": 6}
 _MODULATION_LABEL_MAP = {2: "qpsk", 4: "16qam", 6: "64qam", 1: "bpsk"}
 _VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn"}
+_FACTORY_SIZE_PRESETS = {
+    "s": {
+        "room_dimensions": [15.0, 15.0, 5.0],
+        "num_machines": 5,
+        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
+        "num_ut": 4,
+    },
+    "m": {
+        "room_dimensions": [25.0, 25.0, 6.0],
+        "num_machines": 10,
+        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
+        "num_ut": 8,
+    },
+    "l": {
+        "room_dimensions": [40.0, 40.0, 8.0],
+        "num_machines": 20,
+        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
+        "num_ut": 16,
+    },
+}
 
 
 def _parse_modulation_list(raw: str) -> list[tuple[str, int]]:
@@ -125,6 +145,22 @@ def _parse_channel_list(raw: str) -> list[str]:
     return result
 
 
+def _parse_factory_size_list(raw: str) -> list[str]:
+    result: list[str] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _FACTORY_SIZE_PRESETS:
+            raise ValueError(
+                f"Unknown factory size '{token}'. Choose from: {', '.join(sorted(_FACTORY_SIZE_PRESETS))}."
+            )
+        result.append(token)
+    if not result:
+        raise ValueError("--factory-size requires at least one size.")
+    return result
+
+
 def _build_run_suffix(config, args: argparse.Namespace) -> str:
     all_methods = list(config.estimators.enabled) + list(config.resource_managers.enabled)
     methods_part = "_".join(all_methods) if all_methods else "run"
@@ -137,7 +173,9 @@ def _build_run_suffix(config, args: argparse.Namespace) -> str:
     mod_labels = [_MODULATION_LABEL_MAP.get(bits, f"{bits}bps") for _, bits in args.modulation_list]
     modulation_part = "_".join(mod_labels)
 
-    return f"{methods_part}_{channel_part}_{modulation_part}"
+    size_part = "_".join(args.factory_size_list)
+
+    return f"{methods_part}_{channel_part}_{modulation_part}_{size_part}"
 
 
 def _parse_args() -> argparse.Namespace:
@@ -172,6 +210,12 @@ def _parse_args() -> argparse.Namespace:
         metavar="TYPES",
         default=None,
         help="Comma-separated channel types: rayleigh, rician, tr38901, awgn. Default: from config.",
+    )
+    parser.add_argument(
+        "--factory-size",
+        metavar="SIZES",
+        default="m",
+        help="Comma-separated factory sizes: s (small), m (medium), l (large). Default: m.",
     )
     return parser.parse_args()
 
@@ -222,6 +266,12 @@ def main() -> int:
             return 1
     else:
         args.channel_list = [config.system.channel_model_type]
+
+    try:
+        args.factory_size_list = _parse_factory_size_list(args.factory_size)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
 
     try:
         sim_config = config.simulation
@@ -278,7 +328,7 @@ def main() -> int:
 
         print(f"Loaded configuration for scenario: {config.system.scenario}")
         _wall_start = time.perf_counter()
-        run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list)
+        run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list, factory_sizes=args.factory_size_list)
         print(f"Wall-clock time (incl. setup): {fmt_elapsed(time.perf_counter() - _wall_start)}")
         return 0
     finally:

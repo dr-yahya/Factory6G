@@ -168,74 +168,99 @@ def _write_summary_csv(path: Path, payload: dict[str, Any]) -> None:
         writer.writerows(rows)
 
 
-def write_combined_modulation_plot(
+def write_overview_plots(
     run_dir: Path,
-    entries: list[tuple[str, str, dict[str, Any], list[float]]],
+    entries: list[tuple[str, str, dict[str, Any], list[float], dict[str, float]]],
+    title_prefix: str = "Overview",
 ) -> None:
-    """Plot BER for all (method, modulation) combinations on one chart.
+    """Generate overview plots combining all combos, grouped by stage.
 
-    entries: list of (mod_display_name, stage_name, methods_dict, ebno_db_range)
+    entries: list of (combo_label, stage_name, methods_dict, ebno_db_range, runtime_totals_sec)
     """
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 7))
-    markers = ["o", "s", "D", "^", "v", "x", "*", "+", "p", "h"]
-    linestyles = ["-", "--", ":", "-."]
+    # Group by stage_name
+    from collections import defaultdict
+    by_stage: dict[str, list[tuple[str, dict[str, Any], list[float], dict[str, float]]]] = defaultdict(list)
+    for combo_label, stage_name, methods, ebno_range, runtime_totals in entries:
+        by_stage[stage_name].append((combo_label, methods, ebno_range, runtime_totals))
 
-    plot_idx = 0
-    for mod_display, stage_name, methods, ebno_range in entries:
-        x = np.asarray(ebno_range, dtype=float)
-        for method_name, metric_map in methods.items():
-            if "ber" not in metric_map:
-                continue
-            ber = _coerce_float_array(metric_map["ber"])
-            upper = _coerce_float_array(metric_map.get("ber_upper_confidence", metric_map["ber"]))
-            statuses = _point_status_array(metric_map, fallback_len=ber.size)
+    for stage_name, stage_entries in by_stage.items():
+        stage_display = stage_name.replace("_", " ").title()
+        overview_dir = run_dir / "overview" / stage_name
+        overview_dir.mkdir(parents=True, exist_ok=True)
 
-            label = f"{method_name} – {mod_display}"
-            marker = markers[plot_idx % len(markers)]
-            ls = linestyles[plot_idx % len(linestyles)]
-            upper_mask = statuses == POINT_STATUS_UPPER_BOUND_ONLY
-            valid_mask = ber > 0
+        # Build merged methods dict: key = "combo_label – method_name"
+        merged_methods: dict[str, dict[str, Any]] = {}
+        merged_runtime: dict[str, float] = {}
+        for combo_label, methods, _ebno, runtime_totals in stage_entries:
+            for method_name, metric_map in methods.items():
+                label = f"{combo_label} – {method_name}" if combo_label else method_name
+                merged_methods[label] = metric_map
+                merged_runtime[label] = runtime_totals.get(method_name, 0.0)
 
-            color = None
-            if np.any(valid_mask):
-                handle = ax.semilogy(
-                    x[valid_mask], ber[valid_mask],
-                    marker=marker, linestyle=ls, linewidth=2,
-                    label=label,
-                )
-                color = handle[0].get_color()
+        # Use the ebno_range from the first entry (all should be identical)
+        ebno_range = stage_entries[0][2]
+        title_base = f"All {title_prefix}"
 
-            upper_show = upper_mask & ~valid_mask
-            if np.any(upper_show):
-                handle = ax.semilogy(
-                    x[upper_show], upper[upper_show],
-                    marker=marker, linestyle="--", linewidth=1.5,
-                    markerfacecolor="none",
-                    color=color,
-                    label=label if color is None else "_nolegend_",
-                )
-            plot_idx += 1
+        _plot_ber_publication(
+            plt=plt,
+            methods=merged_methods,
+            ebno_range=ebno_range,
+            title=f"{title_base}: BER vs Eb/No",
+            output_path=overview_dir / "ber_vs_ebno.png",
+        )
+        _plot_ber_raw(
+            plt=plt,
+            methods=merged_methods,
+            ebno_range=ebno_range,
+            title=f"{title_base}: Raw BER vs Eb/No",
+            output_path=overview_dir / "ber_raw_vs_ebno.png",
+        )
+        _plot_metric_vs_ebno(
+            plt=plt,
+            methods=merged_methods,
+            ebno_range=ebno_range,
+            metric="latency_ms",
+            ylabel="Latency (ms)",
+            title=f"{title_base}: Latency vs Eb/No",
+            output_path=overview_dir / "latency_vs_ebno.png",
+        )
+        _plot_metric_vs_ebno(
+            plt=plt,
+            methods=merged_methods,
+            ebno_range=ebno_range,
+            metric="throughput_bits_per_batch",
+            ylabel="Throughput (bits/batch)",
+            title=f"{title_base}: Throughput vs Eb/No",
+            output_path=overview_dir / "throughput_vs_ebno.png",
+        )
+        _plot_metric_vs_ebno(
+            plt=plt,
+            methods=merged_methods,
+            ebno_range=ebno_range,
+            metric="avg_power_w",
+            ylabel="Average Power (W)",
+            title=f"{title_base}: Power vs Eb/No",
+            output_path=overview_dir / "power_vs_ebno.png",
+        )
 
-    ax.set_xlabel("Eb/No (dB)")
-    ax.set_ylabel("BER")
-    ax.set_title("BER vs Eb/No — All Modulations")
-    ax.grid(True, which="both", alpha=0.3)
-    ax.legend(fontsize=9)
-    ax.text(
-        0.01, 0.02,
-        "dashed/open = 95% BER upper bound (zero observed errors)",
-        transform=ax.transAxes, fontsize=9, alpha=0.75,
-    )
-    fig.tight_layout()
-    out_path = run_dir / "combined_ber.png"
-    fig.savefig(out_path, dpi=300)
-    plt.close(fig)
-    print(f"[plot] Combined BER plot: {out_path}")
+        names = list(merged_runtime.keys())
+        values = [merged_runtime[n] for n in names]
+        fig_rt, ax_rt = plt.subplots(1, 1, figsize=(max(9, len(names) * 0.8 + 2), 6))
+        ax_rt.bar(names, values)
+        ax_rt.set_ylabel("Runtime (sec)")
+        ax_rt.set_title(f"{title_base}: Runtime by Method")
+        ax_rt.grid(True, axis="y", alpha=0.3)
+        plt.setp(ax_rt.get_xticklabels(), rotation=30, ha="right", fontsize=8)
+        fig_rt.tight_layout()
+        fig_rt.savefig(overview_dir / "runtime_by_method.png", dpi=300)
+        plt.close(fig_rt)
+
+        print(f"[plot] Overview plots ({stage_name}): {overview_dir}")
 
 
 def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:

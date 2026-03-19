@@ -7,13 +7,34 @@ from pathlib import Path
 from typing import Any
 
 from src.sim.config import Factory6GConfig
-from src.sim.output import write_combined_modulation_plot, write_stage_outputs, write_summary_outputs
+from src.sim.output import write_overview_plots, write_stage_outputs, write_summary_outputs
 from src.sim.run_context import build_run_dir, create_run_context, generate_run_id
 from src.sim.stages.common import fmt_elapsed
 from src.sim.stages.estimators import run_estimator_stage
 from src.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
+_FACTORY_SIZE_DISPLAY = {"s": "Small", "m": "Medium", "l": "Large"}
+_FACTORY_SIZE_PRESETS = {
+    "s": {
+        "room_dimensions": [15.0, 15.0, 5.0],
+        "num_machines": 5,
+        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
+        "num_ut": 4,
+    },
+    "m": {
+        "room_dimensions": [25.0, 25.0, 6.0],
+        "num_machines": 10,
+        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
+        "num_ut": 8,
+    },
+    "l": {
+        "room_dimensions": [40.0, 40.0, 8.0],
+        "num_machines": 20,
+        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
+        "num_ut": 16,
+    },
+}
 
 
 def _load_completed_stage(stage_dir: Path) -> dict[str, Any] | None:
@@ -32,6 +53,7 @@ def run_simulation_flow(
     run_dir: Path | None = None,
     modulations: list[tuple[str, int]] | None = None,
     channels: list[str] | None = None,
+    factory_sizes: list[str] | None = None,
 ) -> dict[str, Any]:
     if run_id is None and run_dir is None:
         run_id, run_dir = create_run_context(
@@ -56,6 +78,8 @@ def run_simulation_flow(
         modulations = [("default", config.system.num_bits_per_symbol)]
     if not channels:
         channels = [config.system.channel_model_type]
+    if not factory_sizes:
+        factory_sizes = ["m"]
 
     run_estimators = bool(config.estimators.enabled)
     run_rms = bool(config.resource_managers.enabled)
@@ -66,10 +90,12 @@ def run_simulation_flow(
     if run_rms:
         active_stages.append("resource_managers")
 
+    multi_size = len(factory_sizes) > 1
     multi_mod = len(modulations) > 1
     multi_ch = len(channels) > 1
 
     mod_display_names = [_MODULATION_DISPLAY.get(bits, f"{bits}bps") for _, bits in modulations]
+    size_display_names = [_FACTORY_SIZE_DISPLAY.get(s, s.upper()) for s in factory_sizes]
 
     print("=" * 70)
     print("  6G Smart Factory Simulation Flow")
@@ -79,6 +105,7 @@ def run_simulation_flow(
         print(f"Estimators: {config.estimators.enabled}")
     if run_rms:
         print(f"Resource managers: {config.resource_managers.enabled}")
+    print(f"Factory sizes: {' | '.join(size_display_names)}")
     print(f"Modulations: {' | '.join(mod_display_names)}")
     print(f"Channels: {' | '.join(channels)}")
     print(f"Scenario: {config.system.scenario}")
@@ -92,140 +119,170 @@ def run_simulation_flow(
     all_stage_payloads: dict[str, dict[str, Any]] = {}
     all_stage_paths: dict[str, dict[str, str]] = {}
 
-    for mod_label, bits_per_symbol in modulations:
-        mod_display = _MODULATION_DISPLAY.get(bits_per_symbol, f"{bits_per_symbol}bps")
-        mod_config = dataclasses.replace(
+    for size_label in factory_sizes:
+        preset = _FACTORY_SIZE_PRESETS[size_label]
+        size_display = _FACTORY_SIZE_DISPLAY.get(size_label, size_label.upper())
+        size_config = dataclasses.replace(
             config,
-            system=dataclasses.replace(config.system, num_bits_per_symbol=bits_per_symbol),
+            system=dataclasses.replace(config.system, num_ut=preset["num_ut"]),
+            factory_scenario=dataclasses.replace(
+                config.factory_scenario,
+                room_dimensions=preset["room_dimensions"],
+                num_machines=preset["num_machines"],
+                machine_size_range=preset["machine_size_range"],
+            ),
+            resource_managers=dataclasses.replace(
+                config.resource_managers,
+                num_active_users=min(config.resource_managers.num_active_users, preset["num_ut"]),
+            ),
         )
 
-        for channel in channels:
-            combo_config = dataclasses.replace(
-                mod_config,
-                system=dataclasses.replace(mod_config.system, channel_model_type=channel),
+        for mod_label, bits_per_symbol in modulations:
+            mod_display = _MODULATION_DISPLAY.get(bits_per_symbol, f"{bits_per_symbol}bps")
+            mod_config = dataclasses.replace(
+                size_config,
+                system=dataclasses.replace(size_config.system, num_bits_per_symbol=bits_per_symbol),
             )
 
-            # Subdir naming based on how many dimensions vary
-            if multi_mod and multi_ch:
-                combo_key = f"{mod_label}_{channel}"
-            elif multi_mod:
-                combo_key = mod_label
-            elif multi_ch:
-                combo_key = channel
-            else:
-                combo_key = ""  # single combo → no subdir
+            for channel in channels:
+                combo_config = dataclasses.replace(
+                    mod_config,
+                    system=dataclasses.replace(mod_config.system, channel_model_type=channel),
+                )
 
-            combo_dir = run_dir / combo_key if combo_key else run_dir
-            combo_dir.mkdir(parents=True, exist_ok=True)
+                # Subdir naming: join non-singleton dimension labels
+                parts = []
+                if multi_size:
+                    parts.append(size_label)
+                if multi_mod:
+                    parts.append(mod_label)
+                if multi_ch:
+                    parts.append(channel)
+                combo_key = "_".join(parts) if parts else ""
 
-            # Label for combined plot
-            if multi_mod and multi_ch:
-                combo_label = f"{mod_display} – {channel}"
-            elif multi_mod:
-                combo_label = mod_display
-            else:
-                combo_label = channel
+                combo_dir = run_dir / combo_key if combo_key else run_dir
+                combo_dir.mkdir(parents=True, exist_ok=True)
 
-            print(f"\n{'=' * 70}")
-            print(f"  {combo_label}")
-            print(f"{'=' * 70}")
+                # Label for combined plot
+                label_parts = []
+                if multi_size:
+                    label_parts.append(size_display)
+                if multi_mod:
+                    label_parts.append(mod_display)
+                if multi_ch:
+                    label_parts.append(channel)
+                combo_label = " – ".join(label_parts) if label_parts else size_display
 
-            stage_payloads: dict[str, dict[str, Any]] = {}
-            stage_paths: dict[str, dict[str, str]] = {}
+                print(f"\n{'=' * 70}")
+                print(f"  {combo_label}")
+                print(f"{'=' * 70}")
 
-            if run_estimators:
-                estimator_stage_dir = combo_dir / "estimators"
-                saved_estimators = _load_completed_stage(estimator_stage_dir)
-                if saved_estimators is not None:
-                    print("[checkpoint] Estimator stage already complete — skipping.")
-                    estimator_result = {
-                        "stage": "estimators",
-                        "ebno_db_range": saved_estimators["ebno_db_range"],
-                        "methods": saved_estimators["methods"],
-                        "runtime_totals_sec": saved_estimators["runtime_totals_sec"],
+                stage_payloads: dict[str, dict[str, Any]] = {}
+                stage_paths: dict[str, dict[str, str]] = {}
+
+                if run_estimators:
+                    estimator_stage_dir = combo_dir / "estimators"
+                    saved_estimators = _load_completed_stage(estimator_stage_dir)
+                    if saved_estimators is not None:
+                        print("[checkpoint] Estimator stage already complete — skipping.")
+                        estimator_result = {
+                            "stage": "estimators",
+                            "ebno_db_range": saved_estimators["ebno_db_range"],
+                            "methods": saved_estimators["methods"],
+                            "runtime_totals_sec": saved_estimators["runtime_totals_sec"],
+                        }
+                        estimator_paths = {
+                            "dir": str(estimator_stage_dir),
+                            "json": str(estimator_stage_dir / "stage_results_v2.json"),
+                            "csv": str(estimator_stage_dir / "stage_results_v2.csv"),
+                        }
+                    else:
+                        print("[estimators] Starting...")
+                        _t = time.perf_counter()
+                        estimator_result = run_estimator_stage(combo_config, checkpoint_dir=estimator_stage_dir)
+                        print(f"[estimators] Done in {fmt_elapsed(time.perf_counter() - _t)}")
+                        estimator_paths = write_stage_outputs(
+                            run_id=run_id,
+                            stage_name="estimators",
+                            stage_result=estimator_result,
+                            stage_dir=estimator_stage_dir,
+                            config_snapshot=combo_config.to_dict(),
+                            confidence_level=combo_config.monte_carlo.confidence_level,
+                            plot_results=combo_config.simulation.plot_results,
+                        )
+                    stage_payloads["estimators"] = {
+                        "methods": estimator_result["methods"],
+                        "runtime_totals_sec": estimator_result["runtime_totals_sec"],
                     }
-                    estimator_paths = {
-                        "dir": str(estimator_stage_dir),
-                        "json": str(estimator_stage_dir / "stage_results_v2.json"),
-                        "csv": str(estimator_stage_dir / "stage_results_v2.csv"),
-                    }
-                else:
-                    print("[estimators] Starting...")
-                    _t = time.perf_counter()
-                    estimator_result = run_estimator_stage(combo_config, checkpoint_dir=estimator_stage_dir)
-                    print(f"[estimators] Done in {fmt_elapsed(time.perf_counter() - _t)}")
-                    estimator_paths = write_stage_outputs(
-                        run_id=run_id,
-                        stage_name="estimators",
-                        stage_result=estimator_result,
-                        stage_dir=estimator_stage_dir,
-                        config_snapshot=combo_config.to_dict(),
-                        confidence_level=combo_config.monte_carlo.confidence_level,
-                        plot_results=combo_config.simulation.plot_results,
-                    )
-                stage_payloads["estimators"] = {
-                    "methods": estimator_result["methods"],
-                    "runtime_totals_sec": estimator_result["runtime_totals_sec"],
-                }
-                stage_paths["estimators"] = estimator_paths
-                combined_plot_entries.append((
-                    combo_label, "estimators",
-                    estimator_result["methods"],
-                    estimator_result["ebno_db_range"],
-                ))
+                    stage_paths["estimators"] = estimator_paths
+                    combined_plot_entries.append((
+                        combo_label, "estimators",
+                        estimator_result["methods"],
+                        estimator_result["ebno_db_range"],
+                        estimator_result["runtime_totals_sec"],
+                    ))
 
-            if run_rms:
-                rm_stage_dir = combo_dir / "resource_managers"
-                saved_rm = _load_completed_stage(rm_stage_dir)
-                if saved_rm is not None:
-                    print("[checkpoint] Resource-manager stage already complete — skipping.")
-                    rm_result = {
-                        "stage": "resource_managers",
-                        "ebno_db_range": saved_rm["ebno_db_range"],
-                        "methods": saved_rm["methods"],
-                        "runtime_totals_sec": saved_rm["runtime_totals_sec"],
+                if run_rms:
+                    rm_stage_dir = combo_dir / "resource_managers"
+                    saved_rm = _load_completed_stage(rm_stage_dir)
+                    if saved_rm is not None:
+                        print("[checkpoint] Resource-manager stage already complete — skipping.")
+                        rm_result = {
+                            "stage": "resource_managers",
+                            "ebno_db_range": saved_rm["ebno_db_range"],
+                            "methods": saved_rm["methods"],
+                            "runtime_totals_sec": saved_rm["runtime_totals_sec"],
+                        }
+                        rm_paths = {
+                            "dir": str(rm_stage_dir),
+                            "json": str(rm_stage_dir / "stage_results_v2.json"),
+                            "csv": str(rm_stage_dir / "stage_results_v2.csv"),
+                        }
+                    else:
+                        print("[resource_managers] Starting...")
+                        _t = time.perf_counter()
+                        rm_result = run_resource_manager_stage(combo_config, checkpoint_dir=rm_stage_dir)
+                        print(f"[resource_managers] Done in {fmt_elapsed(time.perf_counter() - _t)}")
+                        rm_paths = write_stage_outputs(
+                            run_id=run_id,
+                            stage_name="resource_managers",
+                            stage_result=rm_result,
+                            stage_dir=rm_stage_dir,
+                            config_snapshot=combo_config.to_dict(),
+                            confidence_level=combo_config.monte_carlo.confidence_level,
+                            plot_results=combo_config.simulation.plot_results,
+                        )
+                    stage_payloads["resource_managers"] = {
+                        "methods": rm_result["methods"],
+                        "runtime_totals_sec": rm_result["runtime_totals_sec"],
                     }
-                    rm_paths = {
-                        "dir": str(rm_stage_dir),
-                        "json": str(rm_stage_dir / "stage_results_v2.json"),
-                        "csv": str(rm_stage_dir / "stage_results_v2.csv"),
-                    }
-                else:
-                    print("[resource_managers] Starting...")
-                    _t = time.perf_counter()
-                    rm_result = run_resource_manager_stage(combo_config, checkpoint_dir=rm_stage_dir)
-                    print(f"[resource_managers] Done in {fmt_elapsed(time.perf_counter() - _t)}")
-                    rm_paths = write_stage_outputs(
-                        run_id=run_id,
-                        stage_name="resource_managers",
-                        stage_result=rm_result,
-                        stage_dir=rm_stage_dir,
-                        config_snapshot=combo_config.to_dict(),
-                        confidence_level=combo_config.monte_carlo.confidence_level,
-                        plot_results=combo_config.simulation.plot_results,
-                    )
-                stage_payloads["resource_managers"] = {
-                    "methods": rm_result["methods"],
-                    "runtime_totals_sec": rm_result["runtime_totals_sec"],
-                }
-                stage_paths["resource_managers"] = rm_paths
-                combined_plot_entries.append((
-                    combo_label, "resource_managers",
-                    rm_result["methods"],
-                    rm_result["ebno_db_range"],
-                ))
+                    stage_paths["resource_managers"] = rm_paths
+                    combined_plot_entries.append((
+                        combo_label, "resource_managers",
+                        rm_result["methods"],
+                        rm_result["ebno_db_range"],
+                        rm_result["runtime_totals_sec"],
+                    ))
 
-            # Merge into top-level dicts keyed by "{combo_key}/{stage}" or just "{stage}"
-            for stage_key, payload in stage_payloads.items():
-                dict_key = f"{combo_key}/{stage_key}" if combo_key else stage_key
-                all_stage_payloads[dict_key] = payload
-            for stage_key, paths in stage_paths.items():
-                dict_key = f"{combo_key}/{stage_key}" if combo_key else stage_key
-                all_stage_paths[dict_key] = paths
+                # Merge into top-level dicts keyed by "{combo_key}/{stage}" or just "{stage}"
+                for stage_key, payload in stage_payloads.items():
+                    dict_key = f"{combo_key}/{stage_key}" if combo_key else stage_key
+                    all_stage_payloads[dict_key] = payload
+                for stage_key, paths in stage_paths.items():
+                    dict_key = f"{combo_key}/{stage_key}" if combo_key else stage_key
+                    all_stage_paths[dict_key] = paths
 
-    # Combined BER plot when multiple combinations exist
+    # Overview plots when multiple combinations exist
     if config.simulation.plot_results and len(combined_plot_entries) > 1:
-        write_combined_modulation_plot(run_dir, combined_plot_entries)
+        dim_labels = []
+        if multi_size:
+            dim_labels.append("Factory Sizes")
+        if multi_ch:
+            dim_labels.append("Channels")
+        if multi_mod:
+            dim_labels.append("Modulations")
+        title_prefix = " & ".join(dim_labels) if dim_labels else "Overview"
+        write_overview_plots(run_dir, combined_plot_entries, title_prefix=title_prefix)
 
     print(f"\nSimulation complete. Total time: {fmt_elapsed(time.perf_counter() - flow_start)}")
     summary = write_summary_outputs(

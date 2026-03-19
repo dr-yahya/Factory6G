@@ -834,7 +834,7 @@ def run_profile_pipeline(args: argparse.Namespace) -> dict[str, Path]:
         )
 
         if args.generate_visuals:
-            from scripts.visualize_factory_profiles import generate_profile_visuals
+            from scripts.tools.visualize_factory_profiles import generate_profile_visuals
 
             profile_output.visual_paths = generate_profile_visuals(generated, args.visuals_dir)
         profile_outputs.append(profile_output)
