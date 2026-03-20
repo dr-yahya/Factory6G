@@ -665,8 +665,9 @@ class Factory6GConfig:
             "transceiver",
             "factory_scenario",
             "ray_tracing",
+            "jidd_scma",   # optional: Dr. Athirah's JIDD-SCMA simulation config
         }
-        required = allowed
+        required = allowed - {"jidd_scma"}
         _validate_keys("root", raw, allowed)
         _require_keys("root", raw, required)
         return cls(

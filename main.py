@@ -172,8 +172,17 @@ def _parse_factory_size_list(raw: str) -> list[str]:
 
 
 def _build_run_suffix(config, args: argparse.Namespace) -> str:
+    requested_stages = []
+    if getattr(args, "stage", None) is not None:
+        requested_stages = [s.strip().lower() for s in args.stage.split(",") if s.strip()]
+
+    if requested_stages == ["jidd_scma"]:
+        return "jidd_scma"
+
     all_methods = list(config.estimators.enabled) + list(config.resource_managers.enabled)
     methods_part = "_".join(all_methods) if all_methods else "run"
+    if "jidd_scma" in requested_stages:
+        methods_part = "jidd_scma_" + methods_part if methods_part != "run" else "jidd_scma"
 
     channel_labels = []
     for ch in args.channel_list:
@@ -207,7 +216,7 @@ def _parse_args() -> argparse.Namespace:
         "--resource-managers",
         metavar="METHODS",
         default=None,
-        help="Comma-separated resource-manager methods to run, e.g. --resource-managers wmmse,drl. Overrides config. Skips estimator stage unless --estimators is also given.",
+        help="Comma-separated resource-manager methods to run, e.g. --resource-managers wmmse,drl. Overrides config. Skips estimator stage unless --estimators is also given. Default (when omitted): max_throughput.",
     )
     parser.add_argument(
         "--modulation",
@@ -226,6 +235,16 @@ def _parse_args() -> argparse.Namespace:
         metavar="SIZES",
         default="s",
         help="Comma-separated factory sizes: s (small), m (medium), l (large). Default: s.",
+    )
+    parser.add_argument(
+        "--stage",
+        metavar="STAGES",
+        default=None,
+        help=(
+            "Comma-separated stages to run: estimators, resource_managers, jidd_scma. "
+            "Use 'jidd_scma' to run Dr. Athirah's SCMA-OFDM JIDD simulation. "
+            "Default: determined by --estimators / --resource-managers flags."
+        ),
     )
     return parser.parse_args()
 
@@ -248,6 +267,14 @@ def main() -> int:
         print(f"Error loading configuration: {exc}")
         return 1
 
+    # Load raw config dict (for sections not modelled by Factory6GConfig, e.g. jidd_scma)
+    import json as _json
+    try:
+        with open(args.config, encoding="utf-8") as _fh:
+            raw_config: dict = _json.load(_fh)
+    except Exception:
+        raw_config = {}
+
     # CLI method overrides: --estimators / --resource-managers filter which methods run.
     # If only one flag is given, the other stage is skipped (enabled=[]).
     if args.estimators is not None or args.resource_managers is not None:
@@ -265,6 +292,14 @@ def main() -> int:
             config,
             estimators=dataclasses.replace(config.estimators, enabled=est_enabled),
             resource_managers=dataclasses.replace(config.resource_managers, enabled=rm_enabled),
+        )
+    else:
+        # No CLI overrides — default resource managers to max_throughput
+        config = dataclasses.replace(
+            config,
+            resource_managers=dataclasses.replace(
+                config.resource_managers, enabled=["max_throughput"]
+            ),
         )
 
     # Parse channel list; default to channel from config if not specified
@@ -317,7 +352,7 @@ def main() -> int:
         import sionna.phy
         import tensorflow as tf
 
-        from src.sim.flow import run_simulation_flow
+        from src.sim.flow import run_jidd_scma_flow, run_simulation_flow
 
         level = getattr(logging, sim_config.log_level, logging.INFO)
         _configure_root_logging(level, original_stdout, log_path)
@@ -336,9 +371,27 @@ def main() -> int:
 
         from src.sim.stages.common import fmt_elapsed
 
+        # Parse --stage flag to determine which simulation flows to run
+        requested_stages: list[str] = []
+        if args.stage is not None:
+            requested_stages = [s.strip().lower() for s in args.stage.split(",") if s.strip()]
+
+        run_jidd = "jidd_scma" in requested_stages
+        run_standard = (
+            "estimators" in requested_stages
+            or "resource_managers" in requested_stages
+            or not requested_stages  # default: run standard flow unless only jidd_scma
+        ) and not (run_jidd and len(requested_stages) == 1)
+
         print(f"Loaded configuration for scenario: {config.system.scenario}")
         _wall_start = time.perf_counter()
-        run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list, factory_sizes=args.factory_size_list)
+
+        if run_jidd:
+            run_jidd_scma_flow(config, run_id=run_id, run_dir=run_dir, raw_config=raw_config)
+
+        if run_standard:
+            run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list, factory_sizes=args.factory_size_list)
+
         print(f"Wall-clock time (incl. setup): {fmt_elapsed(time.perf_counter() - _wall_start)}")
         return 0
     finally:

@@ -11,6 +11,7 @@ from src.sim.output import write_overview_plots, write_stage_outputs, write_summ
 from src.sim.run_context import build_run_dir, create_run_context, generate_run_id
 from src.sim.stages.common import fmt_elapsed
 from src.sim.stages.estimators import run_estimator_stage
+from src.sim.stages.jidd_scma import run_jidd_scma_stage
 from src.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
@@ -54,6 +55,91 @@ def _load_completed_stage(stage_dir: Path) -> dict[str, Any] | None:
         return None
     with result_path.open(encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def run_jidd_scma_flow(
+    config: Factory6GConfig,
+    *,
+    run_id: str | None = None,
+    run_dir: Path | None = None,
+    raw_config: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run only the JIDD-SCMA stage and write results to run_dir/jidd_scma/."""
+    if run_id is None and run_dir is None:
+        run_id, run_dir = create_run_context(
+            config.simulation.output_dir,
+            run_id=run_id,
+        )
+    elif run_id is not None and run_dir is None:
+        run_dir = build_run_dir(config.simulation.output_dir, run_id)
+    elif run_id is None and run_dir is not None:
+        run_dir = Path(run_dir)
+        run_id = generate_run_id()
+    else:
+        run_dir = Path(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 70)
+    print("  JIDD-SCMA Simulation (Dr. Athirah Mohd Ramly, UKM)")
+    print("=" * 70)
+    print(f"Run directory: {run_dir}")
+    print("-" * 70)
+
+    flow_start = time.perf_counter()
+
+    stage_dir = run_dir / "jidd_scma"
+    saved = _load_completed_stage(stage_dir)
+    if saved is not None:
+        print("[checkpoint] JIDD-SCMA stage already complete — skipping.")
+        jidd_result = {
+            "stage": "jidd_scma",
+            "ebno_db_range": saved["ebno_db_range"],
+            "methods": saved["methods"],
+            "runtime_totals_sec": saved["runtime_totals_sec"],
+        }
+        stage_paths = {
+            "dir": str(stage_dir),
+            "json": str(stage_dir / "stage_results_v2.json"),
+            "csv": str(stage_dir / "stage_results_v2.csv"),
+        }
+    else:
+        _t = time.perf_counter()
+        jidd_result = run_jidd_scma_stage(raw_config or {})
+        print(f"[jidd_scma] Done in {fmt_elapsed(time.perf_counter() - _t)}")
+        stage_paths = write_stage_outputs(
+            run_id=run_id,
+            stage_name="jidd_scma",
+            stage_result=jidd_result,
+            stage_dir=stage_dir,
+            config_snapshot=raw_config or {},
+            confidence_level=config.monte_carlo.confidence_level,
+            plot_results=config.simulation.plot_results,
+        )
+
+    summary = write_summary_outputs(
+        run_id=run_id,
+        run_dir=run_dir,
+        stage_order=["jidd_scma"],
+        stage_paths={"jidd_scma": stage_paths},
+        stage_payloads={"jidd_scma": {
+            "methods": jidd_result["methods"],
+            "runtime_totals_sec": jidd_result["runtime_totals_sec"],
+        }},
+    )
+
+    print(f"\nSimulation complete. Total time: {fmt_elapsed(time.perf_counter() - flow_start)}")
+    return {
+        "schema_version": "2.0",
+        "run_id": run_id,
+        "run_dir": str(run_dir),
+        "stage_order": ["jidd_scma"],
+        "stage_paths": {"jidd_scma": stage_paths},
+        "summary": summary["summary_payload"],
+        "summary_paths": {
+            "json": summary["summary_json"],
+            "csv": summary["summary_csv"],
+        },
+    }
 
 
 def run_simulation_flow(

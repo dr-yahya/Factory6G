@@ -22,6 +22,7 @@ COPY src/       src/
 COPY models/    models/
 COPY config/    config/
 COPY data/      data/
+COPY ["dr_athirah_simulation/", "dr_athirah_simulation/"]
 COPY main.py       .
 COPY train.py      .
 COPY visualize.py  .
