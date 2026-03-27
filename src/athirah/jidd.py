@@ -5,6 +5,7 @@ Translated from JIDD.m (Athirah Mohd Ramly, UKM).
 """
 
 import numpy as np
+from scipy.special import expit
 from src.athirah.utils.math import log_sum_exp
 from src.athirah.polar.scan import polar_scan_decode_alpha
 
@@ -139,14 +140,14 @@ def jidd(y: np.ndarray, polar_N: int, polar_K: int, fz_lookup: np.ndarray,
         for jj in range(N):
             for v in range(V):
                 # Bit 0 (MSB): symbols 0,1 vs 2,3
-                LLR[v, 2 * jj] = np.log(
-                    (np.exp(Q[0, v, jj]) + np.exp(Q[1, v, jj]))
-                    / (np.exp(Q[2, v, jj]) + np.exp(Q[3, v, jj]) + 1e-300)
+                LLR[v, 2 * jj] = (
+                    np.logaddexp(Q[0, v, jj], Q[1, v, jj])
+                    - np.logaddexp(Q[2, v, jj], Q[3, v, jj])
                 )
                 # Bit 1 (LSB): symbols 0,2 vs 1,3
-                LLR[v, 2 * jj + 1] = np.log(
-                    (np.exp(Q[0, v, jj]) + np.exp(Q[2, v, jj]))
-                    / (np.exp(Q[1, v, jj]) + np.exp(Q[3, v, jj]) + 1e-300)
+                LLR[v, 2 * jj + 1] = (
+                    np.logaddexp(Q[0, v, jj], Q[2, v, jj])
+                    - np.logaddexp(Q[1, v, jj], Q[3, v, jj])
                 )
 
         # ── De-interleave and polar decode ──────────────────────────────────
@@ -181,10 +182,10 @@ def jidd(y: np.ndarray, polar_N: int, polar_K: int, fz_lookup: np.ndarray,
             llr_msb = c_llr_int[v, 0::2]   # bits 0,2,4,...  shape (N,)
             llr_lsb = c_llr_int[v, 1::2]   # bits 1,3,5,...  shape (N,)
 
-            sig_msb  = np.exp(llr_msb) / (np.exp(llr_msb) + 1.0)
-            sig_lsb  = np.exp(llr_lsb) / (np.exp(llr_lsb) + 1.0)
-            nsg_msb  = 1.0 / (np.exp(llr_msb) + 1.0)
-            nsg_lsb  = 1.0 / (np.exp(llr_lsb) + 1.0)
+            sig_msb  = expit(llr_msb)
+            sig_lsb  = expit(llr_lsb)
+            nsg_msb  = expit(-llr_msb)
+            nsg_lsb  = expit(-llr_lsb)
 
             polar2scma[0, v, 0, :] = sig_msb * sig_lsb   # 00
             polar2scma[0, v, 1, :] = sig_msb * nsg_lsb   # 01

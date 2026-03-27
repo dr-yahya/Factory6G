@@ -1,0 +1,49 @@
+Log file: /app/results/20260320_171006_jidd_scma/simulation.log
+Loaded configuration for scenario: umi
+======================================================================
+  JIDD-SCMA Simulation (Dr. Athirah Mohd Ramly, UKM)
+======================================================================
+Run directory: results/20260320_171006_jidd_scma
+----------------------------------------------------------------------
+[jidd_scma] Starting JIDD-SCMA simulation ...
+[jidd_scma] Eb/N0 range: 1–20 dB, step 1 dB
+[jidd_scma] Data dir: /app/dr_athirah_simulation/PHY layer
+[jidd_scma] CE method: mmse
+[jidd_scma] Done in 36h 47m 39s
+/app/src/sim/output.py:459: UserWarning: No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+  ax.legend()
+
+Simulation complete. Total time: 36h 47m 40s
+Wall-clock time (incl. setup): 36h 47m 40s
+imulation | [jidd_scma] Eb/N0 = 5.0 dB
+2026-03-20 17:11:03,519 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=5.0 dB | bits=50688 | errors=4557 | BER=0.089903 | t=10.5s
+2026-03-20 17:11:03,520 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 6.0 dB
+2026-03-20 17:11:13,973 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=6.0 dB | bits=50688 | errors=149 | BER=0.002940 | t=10.5s
+2026-03-20 17:11:13,973 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 7.0 dB
+2026-03-20 17:14:20,041 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=7.0 dB | bits=907008 | errors=128 | BER=0.000141 | t=186.1s
+2026-03-20 17:14:20,041 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 8.0 dB
+2026-03-20 18:24:52,890 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=8.0 dB | bits=19987968 | errors=122 | BER=0.000006 | t=4232.8s
+2026-03-20 18:24:52,890 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 9.0 dB
+2026-03-20 21:19:38,994 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=9.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10486.1s
+2026-03-20 21:19:38,995 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 10.0 dB
+2026-03-21 00:14:07,762 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=10.0 dB | bits=50000640 | errors=14 | BER=0.000000 | t=10468.8s
+2026-03-21 00:14:07,763 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 11.0 dB
+2026-03-21 03:09:17,593 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=11.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10509.8s
+2026-03-21 03:09:17,593 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 12.0 dB
+2026-03-21 06:07:09,301 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=12.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10671.7s
+2026-03-21 06:07:09,301 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 13.0 dB
+2026-03-21 09:05:00,402 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=13.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10671.1s
+2026-03-21 09:05:00,402 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 14.0 dB
+2026-03-21 12:04:28,724 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=14.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10768.3s
+2026-03-21 12:04:28,724 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 15.0 dB
+2026-03-21 15:05:43,364 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=15.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10874.6s
+2026-03-21 15:05:43,364 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 16.0 dB
+2026-03-21 18:06:34,287 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=16.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10850.9s
+2026-03-21 18:06:34,287 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 17.0 dB
+2026-03-21 21:04:18,028 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=17.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10663.7s
+2026-03-21 21:04:18,028 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 18.0 dB
+2026-03-22 00:02:08,750 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=18.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10670.7s
+2026-03-22 00:02:08,750 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 19.0 dB
+2026-03-22 03:00:02,070 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=19.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10673.3s
+2026-03-22 03:00:02,071 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 20.0 dB
+2026-03-22 05:57:51,431 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=20.0 dB | bits=50000640 | errors=0 | BER=0.000000 | t=10669.4s

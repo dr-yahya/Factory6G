@@ -1,0 +1,10 @@
+stage,method,metric,value
+jidd_scma,__stage__,stage_dir,results/20260320_083455_jidd_scma/jidd_scma
+jidd_scma,__stage__,stage_json,results/20260320_083455_jidd_scma/jidd_scma/stage_results_v2.json
+jidd_scma,__stage__,stage_csv,results/20260320_083455_jidd_scma/jidd_scma/stage_results_v2.csv
+jidd_scma,jidd_scma,mean_ber,0.29451911818607707
+jidd_scma,jidd_scma,mean_ber_upper_confidence,0.29451911818607707
+jidd_scma,jidd_scma,mean_bit_errors,14951.55
+jidd_scma,jidd_scma,mean_total_bits,3592166.4
+jidd_scma,jidd_scma,mean_runtime_sec,1030.7671171426773
+jidd_scma,jidd_scma,runtime_total_sec,15413.02336739
