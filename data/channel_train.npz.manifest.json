@@ -1,0 +1,11 @@
+{
+  "chunks": [
+    "data/channel_train.npz.chunk0.npz",
+    "data/channel_train.npz.chunk1.npz",
+    "data/channel_train.npz.chunk2.npz",
+    "data/channel_train.npz.chunk3.npz",
+    "data/channel_train.npz.chunk4.npz",
+    "data/channel_train.npz.chunk5.npz"
+  ],
+  "total_samples": 614400
+}

@@ -82,6 +82,18 @@ def _parse_args() -> argparse.Namespace:
         default=20.0,
         help="Maximum Eb/No (dB) for dataset generation (default: 20.0).",
     )
+    parser.add_argument(
+        "--channel-types",
+        nargs="+",
+        default=["tr38901"],
+        choices=["rayleigh", "rician", "tr38901"],
+        help=(
+            "Channel models for curriculum training, ordered easy → hard. "
+            "Multiple values apply a curriculum schedule: first third uses only "
+            "the first type, middle third adds the second, final third uses all. "
+            "Example: --channel-types rayleigh rician tr38901 (default: tr38901)."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -128,6 +140,7 @@ def main() -> int:
             output_path=args.data,
             num_batches=args.batches,
             ebno_db_range=(args.ebno_min, args.ebno_max),
+            channel_types=args.channel_types,
         )
 
     if args.step in {"train", "all"}:

@@ -329,7 +329,7 @@ JIDD Run 2 is expensive primarily because it tests 50M bits per high-SNR point t
    - Deploy distributed MIMO with multiple access points
    - Test with Adaptive estimator (may help but unlikely to solve the fundamental under-determined problem)
 
-3. **Run Adaptive estimator on higher-order modulation.** The 64-QAM BER floor with LS (1.1e-2) may improve 10x with Adaptive estimation. This would validate whether Adaptive + 64-QAM is viable for high-throughput factory applications.
+10. **Run Adaptive estimator on higher-order modulation.** The 64-QAM BER floor with LS (1.1e-2) may improve 10x with Adaptive estimation. This would validate whether Adaptive + 64-QAM is viable for high-throughput factory applications.
 
 ### Medium Priority
 

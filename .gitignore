@@ -51,3 +51,4 @@ models/saved_model/
 .sionna_cache/
 
 
+*.npz
