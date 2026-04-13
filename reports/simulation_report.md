@@ -109,6 +109,12 @@ This report presents a comprehensive evaluation of the Factory6G physical layer 
 
 Latency is stable across Eb/N0 for all methods. LS, PSO, Adaptive, ISTA, and Neural all cluster around 470-480 ms. DFT is 1.7x slower due to the medium factory configuration and DFT processing overhead.
 
+**Why latency is flat across Eb/N0.** The per-frame processing pipeline (channel estimation, equalization, demapping, LDPC decoding) has fixed computational cost regardless of the operating SNR. Unlike runtime (which depends on how many Monte Carlo batches are needed to accumulate enough block errors), latency measures the wall-clock time for a single batch. The number of LDPC decoding iterations is fixed at 20 (not early-terminated), so even at high SNR where decoding converges faster internally, the iteration count -- and therefore the latency -- remains constant.
+
+**Why DFT latency is higher.** The DFT estimator was tested on the medium factory (25x25 m, 8 UTs) rather than the small factory (15x15 m, 4 UTs) used by other methods. The larger resource grid (more UTs) increases the per-batch computation for channel estimation, equalization, and LDPC decoding, explaining the 1.7x latency increase.
+
+**URLLC implications.** For Ultra-Reliable Low-Latency Communication (URLLC), 3GPP targets a user-plane latency of 1 ms for critical factory applications. The measured latencies of ~470-480 ms represent the batch-level simulation time (64 frames processed together) rather than single-frame physical layer latency. The actual over-the-air latency for a single OFDM frame at 30 kHz SCS with 14 symbols is approximately 0.5 ms, well within URLLC bounds. However, the computational overhead of advanced estimators (Adaptive, PSO) would add to processing latency in a real-time implementation and must be considered in the latency budget.
+
 ### 3.3 Runtime
 
 ![Channel Estimator Runtime](plots/estimator_runtime.png)
@@ -126,6 +132,34 @@ Latency is stable across Eb/N0 for all methods. LS, PSO, Adaptive, ISTA, and Neu
 - **Adaptive is 7x slower than LS** but delivers 10x better BER -- a strong cost-benefit tradeoff.
 - **PSO is 101x slower than LS** for marginal improvement over Adaptive. The particle swarm optimization explores many candidate solutions per batch, making it computationally expensive. **Not recommended for production use.**
 - **LS and Neural have identical runtime**, confirming functional equivalence.
+
+### 3.4 BER Floor Analysis
+
+A key observation across all OFDM-based estimators is the **BER floor** -- the BER stops decreasing beyond a certain Eb/N0 and remains flat regardless of further SNR improvement. This phenomenon has a well-understood theoretical basis [1][2][11].
+
+**Root cause.** The mean squared error (MSE) of the LS channel estimator on an OFDM system can be decomposed into two terms:
+
+- **Noise term**: proportional to sigma^2 / N_p (noise variance divided by the number of pilot subcarriers). This term vanishes as SNR increases.
+- **Interpolation bias term**: arises from estimating the channel at data subcarriers by interpolating from pilots. When the channel is frequency-selective (i.e., has significant delay spread), the pilot spacing may be insufficient to capture rapid frequency-domain variations. This term is **independent of SNR** and persists even at infinite Eb/N0.
+
+At high SNR, the noise term becomes negligible and the interpolation bias dominates, creating a residual estimation error that the LDPC decoder cannot correct -- hence the BER floor.
+
+**Why Rayleigh has no floor.** In our configuration, the Rayleigh channel is flat-fading (single tap), meaning the channel frequency response is constant across all subcarriers. There is no frequency selectivity, so the interpolation bias is zero. LS estimation is exact (up to noise), and the LDPC code corrects the remaining noise-induced errors, achieving zero BER above 8 dB.
+
+**Why TR 38.901 UMi has a persistent floor (~3 x 10^-4).** The 3GPP UMi model produces realistic multipath with significant delay spread and spatial correlation. The resulting frequency-selective fading exceeds what the pilot density (2 pilot OFDM symbols out of 14) can track, leaving a residual interpolation error that creates the observed BER floor [10].
+
+**Impact of modulation order.** Higher-order constellations (16-QAM, 64-QAM) have smaller decision regions and are more sensitive to residual estimation error. The same estimation MSE that causes a floor of ~3 x 10^-4 with QPSK produces a floor of ~1.5 x 10^-3 with 16-QAM and ~1.1 x 10^-2 with 64-QAM (Section 4.1).
+
+**How advanced estimators reduce the floor.** Adaptive and PSO estimators achieve a lower floor (~3-4 x 10^-5) by applying frequency-domain smoothing (LMMSE) and delay-domain denoising (DFT truncation). These techniques exploit the channel's correlation structure to reduce the interpolation bias [2][3]. JIDD-SCMA eliminates the floor entirely through joint iterative processing, where the decoder feeds soft information back to the detector, effectively performing iterative channel refinement [7][8].
+
+### 3.5 Adaptive vs PSO Runtime
+
+The Adaptive estimator achieves comparable BER to PSO (~3-4 x 10^-5) while being **14x faster** (5,838 s vs 82,703 s). The runtime difference is architectural:
+
+- **Adaptive** performs a single forward pass per batch: it computes an SNR quality proxy, selects one of three branches (DFT-only, blended DFT+LMMSE, or full LMMSE), and produces the estimate in one step [2][3].
+- **PSO** performs a swarm search: 8 particles x 12 iterations = up to 96 candidate evaluations per batch [5]. Each evaluation runs a full DFT/LMMSE blend with different hyperparameters (tap_ratio, r_freq, blend weight), then selects the best. This exhaustive search yields only marginal BER improvement over Adaptive's fixed thresholds.
+
+For practical factory deployments, Adaptive is the recommended choice -- it provides near-optimal BER at a fraction of PSO's computational cost.
 
 ---
 
@@ -187,6 +221,17 @@ All tests use the LS estimator with QPSK on the small factory.
 - **Rician (K=1)** reaches zero BER above 12 dB. The line-of-sight component helps, but the specular path introduces estimation challenges at low SNR.
 - **TR 38.901 UMi** is the hardest channel with a persistent BER floor of ~3-4 x 10^-4. The 3GPP model includes realistic multipath, delay spread, and spatial correlation that LS cannot fully track. This is the most realistic scenario for factory deployments.
 - The zero-BER results on Rayleigh/Rician suggest that the LDPC code is powerful enough to correct residual errors when channel estimation is sufficiently accurate. The BER floor on TR 38.901 is due to estimation limitations, not coding weakness.
+
+### 5.1 Theoretical Context
+
+The channel model comparison plot includes theoretical (uncoded) QPSK BER curves for reference [11]:
+
+- **AWGN theoretical**: BER = erfc(sqrt(Eb/N0)) / 2. This is the fundamental lower bound for uncoded QPSK in additive white Gaussian noise.
+- **Rayleigh theoretical (uncoded, no diversity)**: BER = 0.5 * (1 - sqrt(gamma / (1 + gamma))), where gamma = Eb/N0. This represents uncoded QPSK over a single-tap Rayleigh fading channel without diversity.
+
+**Coding gain.** The gap between the theoretical uncoded Rayleigh curve and our simulated LS + LDPC Rayleigh results quantifies the coding gain provided by the rate-0.5 LDPC code. At BER = 10^-3, the theoretical uncoded Rayleigh BER requires approximately 24 dB Eb/N0, while our LDPC-coded system achieves this at ~2 dB -- a coding gain of approximately 22 dB. This demonstrates the effectiveness of the 5G LDPC code, particularly on fading channels.
+
+**Why TR 38.901 has no closed-form BER.** Unlike single-tap Rayleigh or AWGN, the 3GPP TR 38.901 UMi model produces frequency-selective fading with a complex power delay profile that depends on the specific propagation environment [10]. There is no simple closed-form BER expression for this channel; performance can only be evaluated through Monte Carlo simulation, as done in this work.
 
 ---
 
@@ -329,9 +374,7 @@ JIDD Run 2 is expensive primarily because it tests 50M bits per high-SNR point t
    - Deploy distributed MIMO with multiple access points
    - Test with Adaptive estimator (may help but unlikely to solve the fundamental under-determined problem)
 
-10. **Run Adaptive estimator on higher-order modulation.** The 64-QAM BER floor with LS (1.1e-2) may improve 10x with Adaptive estimation. This would validate whether Adaptive + 64-QAM is viable for high-throughput factory applications.
-
-### Medium Priority
+3. **Run Adaptive estimator on higher-order modulation.** The 64-QAM BER floor with LS (1.1e-2) may improve 10x with Adaptive estimation. This would validate whether Adaptive + 64-QAM is viable for high-throughput factory applications.
 
 4. **Re-run DFT on small factory.** The current comparison is unfair since DFT was tested on the medium factory while all others used small. A fair comparison would clarify whether DFT's poor performance is inherent or an artifact of the test configuration.
 
@@ -346,3 +389,31 @@ JIDD Run 2 is expensive primarily because it tests 50M bits per high-SNR point t
 8. **Investigate iterative channel estimation with decoder feedback.** The persistent BER floor across all OFDM estimators suggests that pilot-only estimation has fundamental limits. Feeding soft decoder output back to refine channel estimates (turbo equalization) could break through this floor.
 
 9. **Add numerical stability guards to JIDD-SCMA.** The N0-overflow bug in Run 1 should be permanently guarded against with clamping in the log-likelihood computation to prevent future regressions.
+
+---
+
+## 11. References
+
+[1] J.-J. van de Beek, O. Edfors, M. Sandell, S. K. Wilson, and P. O. Borjesson, "On channel estimation in OFDM systems," in *Proc. IEEE Vehicular Technology Conference (VTC)*, vol. 2, Chicago, IL, USA, Jul. 1995, pp. 815-819.
+
+[2] O. Edfors, M. Sandell, J.-J. van de Beek, S. K. Wilson, and P. O. Borjesson, "OFDM channel estimation by singular value decomposition," *IEEE Trans. Commun.*, vol. 46, no. 7, pp. 931-939, Jul. 1998.
+
+[3] Y. Li, "Pilot-symbol-aided channel estimation for OFDM in wireless systems," *IEEE Trans. Veh. Technol.*, vol. 49, no. 4, pp. 1207-1215, Jul. 2000.
+
+[4] A. Beck and M. Teboulle, "A fast iterative shrinkage-thresholding algorithm for linear inverse problems," *SIAM J. Imaging Sci.*, vol. 2, no. 1, pp. 183-202, 2009.
+
+[5] J. Kennedy and R. Eberhart, "Particle swarm optimization," in *Proc. IEEE Int. Conf. Neural Networks (ICNN)*, vol. 4, Perth, WA, Australia, Nov. 1995, pp. 1942-1948.
+
+[6] H. Ye, G. Y. Li, and B.-H. Juang, "Power of deep learning for channel estimation and signal detection in OFDM systems," *IEEE Wireless Commun. Lett.*, vol. 7, no. 1, pp. 114-117, Feb. 2018.
+
+[7] H. Nikopour and H. Baligh, "Sparse code multiple access," in *Proc. IEEE Int. Symp. Personal, Indoor and Mobile Radio Communications (PIMRC)*, London, UK, Sep. 2013, pp. 332-336.
+
+[8] Z. Yuan, G. Yu, W. Li, Y. Yuan, X. Wang, and J. Xu, "Multi-user shared access for Internet of Things," in *Proc. IEEE Vehicular Technology Conference (VTC-Spring)*, Nanjing, China, May 2016, pp. 1-5.
+
+[9] J. Hoydis, S. Cammerer, F. Ait Aoudia, A. Vem, N. Binder, G. Marcus, and A. Keller, "Sionna: An open-source library for next-generation physical layer research," arXiv preprint arXiv:2203.11854, Mar. 2022.
+
+[10] 3GPP, "Study on channel model for frequencies from 0.5 to 100 GHz," 3rd Generation Partnership Project (3GPP), Technical Report (TR) 38.901, v17.0.0, Mar. 2022.
+
+[11] A. Goldsmith, *Wireless Communications*, Cambridge University Press, 2005.
+
+[12] E. Arikan, "Channel polarization: A method for constructing capacity-achieving codes for symmetric binary-input memoryless channels," *IEEE Trans. Inf. Theory*, vol. 55, no. 7, pp. 3051-3073, Jul. 2009.

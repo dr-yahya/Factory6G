@@ -8,6 +8,7 @@ import glob
 import json
 import os
 import numpy as np
+from scipy.special import erfc
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -175,12 +176,23 @@ ax.set_title('Modulation Order Impact on Latency')
 ax.legend(loc='best')
 save(fig, 'modulation_latency_vs_ebno.png')
 
-# ── 6. Channel Model BER (ordered best→worst) ───────────────────────────────
-print("6. Channel model BER comparison...")
+# ── 6. Channel Model BER (ordered best→worst) + theoretical curves ───────────
+print("6. Channel model BER comparison (with theoretical curves)...")
 fig, ax = plt.subplots()
 for i, (name, path) in enumerate(CH_SOURCES):
     data = load_stage(path)
     plot_ber(ax, data['ebno_db_range'], data['methods']['ls']['ber'], name, COLORS[i], MARKERS[i])
+
+# Theoretical BER curves (uncoded QPSK)
+ebno_theory = np.linspace(0, 20, 200)
+ebno_lin = 10 ** (ebno_theory / 10)
+# AWGN: BER_QPSK = erfc(sqrt(Eb/N0)) / 2
+ber_awgn = erfc(np.sqrt(ebno_lin)) / 2
+# Rayleigh flat-fading (no diversity): BER_QPSK = 0.5 * (1 - sqrt(gamma / (1 + gamma)))
+ber_rayleigh_theory = 0.5 * (1 - np.sqrt(ebno_lin / (1 + ebno_lin)))
+ax.semilogy(ebno_theory, ber_awgn, '--', color='#555555', linewidth=1.2, label='Theory: AWGN (uncoded)')
+ax.semilogy(ebno_theory, ber_rayleigh_theory, ':', color='#555555', linewidth=1.2, label='Theory: Rayleigh (uncoded)')
+
 ax.set_xlabel('Eb/N0 (dB)')
 ax.set_ylabel('Bit Error Rate (BER)')
 ax.set_title('Channel Model Impact on BER (LS Estimator, QPSK)')
