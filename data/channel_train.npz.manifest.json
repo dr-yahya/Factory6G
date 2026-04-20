@@ -1,0 +1,6 @@
+{
+  "chunks": [
+    "data/channel_train.npz.chunk0.npz"
+  ],
+  "total_samples": 102400
+}

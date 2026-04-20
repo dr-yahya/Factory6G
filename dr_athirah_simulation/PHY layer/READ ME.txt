@@ -1,0 +1,9 @@
+Athirah Mohd Ramly
+National University of Malaysia (UKM)
+Joint interative Detection and decoding using polar codes SCMA-OFDM
+with channel estimation
+
+
+1. Run the simulator using main_JIDD.m file
+2. Feel free to explore the codes by changing the parameters values.
+3. Any questions, just email me at athirah.ramly90@gmail.com

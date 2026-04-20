@@ -1,0 +1,227 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260313_001054",
+  "stage_order": [
+    "estimators",
+    "resource_managers"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results\\20260313_001054_simulation\\estimators",
+      "json": "results\\20260313_001054_simulation\\estimators\\stage_results_v2.json",
+      "csv": "results\\20260313_001054_simulation\\estimators\\stage_results_v2.csv"
+    },
+    "resource_managers": {
+      "dir": "results\\20260313_001054_simulation\\resource_managers",
+      "json": "results\\20260313_001054_simulation\\resource_managers\\stage_results_v2.json",
+      "csv": "results\\20260313_001054_simulation\\resource_managers\\stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "ls": {
+        "ber": 0.05822288109620042,
+        "ber_upper_confidence": 0.058376380669878276,
+        "latency_ms": 652.9012281868692,
+        "throughput_bits_per_batch": 92580.45789671912,
+        "energy_joules_per_batch": 0.00018645100000000037,
+        "avg_power_w": 0.00029311763802620345,
+        "runtime_sec": 99.72305939677409,
+        "bit_errors": 128337.29032258065,
+        "total_bits": 9164469.677419355,
+        "block_errors": 446.5483870967742,
+        "total_blocks": 5966.451612903225,
+        "num_batches": 93.2258064516129
+      },
+      "dft": {
+        "ber": 0.03930236560366927,
+        "ber_upper_confidence": 0.03941448851182775,
+        "latency_ms": 739.0233997189607,
+        "throughput_bits_per_batch": 94440.4202516969,
+        "energy_joules_per_batch": 0.0001864510000000004,
+        "avg_power_w": 0.0002618675664817087,
+        "runtime_sec": 111.00192893225763,
+        "bit_errors": 98107.96774193548,
+        "total_bits": 9916019.612903226,
+        "block_errors": 370.61290322580646,
+        "total_blocks": 6455.741935483871,
+        "num_batches": 100.87096774193549
+      },
+      "lmmse": {
+        "ber": 0.018493040760539255,
+        "ber_upper_confidence": 0.018557788239528705,
+        "latency_ms": 614.7840629638878,
+        "throughput_bits_per_batch": 96486.06012107593,
+        "energy_joules_per_batch": 0.00018645100000000043,
+        "avg_power_w": 0.00030369046480603704,
+        "runtime_sec": 105.76896417419418,
+        "bit_errors": 72561.41935483871,
+        "total_bits": 10778557.935483871,
+        "block_errors": 309.7741935483871,
+        "total_blocks": 7017.290322580645,
+        "num_batches": 109.64516129032258
+      },
+      "adaptive": {
+        "ber": 0.018190239579650446,
+        "ber_upper_confidence": 0.01825348150419432,
+        "latency_ms": 805.7571050041478,
+        "throughput_bits_per_batch": 96515.82668836204,
+        "energy_joules_per_batch": 0.00018645100000000043,
+        "avg_power_w": 0.00024122711109725325,
+        "runtime_sec": 140.1953653709671,
+        "bit_errors": 71711.25806451614,
+        "total_bits": 10822953.290322581,
+        "block_errors": 307.0,
+        "total_blocks": 7046.193548387097,
+        "num_batches": 110.09677419354838
+      },
+      "pso": {
+        "ber": 0.08962515600451168,
+        "ber_upper_confidence": 0.08985645107047394,
+        "latency_ms": 897.2098908493449,
+        "throughput_bits_per_batch": 89493.48866413247,
+        "energy_joules_per_batch": 0.00018645100000000016,
+        "avg_power_w": 0.00021421971608232967,
+        "runtime_sec": 193.14623422580613,
+        "bit_errors": 369804.32258064515,
+        "total_bits": 5073754.838709678,
+        "block_errors": 1013.258064516129,
+        "total_blocks": 3303.2258064516127,
+        "num_batches": 51.61290322580645
+      },
+      "perfect": {
+        "ber": 0.002068010178567581,
+        "ber_upper_confidence": 0.0020794138977357586,
+        "latency_ms": 839.033216174908,
+        "throughput_bits_per_batch": 98100.7063274061,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.0002225229500143639,
+        "runtime_sec": 152.29426485806565,
+        "bit_errors": 16658.483870967742,
+        "total_bits": 12227749.161290323,
+        "block_errors": 114.48387096774194,
+        "total_blocks": 7960.774193548387,
+        "num_batches": 124.38709677419355
+      }
+    },
+    "resource_managers": {
+      "static": {
+        "ber": 0.018059397819693464,
+        "ber_upper_confidence": 0.018122451066377082,
+        "latency_ms": 923.0033467152815,
+        "throughput_bits_per_batch": 96528.68895673286,
+        "energy_joules_per_batch": 0.00018645100000000043,
+        "avg_power_w": 0.00020208790590780842,
+        "runtime_sec": 107.67296331291178,
+        "bit_errors": 71941.3870967742,
+        "total_bits": 10797584.516129032,
+        "block_errors": 308.741935483871,
+        "total_blocks": 7029.677419354839,
+        "num_batches": 109.83870967741936
+      },
+      "round_robin": {
+        "ber": 0.006196057956212804,
+        "ber_upper_confidence": 0.006228529170596487,
+        "latency_ms": 931.5642008505777,
+        "throughput_bits_per_batch": 48847.45135933623,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.00020016557076048708,
+        "runtime_sec": 122.75618024515866,
+        "bit_errors": 30307.290322580644,
+        "total_bits": 6147171.096774193,
+        "block_errors": 137.4516129032258,
+        "total_blocks": 4002.064516129032,
+        "num_batches": 125.06451612903226
+      },
+      "max_throughput": {
+        "ber": 0.0046728396888821,
+        "ber_upper_confidence": 0.004697688728185291,
+        "latency_ms": 930.9445340782942,
+        "throughput_bits_per_batch": 48922.32058361207,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.00020029847636770132,
+        "runtime_sec": 123.83235787416643,
+        "bit_errors": 23173.25806451613,
+        "total_bits": 6180467.612903226,
+        "block_errors": 113.54838709677419,
+        "total_blocks": 4023.7419354838707,
+        "num_batches": 125.74193548387096
+      },
+      "pf": {
+        "ber": 0.006370744305487099,
+        "ber_upper_confidence": 0.006403828126428023,
+        "latency_ms": 931.2369453661653,
+        "throughput_bits_per_batch": 48838.8651758967,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.000200238059346664,
+        "runtime_sec": 123.02687041935391,
+        "bit_errors": 30343.548387096773,
+        "total_bits": 6137657.806451613,
+        "block_errors": 136.67741935483872,
+        "total_blocks": 3995.8709677419356,
+        "num_batches": 124.87096774193549
+      },
+      "wmmse": {
+        "ber": 0.005895552080753295,
+        "ber_upper_confidence": 0.005927667467633152,
+        "latency_ms": 931.4172189937187,
+        "throughput_bits_per_batch": 48862.22182412681,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.00020019668853219603,
+        "runtime_sec": 123.41940254194337,
+        "bit_errors": 29041.774193548386,
+        "total_bits": 6155098.838709678,
+        "block_errors": 133.09677419354838,
+        "total_blocks": 4007.2258064516127,
+        "num_batches": 125.2258064516129
+      },
+      "queue_aware": {
+        "ber": 0.006494536795817887,
+        "ber_upper_confidence": 0.006528337160736917,
+        "latency_ms": 931.0245605035033,
+        "throughput_bits_per_batch": 48832.78052741196,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.00020028336383670295,
+        "runtime_sec": 123.15217127419295,
+        "bit_errors": 31136.451612903227,
+        "total_bits": 6142414.451612903,
+        "block_errors": 139.38709677419354,
+        "total_blocks": 3998.967741935484,
+        "num_batches": 124.96774193548387
+      },
+      "drl": {
+        "ber": 0.006274940007618821,
+        "ber_upper_confidence": 0.006308155379390581,
+        "latency_ms": 931.0544045747233,
+        "throughput_bits_per_batch": 48843.574148745516,
+        "energy_joules_per_batch": 0.00018645100000000045,
+        "avg_power_w": 0.0002002771013564045,
+        "runtime_sec": 125.8344697999928,
+        "bit_errors": 30141.645161290322,
+        "total_bits": 6137657.806451613,
+        "block_errors": 139.25806451612902,
+        "total_blocks": 3995.8709677419356,
+        "num_batches": 124.87096774193549
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "ls": 3091.4148412999966,
+      "dft": 3441.0597968999864,
+      "lmmse": 3278.83788940002,
+      "adaptive": 4346.05632649998,
+      "pso": 5987.53326099999,
+      "perfect": 4721.122210600035
+    },
+    "resource_managers": {
+      "static": 3337.861862700265,
+      "round_robin": 3805.4415875999184,
+      "max_throughput": 3838.8030940991594,
+      "pf": 3813.832982999971,
+      "wmmse": 3826.0014788002445,
+      "queue_aware": 3817.7173094999816,
+      "drl": 3900.868563799777
+    }
+  }
+}

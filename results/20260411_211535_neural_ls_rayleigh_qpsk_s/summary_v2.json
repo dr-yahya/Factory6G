@@ -1,0 +1,77 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260411_211535",
+  "stage_order": [
+    "estimators",
+    "resource_managers"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/estimators",
+      "json": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/estimators/stage_results_v2.json",
+      "csv": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/estimators/stage_results_v2.csv"
+    },
+    "resource_managers": {
+      "dir": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/resource_managers",
+      "json": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/resource_managers/stage_results_v2.json",
+      "csv": "results/20260411_211535_neural_ls_rayleigh_qpsk_s/resource_managers/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "neural": {
+        "ber": 5.5957642171629335e-06,
+        "ber_upper_confidence": 5.693723052156994e-06,
+        "latency_ms": 310.1396463924994,
+        "throughput_bits_per_batch": 196606.89982798882,
+        "energy_joules_per_batch": 0.0001864509999999989,
+        "avg_power_w": 0.0006011847078027924,
+        "runtime_sec": 1394.2156041550347,
+        "bit_errors": 1300.6363636363637,
+        "total_bits": 306851467.6363636,
+        "block_errors": 9.545454545454545,
+        "total_blocks": 199773.0909090909,
+        "num_batches": 1560.7272727272727
+      },
+      "ls": {
+        "ber": 0.0009461352628180784,
+        "ber_upper_confidence": 0.000957542926567536,
+        "latency_ms": 309.56259883072045,
+        "throughput_bits_per_batch": 196421.98223824787,
+        "energy_joules_per_batch": 0.00018645099999999883,
+        "avg_power_w": 0.0006023114759603088,
+        "runtime_sec": 429.68504591508,
+        "bit_errors": 4988.454545454545,
+        "total_bits": 259647674.1818182,
+        "block_errors": 27.818181818181817,
+        "total_blocks": 169041.45454545456,
+        "num_batches": 1320.6363636363637
+      }
+    },
+    "resource_managers": {
+      "max_throughput": {
+        "ber": 0.0,
+        "ber_upper_confidence": 1.904635285411828e-08,
+        "latency_ms": 312.55581499175884,
+        "throughput_bits_per_batch": 98304.0,
+        "energy_joules_per_batch": 0.00018645099999999853,
+        "avg_power_w": 0.000596538268747496,
+        "runtime_sec": 548.8496774736705,
+        "bit_errors": 0.0,
+        "total_bits": 157286400.0,
+        "block_errors": 0.0,
+        "total_blocks": 102400.0,
+        "num_batches": 1600.0
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "neural": 15336.371645705382,
+      "ls": 4726.53550506588
+    },
+    "resource_managers": {
+      "max_throughput": 6037.346452210375
+    }
+  }
+}

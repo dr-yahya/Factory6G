@@ -7,6 +7,7 @@ can configure TensorFlow/Sionna runtime before importing heavy modules.
 from __future__ import annotations
 
 import os
+import tempfile
 
 
 def configure_env(force_cpu: bool = False, gpu_num: int = 0) -> None:
@@ -16,14 +17,18 @@ def configure_env(force_cpu: bool = False, gpu_num: int = 0) -> None:
     - Optionally force CPU
     - Otherwise select a single GPU by index
     """
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+    # Keep matplotlib cache in a writable location across runs.
+    mpl_cache_dir = os.path.join(tempfile.gettempdir(), "factory6g_mplconfig")
+    os.makedirs(mpl_cache_dir, exist_ok=True)
+    os.environ["MPLCONFIGDIR"] = mpl_cache_dir
     if force_cpu:
         os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     else:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_num)
 
 
-def setup_gpu(gpu_num: int = 0) -> None:
+def setup_gpu(gpu_num: int = 0, force_cpu: bool = False) -> None:
     """Optional post-import TensorFlow GPU configuration (safe on CPU-only hosts)."""
     try:
         import tensorflow as tf  # type: ignore[import]
@@ -34,6 +39,13 @@ def setup_gpu(gpu_num: int = 0) -> None:
         gpus = tf.config.list_physical_devices("GPU")
         if not gpus:
             return
+            
+        if force_cpu:
+            tf.config.set_visible_devices([], "GPU")
+            return
+            
+        # Select specific GPU if not forcing CPU (though CUDA_VISIBLE_DEVICES usually handles this)
+        # Here we just set memory growth for all visible GPUs (which might only be 1 if env var worked)
         for gpu in gpus:
             try:
                 tf.config.experimental.set_memory_growth(gpu, True)
@@ -42,5 +54,3 @@ def setup_gpu(gpu_num: int = 0) -> None:
                 pass
     except Exception:
         return
-
-

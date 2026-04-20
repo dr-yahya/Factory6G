@@ -64,7 +64,7 @@ from sionna.phy.ofdm import (
 )
 from sionna.phy.mapping import Demapper
 from sionna.phy.fec.ldpc import LDPC5GDecoder
-from .config import SystemConfig
+
 
 
 class Receiver:
@@ -99,7 +99,7 @@ class Receiver:
            - Outputs hard-decoded information bits
     """
     
-    def __init__(self, config: SystemConfig, resource_grid: ResourceGrid,
+    def __init__(self, config: dict, resource_grid: ResourceGrid,
                  stream_management: StreamManagement, encoder,
                  perfect_csi: bool = False,
                  channel_estimator: object | None = None):
@@ -175,10 +175,13 @@ class Receiver:
         self._equalizer = LMMSEEqualizer(resource_grid, stream_management)
         
         # APP demapper: converts symbols to log-likelihood ratios
-        self._demapper = Demapper("app", "qam", config.num_bits_per_symbol)
+        self._demapper = Demapper("app", "qam", self.config.get("num_bits_per_symbol", 2))
         
         # LDPC decoder: use Sionna's 5G decoder
-        self._decoder = LDPC5GDecoder(encoder, hard_out=True, return_num_iter=True)
+        self._decoder = LDPC5GDecoder(encoder, 
+                                      num_iter=self.config.get("num_decoding_iter", 20),
+                                      hard_out=True, 
+                                      return_num_iter=True)
     
     def estimate_channel(self, y: tf.Tensor, noise_var: tf.Tensor) -> tuple:
         """
@@ -491,11 +494,12 @@ class Receiver:
         """
         # Remove nulled subcarriers from both received signal and channel
         # (match resource grid structure)
-        y_processed = self._remove_nulled_subcarriers(y)
-        h_hat = self._remove_nulled_subcarriers(h)
+        # y_processed = self._remove_nulled_subcarriers(y)
+        # h_hat = self._remove_nulled_subcarriers(h)
         
         # Perfect CSI: no channel estimation error
         err_var = 0.0
         
         # Process through receiver chain
-        return self.__call__(y_processed, h_hat, err_var, noise_var)
+        # Pass full y and h (h_hat) to receiver, as equalizer expects full grid
+        return self.__call__(y, h, err_var, noise_var)

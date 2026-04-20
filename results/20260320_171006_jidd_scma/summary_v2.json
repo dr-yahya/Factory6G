@@ -1,0 +1,30 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260320_171006",
+  "stage_order": [
+    "jidd_scma"
+  ],
+  "stage_paths": {
+    "jidd_scma": {
+      "dir": "results/20260320_171006_jidd_scma/jidd_scma",
+      "json": "results/20260320_171006_jidd_scma/jidd_scma/stage_results_v2.json",
+      "csv": "results/20260320_171006_jidd_scma/jidd_scma/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "jidd_scma": {
+      "jidd_scma": {
+        "ber": 0.09076751581768101,
+        "ber_upper_confidence": 0.09076751581768101,
+        "bit_errors": 4613.65,
+        "total_bits": 31060339.2,
+        "runtime_sec": 6623.005339062214
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "jidd_scma": {
+      "jidd_scma": 132459.629715493
+    }
+  }
+}

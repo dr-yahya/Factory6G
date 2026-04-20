@@ -1,577 +1,411 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-"""
-Main simulation script for 6G Smart Factory Physical Layer System.
 
-This script runs BER/BLER simulations for the complete OFDM-MIMO system with
-different configurations (scenarios, CSI conditions, channel estimators, etc.).
-It provides a comprehensive command-line interface for system evaluation and
-performance analysis.
-
-Theory:
-    BER/BLER Simulation:
-    
-    The script performs Monte Carlo simulations to estimate:
-    - Bit Error Rate (BER): P(b̂ ≠ b) = E[I(b̂ ≠ b)]
-    - Block Error Rate (BLER): P(∃ i: b̂[i] ≠ b[i]) = 1 - (1 - BER)^n
-    
-    Simulation Process:
-    1. Generate random information bits
-    2. Transmit through system (encoder → modulator → channel → receiver → decoder)
-    3. Compare received bits with transmitted bits
-    4. Compute error rates: BER = (# bit errors) / (# total bits)
-    5. Repeat for multiple channel realizations (Monte Carlo)
-    
-    Stopping Criteria:
-    - Maximum iterations: Stop after max_mc_iter channel realizations
-    - Target block errors: Stop after num_target_block_errors errors
-    - Target BLER: Stop if BLER < target_bler (early stopping)
-    
-    Eb/No Range:
-    - Eb/No: Energy per bit to noise power spectral density ratio
-    - Eb/No (dB) = 10·log10(Eb/N0)
-    - Higher Eb/No: Better performance (lower BER/BLER)
-    - Typical range: -5 dB to 20 dB for evaluation
-    
-    Performance Analysis:
-    - Compare perfect vs imperfect CSI
-    - Compare different channel estimators
-    - Compare different scenarios (UMi, UMa, RMa)
-    - Generate performance curves (BER/BLER vs Eb/No)
-
-Usage:
-    python main.py [options]
-
-Examples:
-    # Run default 6G simulation (6g_baseline profile)
-    python main.py
-
-    # Run specific 6G scenario profile (AI estimator)
-    python main.py --scenario-profile 6g_ai_estimator
-
-    # Run multiple 6G scenario profiles
-    python main.py --scenario-profile 6g_baseline 6g_ai_estimator
-
-    # Run with manual parameters (bypass scenario profiles)
-    python main.py --scenario-profile "" --scenario uma --estimator ls_lin
-
-    # Run only perfect CSI
-    python main.py --scenario-profile 6g_baseline --perfect-csi-only
-"""
-
-import os
-import sys
-import time
 import argparse
+import dataclasses
+import logging
+import time
+import random
+import re
+import sys
+import warnings
 from pathlib import Path
-from typing import Any, Optional
+from typing import TextIO
 
-# Add src to path before importing project modules
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
-# Now safe to import other modules directly
-import numpy as np
-import matplotlib.pyplot as plt
-from src.models.resource_manager import StaticResourceManager
-from src.sim.scenarios import SCENARIO_PRESETS, ScenarioSpec
-from src.sim.metrics import MetricsAccumulator
-from src.sim.runner import run_simulation
-from src.sim.plotting import plot_simulation_results
-from src.sim.results import save_simulation_results
+from src.sim.config import ConfigError, load_config
 from src.sim.env import configure_env, setup_gpu
+from src.sim.run_context import create_run_context
 
 
-def print_results_summary(results: dict):
-    """Print concise summary tables for the collected metrics."""
-    print("\n" + "=" * 80)
-    print("SIMULATION RESULTS SUMMARY")
-    print("=" * 80)
-    print(f"Scenario : {results.get('scenario', 'unknown')}")
-    print(f"Estimator: {results.get('estimator', 'N/A').upper()}")
-    if results.get("profile"):
-        print(f"Profile : {results['profile']}")
+class _FilteredTeeStream:
+    """Mirror stream output to console + log file while filtering noisy lines."""
 
-    runs = results.get("runs", [])
-    if not runs:
-        print("No metrics available.")
-        return
+    _NOISY_PATTERNS = [
+        re.compile(r".*Allocation.*exceeds.*free system memory.*"),
+        re.compile(r".*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*"),
+        re.compile(r".*No supported GPU was found.*"),
+        re.compile(r".*Matplotlib created a temporary cache directory.*"),
+        re.compile(r".*Matplotlib is building the font cache; this may take a moment.*"),
+        re.compile(r".*\.matplotlib is not a writable directory.*"),
+    ]
 
-    for run in runs:
-        csi_str = "Perfect" if run.get("perfect_csi") else "Imperfect"
-        print(f"\n[{csi_str} CSI]")
-        print("-" * 80)
-        header = f"{'Eb/No [dB]':>10} | {'BER':>12} | {'BLER':>12} | {'SINR (dB)':>10} | {'NMSE (dB)':>10} | {'Avg Iter':>9}"
-        print(header)
-        print("-" * len(header))
-        for metric in run.get("metrics", []):
-            ebno = metric.get("ebno_db")
-            overall = metric.get("overall", {})
-            ber = overall.get("ber")
-            bler = overall.get("bler")
-            sinr_db = overall.get("sinr_db")
-            nmse_db = overall.get("nmse_db")
-            iter_avg = overall.get("decoder_iter_avg")
-            print(
-                f"{ebno:10.2f} | "
-                f"{(ber if ber is not None else float('nan')):>12.3e} | "
-                f"{(bler if bler is not None else float('nan')):>12.3e} | "
-                f"{(sinr_db if sinr_db is not None else float('nan')):>10.3f} | "
-                f"{(nmse_db if nmse_db is not None else float('nan')):>10.3f} | "
-                f"{(iter_avg if iter_avg is not None else float('nan')):>9.3f}"
+    def __init__(self, console_stream: TextIO, log_stream: TextIO):
+        self.console_stream = console_stream
+        self.log_stream = log_stream
+
+    def write(self, message):
+        if not message:
+            return 0
+        if any(pattern.search(message) for pattern in self._NOISY_PATTERNS):
+            return len(message)
+        self.console_stream.write(message)
+        self.log_stream.write(message)
+        return len(message)
+
+    def flush(self):
+        self.console_stream.flush()
+        self.log_stream.flush()
+
+    @property
+    def encoding(self):
+        return getattr(self.console_stream, "encoding", "utf-8")
+
+    @property
+    def errors(self):
+        return getattr(self.console_stream, "errors", "strict")
+
+    def isatty(self):
+        return bool(getattr(self.console_stream, "isatty", lambda: False)())
+
+    def fileno(self):
+        return self.console_stream.fileno()
+
+    def __getattr__(self, name: str):
+        return getattr(self.console_stream, name)
+
+
+def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) -> None:
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        root.removeHandler(handler)
+        handler.close()
+
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+
+    console_handler = logging.StreamHandler(console_stream)
+    console_handler.setLevel(level)
+    console_handler.setFormatter(formatter)
+
+    file_handler = logging.FileHandler(log_path, encoding="utf-8")
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+
+    root.setLevel(level)
+    root.addHandler(console_handler)
+    root.addHandler(file_handler)
+
+
+_MODULATION_MAP = {"low": 2, "mid": 4, "high": 6}
+_MODULATION_LABEL_MAP = {2: "qpsk", 4: "16qam", 6: "64qam", 1: "bpsk"}
+_VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn"}
+_FACTORY_SIZE_PRESETS = {
+    "s": {
+        "room_dimensions": [15.0, 15.0, 5.0],
+        "num_machines": 5,
+        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
+        "num_ut": 4,
+    },
+    "m": {
+        "room_dimensions": [25.0, 25.0, 6.0],
+        "num_machines": 10,
+        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
+        "num_ut": 8,
+    },
+    "l": {
+        "room_dimensions": [40.0, 40.0, 8.0],
+        "num_machines": 20,
+        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
+        "num_ut": 16,
+    },
+    "apple": {
+        # Consumer electronics precision assembly hall (iPhone-style)
+        # 60×35m floor, 8m ceiling — rectangular assembly line layout
+        # Dense compact workstations: SMT placers, robotic arms, test stations
+        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
+        "room_dimensions": [60.0, 35.0, 8.0],
+        "num_machines": 22,
+        "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
+        "num_ut": 8,
+    },
+}
+
+
+def _parse_modulation_list(raw: str) -> list[tuple[str, int]]:
+    result: list[tuple[str, int]] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _MODULATION_MAP:
+            raise ValueError(
+                f"Unknown modulation level '{token}'. Choose from: {', '.join(sorted(_MODULATION_MAP))}."
             )
-    print("=" * 80)
+        result.append((token, _MODULATION_MAP[token]))
+    if not result:
+        raise ValueError("--modulation requires at least one level.")
+    return result
 
 
-def main():
-    """Main entry point"""
-    # Build CLI without importing TensorFlow yet
-    parser = argparse.ArgumentParser(
-        description="6G Smart Factory Physical Layer Simulation",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__
-    )
-    
+def _parse_channel_list(raw: str) -> list[str]:
+    result: list[str] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _VALID_CHANNELS:
+            raise ValueError(
+                f"Unknown channel type '{token}'. Choose from: {', '.join(sorted(_VALID_CHANNELS))}."
+            )
+        result.append(token)
+    if not result:
+        raise ValueError("--channel requires at least one type.")
+    return result
+
+
+def _parse_factory_size_list(raw: str) -> list[str]:
+    result: list[str] = []
+    for token in raw.split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        if token not in _FACTORY_SIZE_PRESETS:
+            raise ValueError(
+                f"Unknown factory size '{token}'. Choose from: {', '.join(sorted(_FACTORY_SIZE_PRESETS))}."
+            )
+        result.append(token)
+    if not result:
+        raise ValueError("--factory-size requires at least one size.")
+    return result
+
+
+def _build_run_suffix(config, args: argparse.Namespace) -> str:
+    requested_stages = []
+    if getattr(args, "stage", None) is not None:
+        requested_stages = [s.strip().lower() for s in args.stage.split(",") if s.strip()]
+
+    if requested_stages == ["jidd_scma"]:
+        return "jidd_scma"
+
+    all_methods = list(config.estimators.enabled) + list(config.resource_managers.enabled)
+    methods_part = "_".join(all_methods) if all_methods else "run"
+    if "jidd_scma" in requested_stages:
+        methods_part = "jidd_scma_" + methods_part if methods_part != "run" else "jidd_scma"
+
+    channel_labels = []
+    for ch in args.channel_list:
+        channel_labels.append(config.system.scenario if ch == "tr38901" else ch)
+    channel_part = "_".join(channel_labels)
+
+    mod_labels = [_MODULATION_LABEL_MAP.get(bits, f"{bits}bps") for _, bits in args.modulation_list]
+    modulation_part = "_".join(mod_labels)
+
+    size_part = "_".join(args.factory_size_list)
+
+    return f"{methods_part}_{channel_part}_{modulation_part}_{size_part}"
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run Factory6G simulations.")
+    parser.add_argument("--config", default="config.json", help="Path to the simulation config JSON file.")
     parser.add_argument(
-        '--scenario',
-        type=str,
-        default='umi',
-        choices=['umi', 'uma', 'rma'],
-        help='Channel scenario (default: umi)'
-    )
-
-    parser.add_argument(
-        '--scenario-profile',
-        nargs='+',
-        default=['6g_baseline'],
-        help=f"Run one or more predefined scenario presets ({', '.join(SCENARIO_PRESETS.keys())}). Default: 6g_baseline"
-    )
-
-    parser.add_argument(
-        '--list-scenarios',
-        action='store_true',
-        help='List available scenario presets and exit.'
-    )
-
-    parser.add_argument(
-        '--estimator',
-        nargs='+',
-        default=['ls_nn'],
-        choices=['ls', 'ls_nn', 'ls_lin', 'neural'],
-        help='Channel estimator(s): ls, ls_nn, ls_lin, neural (multiple allowed)'
-    )
-
-    parser.add_argument(
-        '--neural-weights',
-        type=str,
+        "--resume",
+        metavar="RUN_DIR",
         default=None,
-        help='Path to pretrained neural estimator weights (required when using --estimator neural).'
-    )
-
-    parser.add_argument(
-        '--neural-hidden-units',
-        type=int,
-        nargs='+',
-        default=[32, 32],
-        help='Hidden layer sizes for the neural estimator (default: 32 32).'
-    )
-    
-    parser.add_argument(
-        '--perfect-csi-only',
-        action='store_true',
-        help='Run only perfect CSI simulation'
-    )
-    
-    parser.add_argument(
-        '--imperfect-csi-only',
-        action='store_true',
-        help='Run only imperfect CSI simulation'
-    )
-    
-    parser.add_argument(
-        '--ebno-min',
-        type=float,
-        default=-5.0,
-        help='Minimum Eb/No in dB (default: -5.0)'
-    )
-    
-    parser.add_argument(
-        '--ebno-max',
-        type=float,
-        default=15.0,
-        help='Maximum Eb/No in dB (default: 15.0)'
-    )
-    
-    parser.add_argument(
-        '--ebno-step',
-        type=float,
-        default=2.0,
-        help='Eb/No step size in dB (default: 2.0)'
-    )
-    
-    parser.add_argument(
-        '--batch-size',
-        type=int,
-        default=128,
-        help='Batch size for simulation (default: 128)'
-    )
-    
-    parser.add_argument(
-        '--max-iter',
-        type=int,
-        default=1000,
-        help='Maximum Monte Carlo iterations (default: 1000)'
-    )
-    
-    parser.add_argument(
-        '--target-block-errors',
-        type=int,
-        default=1000,
-        help='Target number of block errors (default: 1000)'
-    )
-    
-    parser.add_argument(
-        '--target-bler',
-        type=float,
-        default=1e-3,
-        help='Target BLER for early stopping (default: 1e-3)'
-    )
-    
-    parser.add_argument(
-        '--gpu',
-        type=int,
-        default=0,
-        help='GPU device number (default: 0)'
+        help="Resume an interrupted run from an existing run directory (e.g. results/20260315_092517_simulation).",
     )
     parser.add_argument(
-        '--cpu',
-        action='store_true',
-        help='Force CPU execution and silence CUDA library errors'
-    )
-    
-    parser.add_argument(
-        '--no-plot',
-        action='store_true',
-        help='Skip generating plots'
-    )
-    
-    parser.add_argument(
-        '--no-save',
-        action='store_true',
-        help='Skip saving results'
-    )
-    
-    parser.add_argument(
-        '--output-dir',
-        type=str,
-        default='results',
-        help='Output directory for results (default: results)'
-    )
-    parser.add_argument(
-        '--log-file',
-        type=str,
+        "--estimators",
+        metavar="METHODS",
         default=None,
-        help='Path to write a full log (captures stdout and stderr), e.g., results/run.log'
+        help="Comma-separated estimator methods to run, e.g. --estimators ls,pso. Overrides config. Skips resource-manager stage unless --resource-managers is also given.",
     )
     parser.add_argument(
-        '--log-level',
-        type=str,
-        default='INFO',
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        help='Python logging level for console/file logs (default: INFO)'
-    )
-    parser.add_argument(
-        '--no-stderr-filter',
-        action='store_true',
-        help='Do not filter XLA allocator warnings (show full stderr)'
-    )
-    parser.add_argument(
-        '--tf-errors-only',
-        action='store_true',
-        help='Force TensorFlow/absl logs to ERROR level (suppress INFO/WARNING)'
-    )
-    
-    parser.add_argument(
-        '--seed',
-        type=int,
-        default=42,
-        help='Random seed for reproducibility (default: 42)'
-    )
-    
-    # Resource Management (Static) flags
-    parser.add_argument(
-        '--use-static-rm',
-        action='store_true',
-        help='Enable Static Resource Manager (scheduling/power control)'
-    )
-    parser.add_argument(
-        '--active-ut-mask',
-        type=int,
-        nargs='+',
+        "--resource-managers",
+        metavar="METHODS",
         default=None,
-        help='Active UT mask, e.g., 1 0 1 0'
+        help="Comma-separated resource-manager methods to run, e.g. --resource-managers wmmse,drl. Overrides config. Skips estimator stage unless --estimators is also given. Default (when omitted): max_throughput.",
     )
     parser.add_argument(
-        '--per-ut-power',
-        type=float,
-        nargs='+',
-        default=None,
-        help='Per-UT power scaling (linear), e.g., 1.0 0.5 2.0 0.5'
+        "--modulation",
+        metavar="LEVELS",
+        default="low",
+        help="Comma-separated modulation levels: low=QPSK(2), mid=16-QAM(4), high=64-QAM(6). Default: low.",
     )
     parser.add_argument(
-        '--pilot-reuse-factor',
-        type=int,
+        "--channel",
+        metavar="TYPES",
         default=None,
-        help='Pilot reuse factor placeholder (integer)'
+        help="Comma-separated channel types: rayleigh, rician, tr38901, awgn. Default: from config.",
     )
-    
-    args = parser.parse_args()
+    parser.add_argument(
+        "--factory-size",
+        metavar="SIZES",
+        default="s",
+        help="Comma-separated factory sizes: s (small), m (medium), l (large). Default: s.",
+    )
+    parser.add_argument(
+        "--stage",
+        metavar="STAGES",
+        default=None,
+        help=(
+            "Comma-separated stages to run: estimators, resource_managers, jidd_scma. "
+            "Use 'jidd_scma' to run Dr. Athirah's SCMA-OFDM JIDD simulation. "
+            "Default: determined by --estimators / --resource-managers flags."
+        ),
+    )
+    return parser.parse_args()
 
-    if args.list_scenarios:
-        print("Available scenario profiles:")
-        for key, spec in SCENARIO_PRESETS.items():
-            print(f"  - {key}: {spec.description}")
-        return
-    
-    # Configure environment BEFORE importing TensorFlow/Sionna
-    configure_env(force_cpu=args.cpu, gpu_num=args.gpu)
 
-    # Optional: tee stdout/stderr to a file if requested
-    if args.log_file:
-        from pathlib import Path as _Path
-        class _Tee:
-            def __init__(self, original, fh):
-                self._orig = original
-                self._fh = fh
-            def write(self, data):
-                try:
-                    self._orig.write(data)
-                except Exception:
-                    pass
-                try:
-                    self._fh.write(data)
-                except Exception:
-                    pass
-            def flush(self):
-                try:
-                    self._orig.flush()
-                except Exception:
-                    pass
-                try:
-                    self._fh.flush()
-                except Exception:
-                    pass
-        _p = _Path(args.log_file)
-        _p.parent.mkdir(parents=True, exist_ok=True)
-        _fh = open(_p, 'a', buffering=1)
-        sys.stdout = _Tee(sys.stdout, _fh)
-        sys.stderr = _Tee(sys.stderr, _fh)
+def main() -> int:
+    args = _parse_args()
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    log_handle: TextIO | None = None
 
-    # Filter XLA allocator warnings from stderr (they come from C++ code)
-    import re
-    
-    class StderrFilter:
-        """Filter XLA allocator warnings from stderr"""
-        def __init__(self, original_stderr):
-            self.original_stderr = original_stderr
-            # Match XLA allocator warnings (can appear in full or partial lines)
-            self.xla_patterns = [
-                re.compile(r'.*Allocation.*exceeds.*free system memory.*'),
-                re.compile(r'.*external/local_xla/xla/tsl/framework/cpu_allocator_impl.*'),
-            ]
-        
-        def write(self, message):
-            # Check if message contains XLA allocator warning
-            should_suppress = any(pattern.search(message) for pattern in self.xla_patterns)
-            if not should_suppress:
-                self.original_stderr.write(message)
-        
-        def flush(self):
-            self.original_stderr.flush()
-    
-    # Install stderr filter to suppress XLA warnings (unless disabled)
-    if not args.no_stderr_filter:
-        sys.stderr = StderrFilter(sys.stderr)
+    try:
+        args.modulation_list = _parse_modulation_list(args.modulation)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
 
-    # Now safe to import TensorFlow/Sionna and configure runtime
-    import tensorflow as tf
-    import sionna
-    import warnings
-    import logging
-    
-    # Configure logging levels
-    import logging
-    _level = getattr(logging, args.log_level.upper(), logging.INFO)
-    logging.getLogger().setLevel(_level)
-    # TensorFlow Python logger
-    tf.get_logger().setLevel('ERROR' if _level > logging.DEBUG else 'INFO')
-    
-    # Suppress Python warnings
-    warnings.filterwarnings('ignore', category=UserWarning, module='tensorflow')
-    
-    # 3p libraries
-    logging.getLogger('tensorflow').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
-    logging.getLogger('absl').setLevel(logging.ERROR if _level > logging.DEBUG else logging.INFO)
+    try:
+        config = load_config(args.config)
+    except (ConfigError, FileNotFoundError, ValueError) as exc:
+        print(f"Error loading configuration: {exc}")
+        return 1
 
-    # Enforce TensorFlow/absl errors-only if requested
-    if args.tf_errors_only:
-        tf.get_logger().setLevel('ERROR')
-        logging.getLogger('tensorflow').setLevel(logging.ERROR)
-        logging.getLogger('absl').setLevel(logging.ERROR)
-    
-    setup_gpu(args.gpu)
-    
-    # Set random seed (Sionna >=0.16 has no global phy seed)
-    np.random.seed(args.seed)
-    tf.random.set_seed(args.seed)
-    
-    results_all = []
+    # Load raw config dict (for sections not modelled by Factory6GConfig, e.g. jidd_scma)
+    import json as _json
+    try:
+        with open(args.config, encoding="utf-8") as _fh:
+            raw_config: dict = _json.load(_fh)
+    except Exception:
+        raw_config = {}
 
-    # Filter out empty strings from scenario_profile if provided
-    if args.scenario_profile:
-        args.scenario_profile = [p for p in args.scenario_profile if p and p.strip()]
-        if not args.scenario_profile:
-            args.scenario_profile = None
-
-    if args.scenario_profile:
-        profile_names = [name.lower() for name in args.scenario_profile]
-        for profile_name in profile_names:
-            if profile_name not in SCENARIO_PRESETS:
-                print(f"⚠ Unknown scenario profile '{profile_name}'. Available: {', '.join(SCENARIO_PRESETS.keys())}")
-                continue
-            spec = SCENARIO_PRESETS[profile_name]
-            scenario_name = spec.channel_scenario or args.scenario
-            ebno_db_range = np.arange(spec.ebno_min, spec.ebno_max + spec.ebno_step, spec.ebno_step)
-
-            rm = None
-            if spec.resource_manager:
-                rm = StaticResourceManager(**spec.resource_manager)
-
-            estimators = spec.estimators or args.estimator
-            for estimator in estimators:
-                estimator_kwargs = {}
-                if spec.estimator_kwargs:
-                    if estimator in spec.estimator_kwargs and isinstance(spec.estimator_kwargs[estimator], dict):
-                        estimator_kwargs = dict(spec.estimator_kwargs[estimator])
-                    elif isinstance(spec.estimator_kwargs, dict):
-                        estimator_kwargs = dict(spec.estimator_kwargs)
-                estimator_weights = spec.estimator_weights
-                if estimator == 'neural':
-                    estimator_kwargs.setdefault('hidden_units', args.neural_hidden_units)
-                    if estimator_weights is None:
-                        estimator_weights = args.neural_weights
-
-                # Create optimized config for 6g_baseline to meet 6G requirements
-                # Note: Custom configs cause stream management issues, so we'll optimize via scenario params
-                # For now, use default config with optimized Eb/No range and perfect CSI
-                custom_config = None
-                
-                # Apply mobility, channel model, and antenna parameters if specified
-                if (spec.min_ut_velocity > 0 or spec.max_ut_velocity > 0 or 
-                    spec.channel_model_type != "tr38901" or
-                    spec.num_bs_ant > 0 or spec.num_ut > 0 or spec.num_ut_ant > 0):
-                    
-                    # Create base config args
-                    config_args = {
-                        "scenario": scenario_name,
-                        "min_ut_velocity": spec.min_ut_velocity,
-                        "max_ut_velocity": spec.max_ut_velocity,
-                        "channel_model_type": spec.channel_model_type
-                    }
-                    
-                    # Override antenna params if set in spec
-                    if spec.num_bs_ant > 0:
-                        config_args["num_bs_ant"] = spec.num_bs_ant
-                    if spec.num_ut > 0:
-                        config_args["num_ut"] = spec.num_ut
-                    if spec.num_ut_ant > 0:
-                        config_args["num_ut_ant"] = spec.num_ut_ant
-                        
-                    from src.components.config import SystemConfig
-                    custom_config = SystemConfig(**config_args)
-
-                profile_output_dir = Path(args.output_dir) / spec.name
-                results = run_simulation(
-                    scenario=scenario_name,
-                    perfect_csi_list=spec.perfect_csi,
-                    ebno_db_range=ebno_db_range,
-                    batch_size=spec.batch_size,
-                    max_mc_iter=spec.max_iter,
-                    num_target_block_errors=spec.target_block_errors,
-                    target_bler=spec.target_bler,
-                    config=custom_config,  # Pass optimized config
-                    save_results=not args.no_save,
-                    plot_results=not args.no_plot,
-                    output_dir=str(profile_output_dir),
-                    estimator_type=estimator,
-                    estimator_weights=estimator_weights,
-                    estimator_kwargs=estimator_kwargs,
-                    resource_manager=rm,
-                    resource_manager_config=spec.resource_manager,
-                    profile_name=spec.name,
-                )
-                if spec.description:
-                    print(f"\nDescription: {spec.description}")
-                print_results_summary(results)
-                results_all.append(results)
+    # CLI method overrides: --estimators / --resource-managers filter which methods run.
+    # If only one flag is given, the other stage is skipped (enabled=[]).
+    if args.estimators is not None or args.resource_managers is not None:
+        est_enabled = (
+            [m.strip().lower() for m in args.estimators.split(",") if m.strip()]
+            if args.estimators is not None
+            else []
+        )
+        rm_enabled = (
+            [m.strip().lower() for m in args.resource_managers.split(",") if m.strip()]
+            if args.resource_managers is not None
+            else []
+        )
+        config = dataclasses.replace(
+            config,
+            estimators=dataclasses.replace(config.estimators, enabled=est_enabled),
+            resource_managers=dataclasses.replace(config.resource_managers, enabled=rm_enabled),
+        )
     else:
-        # Determine CSI conditions from CLI switches
-        if args.perfect_csi_only:
-            perfect_csi_list = [True]
-        elif args.imperfect_csi_only:
-            perfect_csi_list = [False]
+        # No CLI overrides — default resource managers to max_throughput
+        config = dataclasses.replace(
+            config,
+            resource_managers=dataclasses.replace(
+                config.resource_managers, enabled=["max_throughput"]
+            ),
+        )
+
+    # Parse channel list; default to channel from config if not specified
+    if args.channel is not None:
+        try:
+            args.channel_list = _parse_channel_list(args.channel)
+        except ValueError as exc:
+            print(f"Error: {exc}")
+            return 1
+    else:
+        args.channel_list = [config.system.channel_model_type]
+
+    try:
+        args.factory_size_list = _parse_factory_size_list(args.factory_size)
+    except ValueError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    try:
+        sim_config = config.simulation
+        if args.resume:
+            run_dir = Path(args.resume)
+            # Extract run_id as the timestamp prefix (everything before the first _ after date)
+            parts = run_dir.name.split("_")
+            run_id = "_".join(parts[:2]) if len(parts) >= 2 else run_dir.name
+            log_mode = "a"
         else:
-            perfect_csi_list = [True, False]
-
-        ebno_db_range = np.arange(args.ebno_min, args.ebno_max + args.ebno_step, args.ebno_step)
-
-        rm_config = None
-        resource_manager = None
-        if args.use_static_rm:
-            rm_config = {
-                "active_ut_mask": args.active_ut_mask,
-                "per_ut_power": args.per_ut_power,
-                "pilot_reuse_factor": args.pilot_reuse_factor,
-            }
-            rm_config = {k: v for k, v in rm_config.items() if v is not None}
-            resource_manager = StaticResourceManager(**rm_config) if rm_config else None
-        
-        for estimator in args.estimator:
-            estimator_kwargs = {}
-            estimator_weights = None
-            if estimator == 'neural':
-                estimator_kwargs['hidden_units'] = args.neural_hidden_units
-                estimator_weights = args.neural_weights
-                if estimator_weights is None:
-                    print("⚠ Neural estimator selected without --neural-weights. Provide weights before running.")
-
-            results = run_simulation(
-                scenario=args.scenario,
-                perfect_csi_list=perfect_csi_list,
-                ebno_db_range=ebno_db_range,
-                batch_size=args.batch_size,
-                max_mc_iter=args.max_iter,
-                num_target_block_errors=args.target_block_errors,
-                target_bler=args.target_bler,
-                save_results=not args.no_save,
-                plot_results=not args.no_plot,
-                output_dir=args.output_dir,
-                estimator_type=estimator,
-                estimator_weights=estimator_weights,
-                estimator_kwargs=estimator_kwargs,
-                resource_manager=resource_manager,
-                resource_manager_config=rm_config,
+            run_id, run_dir = create_run_context(
+                sim_config.output_dir,
+                suffix=_build_run_suffix(config, args),
             )
+            log_mode = "w"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        log_path = run_dir / "simulation.log"
 
-            print_results_summary(results)
-            results_all.append(results)
+        try:
+            log_handle = log_path.open(log_mode, encoding="utf-8")
+        except OSError as exc:
+            original_stderr.write(f"Error opening log file '{log_path}': {exc}\n")
+            original_stderr.flush()
+            return 1
 
-    if not results_all:
-        return None
+        sys.stdout = _FilteredTeeStream(original_stdout, log_handle)
+        sys.stderr = _FilteredTeeStream(original_stderr, log_handle)
+        print(f"Log file: {log_path.resolve()}")
 
-    return results_all if len(results_all) > 1 else results_all[0]
+        configure_env(force_cpu=sim_config.force_cpu, gpu_num=sim_config.gpu_id)
+
+        import numpy as np
+        import sionna.phy
+        import tensorflow as tf
+
+        from src.sim.flow import run_jidd_scma_flow, run_simulation_flow
+
+        level = getattr(logging, sim_config.log_level, logging.INFO)
+        _configure_root_logging(level, original_stdout, log_path)
+        tf.get_logger().setLevel("ERROR" if level > logging.DEBUG else "INFO")
+        warnings.filterwarnings("ignore", category=UserWarning, module="tensorflow")
+        logging.getLogger("tensorflow").setLevel(logging.ERROR if level > logging.DEBUG else logging.INFO)
+        logging.getLogger("absl").setLevel(logging.ERROR if level > logging.DEBUG else logging.INFO)
+
+        if not sim_config.force_cpu:
+            setup_gpu(sim_config.gpu_id, force_cpu=sim_config.force_cpu)
+
+        random.seed(sim_config.seed)
+        np.random.seed(sim_config.seed)
+        tf.random.set_seed(sim_config.seed)
+        sionna.phy.config.seed = sim_config.seed
+
+        from src.sim.stages.common import fmt_elapsed
+
+        # Parse --stage flag to determine which simulation flows to run
+        requested_stages: list[str] = []
+        if args.stage is not None:
+            requested_stages = [s.strip().lower() for s in args.stage.split(",") if s.strip()]
+
+        run_jidd = "jidd_scma" in requested_stages
+        run_standard = (
+            "estimators" in requested_stages
+            or "resource_managers" in requested_stages
+            or not requested_stages  # default: run standard flow unless only jidd_scma
+        ) and not (run_jidd and len(requested_stages) == 1)
+
+        print(f"Loaded configuration for scenario: {config.system.scenario}")
+        _wall_start = time.perf_counter()
+
+        if run_jidd:
+            run_jidd_scma_flow(config, run_id=run_id, run_dir=run_dir, raw_config=raw_config)
+
+        if run_standard:
+            run_simulation_flow(config, run_id=run_id, run_dir=run_dir, modulations=args.modulation_list, channels=args.channel_list, factory_sizes=args.factory_size_list)
+
+        print(f"Wall-clock time (incl. setup): {fmt_elapsed(time.perf_counter() - _wall_start)}")
+        return 0
+    finally:
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        except Exception:
+            pass
+        sys.stdout = original_stdout
+        sys.stderr = original_stderr
+        if log_handle is not None:
+            log_handle.flush()
+            log_handle.close()
 
 
 if __name__ == "__main__":
-    main()
-
+    raise SystemExit(main())

@@ -57,7 +57,7 @@ References:
 """
 
 from sionna.phy.channel.tr38901 import AntennaArray
-from .config import SystemConfig
+
 
 
 class AntennaConfig:
@@ -83,7 +83,7 @@ class AntennaConfig:
         - Beamforming capabilities
     """
     
-    def __init__(self, config: SystemConfig):
+    def __init__(self, config: dict):
         """
         Initialize antenna arrays for base station and user terminals.
         
@@ -98,6 +98,31 @@ class AntennaConfig:
         self.config = config
         self.ut_array = self._create_ut_array()
         self.bs_array = self._create_bs_array()
+
+    @staticmethod
+    def _normalize_pattern(pattern: str | None, default: str) -> str:
+        """Map RT-style names from config.json to the TR 38.901 channel API."""
+        if pattern is None:
+            return default
+        normalized = str(pattern).strip().lower()
+        if normalized in {"tr38901", "38.901", "38901"}:
+            return "38.901"
+        if normalized in {"iso", "isotropic", "omni"}:
+            return "omni"
+        return default
+
+    @staticmethod
+    def _resolve_polarization(value: str | None, default_mode: str,
+                              default_type: str) -> tuple[str, str]:
+        """Translate config polarization labels into Sionna channel-array arguments."""
+        if value is None:
+            return default_mode, default_type
+        normalized = str(value).strip().lower()
+        if normalized in {"v", "h"}:
+            return "single", normalized.upper()
+        if normalized in {"vh", "cross"}:
+            return "dual", "cross" if normalized == "cross" else "VH"
+        return default_mode, default_type
     
     def _create_ut_array(self) -> AntennaArray:
         """
@@ -125,13 +150,29 @@ class AntennaConfig:
             - Single vertical polarization
             - Omni-directional pattern
         """
+        polarization, polarization_type = self._resolve_polarization(
+            self.config.get("rx_polarization"), "single", "V"
+        )
+        num_ut_ant = int(self.config.get("num_ut_ant", 1))
+        ports_per_element = 2 if polarization == "dual" else 1
+        if num_ut_ant % ports_per_element != 0:
+            raise ValueError(
+                f"num_ut_ant={num_ut_ant} is incompatible with "
+                f"{polarization} polarization ({polarization_type})."
+            )
+
+        antenna_spacing = self.config.get("antenna_spacing", 0.5)
         return AntennaArray(
             num_rows=1,
-            num_cols=1,
-            polarization="single",
-            polarization_type="V",
-            antenna_pattern="omni",
-            carrier_frequency=self.config.carrier_frequency
+            num_cols=max(1, num_ut_ant // ports_per_element),
+            polarization=polarization,
+            polarization_type=polarization_type,
+            antenna_pattern=self._normalize_pattern(
+                self.config.get("rx_pattern"), "omni"
+            ),
+            carrier_frequency=self.config.get("carrier_frequency", 3.5e9),
+            vertical_spacing=antenna_spacing,
+            horizontal_spacing=antenna_spacing,
         )
     
     def _create_bs_array(self) -> AntennaArray:
@@ -177,13 +218,29 @@ class AntennaConfig:
             - Dual cross-polarization (±45°)
             - 3GPP 38.901 directional pattern
         """
+        polarization, polarization_type = self._resolve_polarization(
+            self.config.get("tx_polarization"), "dual", "cross"
+        )
+        num_bs_ant = int(self.config.get("num_bs_ant", 32))
+        ports_per_element = 2 if polarization == "dual" else 1
+        if num_bs_ant % ports_per_element != 0:
+            raise ValueError(
+                f"num_bs_ant={num_bs_ant} is incompatible with "
+                f"{polarization} polarization ({polarization_type})."
+            )
+
+        antenna_spacing = self.config.get("antenna_spacing", 0.5)
         return AntennaArray(
             num_rows=1,
-            num_cols=int(self.config.num_bs_ant / 2),  # Dual polarization
-            polarization="dual",
-            polarization_type="cross",
-            antenna_pattern="38.901",
-            carrier_frequency=self.config.carrier_frequency
+            num_cols=max(1, num_bs_ant // ports_per_element),
+            polarization=polarization,
+            polarization_type=polarization_type,
+            antenna_pattern=self._normalize_pattern(
+                self.config.get("tx_pattern"), "38.901"
+            ),
+            carrier_frequency=self.config.get("carrier_frequency", 3.5e9),
+            vertical_spacing=antenna_spacing,
+            horizontal_spacing=antenna_spacing,
         )
     
     def get_ut_array(self) -> AntennaArray:
@@ -206,4 +263,3 @@ class AntennaConfig:
             including directional patterns and dual polarization.
         """
         return self.bs_array
-

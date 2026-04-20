@@ -1,0 +1,85 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260318_172603",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "low/estimators": {
+      "dir": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/low/estimators",
+      "json": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/low/estimators/stage_results_v2.json",
+      "csv": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/low/estimators/stage_results_v2.csv"
+    },
+    "mid/estimators": {
+      "dir": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/mid/estimators",
+      "json": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/mid/estimators/stage_results_v2.json",
+      "csv": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/mid/estimators/stage_results_v2.csv"
+    },
+    "high/estimators": {
+      "dir": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/high/estimators",
+      "json": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/high/estimators/stage_results_v2.json",
+      "csv": "results/20260318_172603_ls_umi_qpsk_16qam_64qam/high/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "low/estimators": {
+      "ls": {
+        "ber": 0.0028995453081085876,
+        "ber_upper_confidence": 0.0029187119363086153,
+        "latency_ms": 471.1832651008083,
+        "throughput_bits_per_batch": 392075.85239212675,
+        "energy_joules_per_batch": 0.00018645100000000005,
+        "avg_power_w": 0.0003957299117643066,
+        "runtime_sec": 73.81821841454567,
+        "bit_errors": 31399.545454545456,
+        "total_bits": 58267461.81818182,
+        "block_errors": 134.27272727272728,
+        "total_blocks": 37934.545454545456,
+        "num_batches": 148.1818181818182
+      }
+    },
+    "mid/estimators": {
+      "ls": {
+        "ber": 0.019208299334768062,
+        "ber_upper_confidence": 0.01925628741185499,
+        "latency_ms": 773.6499044364041,
+        "throughput_bits_per_batch": 771325.9787375596,
+        "energy_joules_per_batch": 0.00021102699999999994,
+        "avg_power_w": 0.00027277110386842996,
+        "runtime_sec": 16.765344140727123,
+        "bit_errors": 166172.0,
+        "total_bits": 16229096.727272727,
+        "block_errors": 373.3636363636364,
+        "total_blocks": 5282.909090909091,
+        "num_batches": 20.636363636363637
+      }
+    },
+    "high/estimators": {
+      "ls": {
+        "ber": 0.05060042564315024,
+        "ber_upper_confidence": 0.05068317315997731,
+        "latency_ms": 1689.6942045424125,
+        "throughput_bits_per_batch": 1119957.3090909088,
+        "energy_joules_per_batch": 0.00023560300000000003,
+        "avg_power_w": 0.00013943649179070158,
+        "runtime_sec": 17.310071386090986,
+        "bit_errors": 596906.9090909091,
+        "total_bits": 11796480.0,
+        "block_errors": 732.0909090909091,
+        "total_blocks": 2560.0,
+        "num_batches": 10.0
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "low/estimators": {
+      "ls": 812.0004025600023
+    },
+    "mid/estimators": {
+      "ls": 184.41878554799837
+    },
+    "high/estimators": {
+      "ls": 190.41078524700083
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260319_135513",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260319_135513_ls_umi_qpsk_apple/estimators",
+      "json": "results/20260319_135513_ls_umi_qpsk_apple/estimators/stage_results_v2.json",
+      "csv": "results/20260319_135513_ls_umi_qpsk_apple/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "ls": {
+        "ber": 0.024960858894116953,
+        "ber_upper_confidence": 0.02503909442078316,
+        "latency_ms": 813.2382934878802,
+        "throughput_bits_per_batch": 766801.9818181819,
+        "energy_joules_per_batch": 0.00018645100000000005,
+        "avg_power_w": 0.00022927904442411574,
+        "runtime_sec": 8.654238204818181,
+        "bit_errors": 196300.18181818182,
+        "total_bits": 7864320.0,
+        "block_errors": 759.8181818181819,
+        "total_blocks": 5120.0,
+        "num_batches": 10.0
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "ls": 95.19662025299999
+    }
+  }
+}

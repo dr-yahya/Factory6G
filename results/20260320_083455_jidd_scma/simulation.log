@@ -1,0 +1,57 @@
+Log file: /app/results/20260320_083455_jidd_scma/simulation.log
+Loaded configuration for scenario: umi
+======================================================================
+  JIDD-SCMA Simulation (Dr. Athirah Mohd Ramly, UKM)
+======================================================================
+Run directory: results/20260320_083455_jidd_scma
+----------------------------------------------------------------------
+[jidd_scma] Starting JIDD-SCMA simulation ...
+[jidd_scma] Eb/N0 range: 1–20 dB, step 1 dB
+[jidd_scma] Data dir: /app/dr_athirah_simulation/PHY layer
+[jidd_scma] CE method: mmse
+/app/src/athirah/jidd.py:184: RuntimeWarning: overflow encountered in exp
+  sig_msb  = np.exp(llr_msb) / (np.exp(llr_msb) + 1.0)
+/app/src/athirah/jidd.py:184: RuntimeWarning: invalid value encountered in divide
+  sig_msb  = np.exp(llr_msb) / (np.exp(llr_msb) + 1.0)
+/app/src/athirah/jidd.py:186: RuntimeWarning: overflow encountered in exp
+  nsg_msb  = 1.0 / (np.exp(llr_msb) + 1.0)
+/app/src/athirah/jidd.py:185: RuntimeWarning: overflow encountered in exp
+  sig_lsb  = np.exp(llr_lsb) / (np.exp(llr_lsb) + 1.0)
+/app/src/athirah/jidd.py:185: RuntimeWarning: invalid value encountered in divide
+  sig_lsb  = np.exp(llr_lsb) / (np.exp(llr_lsb) + 1.0)
+/app/src/athirah/jidd.py:187: RuntimeWarning: overflow encountered in exp
+  nsg_lsb  = 1.0 / (np.exp(llr_lsb) + 1.0)
+/app/src/athirah/jidd.py:147: RuntimeWarning: divide by zero encountered in log
+  LLR[v, 2 * jj + 1] = np.log(
+/app/src/athirah/jidd.py:142: RuntimeWarning: divide by zero encountered in log
+  LLR[v, 2 * jj] = np.log(
+/app/src/athirah/polar/scan.py:158: RuntimeWarning: invalid value encountered in multiply
+  c_llr = B[:, n] + alpha * (mean_B / mean_L) * L[:, n]
+[jidd_scma] Done in 4h 16m 53s
+/app/src/sim/output.py:459: UserWarning: No artists with labels found to put in legend.  Note that artists whose label start with an underscore are ignored when legend() is called with no argument.
+  ax.legend()
+
+Simulation complete. Total time: 4h 16m 54s
+Wall-clock time (incl. setup): 4h 16m 54s
+ma] Eb/N0 = 10.0 dB
+2026-03-20 14:16:46,544 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=10.0 dB | bits=136704 | errors=358 | BER=0.002619 | t=28.6s
+2026-03-20 14:16:46,544 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 11.0 dB
+2026-03-20 14:16:57,255 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=11.0 dB | bits=50688 | errors=357 | BER=0.007043 | t=10.7s
+2026-03-20 14:16:57,255 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 12.0 dB
+2026-03-20 14:17:07,979 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=12.0 dB | bits=50688 | errors=4258 | BER=0.084004 | t=10.7s
+2026-03-20 14:17:07,979 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 13.0 dB
+2026-03-20 14:17:18,940 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=13.0 dB | bits=50688 | errors=24618 | BER=0.485677 | t=11.0s
+2026-03-20 14:17:18,940 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 14.0 dB
+2026-03-20 14:17:29,870 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=14.0 dB | bits=50688 | errors=25346 | BER=0.500039 | t=10.9s
+2026-03-20 14:17:29,870 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 15.0 dB
+2026-03-20 14:17:40,826 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=15.0 dB | bits=50688 | errors=25256 | BER=0.498264 | t=11.0s
+2026-03-20 14:17:40,826 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 16.0 dB
+2026-03-20 14:17:51,893 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=16.0 dB | bits=50688 | errors=25123 | BER=0.495640 | t=11.1s
+2026-03-20 14:17:51,893 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 17.0 dB
+2026-03-20 14:18:02,855 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=17.0 dB | bits=50688 | errors=25456 | BER=0.502210 | t=11.0s
+2026-03-20 14:18:02,855 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 18.0 dB
+2026-03-20 14:18:14,043 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=18.0 dB | bits=50688 | errors=25266 | BER=0.498461 | t=11.2s
+2026-03-20 14:18:14,043 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 19.0 dB
+2026-03-20 14:18:25,078 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=19.0 dB | bits=50688 | errors=25323 | BER=0.499586 | t=11.0s
+2026-03-20 14:18:25,081 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0 = 20.0 dB
+2026-03-20 14:18:36,030 | INFO | src.athirah.simulation | [jidd_scma] Eb/N0=20.0 dB | bits=50688 | errors=25353 | BER=0.500178 | t=10.9s

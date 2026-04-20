@@ -1,0 +1,52 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260412_162534",
+  "stage_order": [
+    "estimators"
+  ],
+  "stage_paths": {
+    "estimators": {
+      "dir": "results/20260412_162534_neural_ls_rayleigh_64qam_s/estimators",
+      "json": "results/20260412_162534_neural_ls_rayleigh_64qam_s/estimators/stage_results_v2.json",
+      "csv": "results/20260412_162534_neural_ls_rayleigh_64qam_s/estimators/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "estimators": {
+      "neural": {
+        "ber": 0.009410905623488923,
+        "ber_upper_confidence": 0.009437916968048132,
+        "latency_ms": 778.3655357443007,
+        "throughput_bits_per_batch": 584273.2220015313,
+        "energy_joules_per_batch": 0.00023560299999999463,
+        "avg_power_w": 0.0003026966478550575,
+        "runtime_sec": 1434.2719332562783,
+        "bit_errors": 63293.36363636364,
+        "total_bits": 615508154.1818181,
+        "block_errors": 137.72727272727272,
+        "total_blocks": 133573.81818181818,
+        "num_batches": 1043.5454545454545
+      },
+      "ls": {
+        "ber": 0.032000638630018306,
+        "ber_upper_confidence": 0.032058206547509176,
+        "latency_ms": 794.0425307931197,
+        "throughput_bits_per_batch": 570949.255320688,
+        "energy_joules_per_batch": 0.00023560299999999602,
+        "avg_power_w": 0.00029672662805483744,
+        "runtime_sec": 689.7979226634486,
+        "bit_errors": 198063.0,
+        "total_bits": 501618501.8181818,
+        "block_errors": 275.6363636363636,
+        "total_blocks": 108858.18181818182,
+        "num_batches": 850.4545454545455
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "estimators": {
+      "neural": 15776.99126581906,
+      "ls": 7587.777149297935
+    }
+  }
+}
