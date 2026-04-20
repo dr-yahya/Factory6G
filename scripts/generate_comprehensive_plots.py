@@ -67,10 +67,10 @@ def plot_ber(ax, ebno, ber, label, color, marker, linestyle='-'):
 EST_SOURCES = [
     ('Adaptive', os.path.join(RESULTS, "20260318_094228_adaptive_umi_qpsk/estimators/stage_results_v2.json"), None),
     ('PSO',      os.path.join(RESULTS, "20260317_083505_ls_pso_umi_qpsk/estimators/stage_results_v2.json"), 'pso'),
+    ('DFT',      os.path.join(RESULTS, "20260415_052116_dft_umi_qpsk_s/estimators/stage_results_v2.json"), None),
     ('LS',       os.path.join(RESULTS, "20260319_103327_ls_umi_qpsk_s/estimators/stage_results_v2.json"), None),
     ('Neural',   os.path.join(RESULTS, "20260319_110248_neural_umi_qpsk_s/estimators/stage_results_v2.json"), None),
     ('ISTA',     os.path.join(RESULTS, "20260319_102908_ista_umi_qpsk_s/estimators/stage_results_v2.json"), None),
-    ('DFT*',     os.path.join(RESULTS, "20260319_083829_dft_umi_qpsk_m/estimators/stage_results_v2.json"), None),
 ]
 
 MOD_SOURCES = [

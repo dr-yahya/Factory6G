@@ -1,0 +1,17 @@
+stage,method,metric,value
+estimators,__stage__,stage_dir,results/20260415_052116_dft_umi_qpsk_s/estimators
+estimators,__stage__,stage_json,results/20260415_052116_dft_umi_qpsk_s/estimators/stage_results_v2.json
+estimators,__stage__,stage_csv,results/20260415_052116_dft_umi_qpsk_s/estimators/stage_results_v2.csv
+estimators,dft,mean_ber,0.0010877902903328885
+estimators,dft,mean_ber_upper_confidence,0.001097599819092294
+estimators,dft,mean_latency_ms,476.267350974092
+estimators,dft,mean_throughput_bits_per_batch,392788.2634531964
+estimators,dft,mean_energy_joules_per_batch,0.0001864509999999997
+estimators,dft,mean_avg_power_w,0.0003915332848525316
+estimators,dft,mean_runtime_sec,465.8251586141821
+estimators,dft,mean_bit_errors,23240.727272727272
+estimators,dft,mean_total_bits,363581812.3636364
+estimators,dft,mean_block_errors,104.45454545454545
+estimators,dft,mean_total_blocks,236706.9090909091
+estimators,dft,mean_num_batches,924.6363636363636
+estimators,dft,runtime_total_sec,5124.076744756003

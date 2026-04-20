@@ -1,6 +1,6 @@
 # Factory6G Simulation Results Report (v2)
 
-*Generated: 2026-04-13*
+*Generated: 2026-04-20*
 
 ---
 
@@ -11,7 +11,7 @@ This report presents a comprehensive evaluation of the Factory6G physical layer 
 **Key findings:**
 
 - **Retrained Neural estimator dramatically outperforms LS on Rayleigh** -- up to 160x lower BER at 0 dB (QPSK), achieving zero BER at 6 dB vs 8 dB for LS. This resolves the previous finding that the neural estimator had collapsed to the LS solution.
-- **Adaptive and PSO** channel estimators achieve the lowest BER floors on TR 38.901 UMi (~3-4 x 10^-5), an order of magnitude better than LS (~3 x 10^-4). PSO is 14x slower than Adaptive for comparable performance.
+- **Adaptive, PSO, and DFT (re-run on small factory)** achieve the lowest BER floors on TR 38.901 UMi (~3-5 x 10^-5), an order of magnitude better than LS (~3 x 10^-4). DFT is 6.3x slower than LS but 12% faster than Adaptive.
 - **JIDD-SCMA** achieves effectively zero BER above 9 dB Eb/N0, demonstrating the power of joint iterative detection-decoding, but at 162x the computational cost of LS.
 - **Higher-order modulation** (64-QAM) raises the BER floor to ~1.1 x 10^-2 on TR 38.901 and triples latency compared to QPSK. On Rayleigh, the neural estimator achieves zero BER at 12 dB even with 64-QAM.
 - **Rayleigh fading** is the easiest channel (zero BER above 8 dB with LS, above 6 dB with Neural), while **TR 38.901 UMi** produces a persistent BER floor (~3 x 10^-4).
@@ -50,7 +50,7 @@ This report presents a comprehensive evaluation of the Factory6G physical layer 
 | Adaptive | SNR-aware hybrid (DFT/LMMSE switching) | Quality thresholds: 3-12 dB | [2][3] |
 | ISTA | Iterative Shrinkage-Thresholding | 10 iterations | [4] |
 | Neural | SNR-conditioned Conv2D residual network | 68,450 params, trained on Rayleigh | [6] |
-| DFT | DFT-based delay-domain truncation | Tested on medium factory | [3] |
+| DFT | DFT-based delay-domain truncation | Re-run on small factory (2026-04-15) | [3] |
 
 ### 2.3 Neural Estimator Architecture
 
@@ -89,25 +89,24 @@ The final estimate is h_hat = h_ls + complex(delta_re, delta_im). Training used 
 
 #### BER at Key Eb/N0 Points
 
-| Eb/N0 (dB) | LS | PSO | Adaptive | ISTA | Neural* | DFT** |
+| Eb/N0 (dB) | LS | PSO | Adaptive | ISTA | Neural* | DFT |
 |---|---|---|---|---|---|---|
-| 0  | 2.42e-2 | 4.79e-3 | 4.84e-3 | 3.95e-1 | 2.42e-2 | 8.77e-2 |
-| 4  | 9.65e-4 | 2.60e-4 | 4.01e-4 | 1.76e-1 | 9.65e-4 | 1.88e-2 |
-| 8  | 3.46e-4 | 4.94e-5 | 5.13e-5 | 4.22e-2 | 3.46e-4 | 5.57e-3 |
-| 12 | 2.82e-4 | 3.75e-5 | 2.94e-5 | 4.37e-3 | 2.82e-4 | 4.33e-3 |
-| 16 | 3.22e-4 | 4.20e-5 | 2.96e-5 | 6.34e-4 | 3.22e-4 | 6.39e-3 |
-| 20 | 4.00e-4 | 3.94e-5 | 4.01e-5 | 3.26e-4 | 4.00e-4 | 7.78e-3 |
+| 0  | 2.42e-2 | 4.79e-3 | 4.84e-3 | 3.95e-1 | 2.42e-2 | 9.42e-3 |
+| 4  | 9.65e-4 | 2.60e-4 | 4.01e-4 | 1.76e-1 | 9.65e-4 | 3.51e-4 |
+| 8  | 3.46e-4 | 4.94e-5 | 5.13e-5 | 4.22e-2 | 3.46e-4 | 4.76e-5 |
+| 12 | 2.82e-4 | 3.75e-5 | 2.94e-5 | 4.37e-3 | 2.82e-4 | 3.40e-5 |
+| 16 | 3.22e-4 | 4.20e-5 | 2.96e-5 | 6.34e-4 | 3.22e-4 | 3.49e-5 |
+| 20 | 4.00e-4 | 3.94e-5 | 4.01e-5 | 3.26e-4 | 4.00e-4 | 3.03e-5 |
 
 *\*Neural was tested with the original (untrained) model on TR 38.901, producing results identical to LS. See Section 4 for retrained results on Rayleigh.*
-*\*\*DFT was tested on the medium factory (25x25 m) rather than the small factory used by other methods.*
 
 **Analysis:**
 
-- **Adaptive and PSO are the top performers** on TR 38.901, both achieving BER floors of ~3-4 x 10^-5 -- roughly 10x lower than LS [1][2]. At 12 dB, Adaptive edges ahead (2.94e-5 vs 3.75e-5), but the difference is within noise.
+- **Adaptive, PSO, and DFT are the top performers** on TR 38.901, all achieving BER floors of ~3-5 x 10^-5 -- roughly 10x lower than LS [1][2][3]. At 20 dB, DFT reaches 3.03e-5, slightly lower than Adaptive/PSO.
 - **LS and Neural (untrained) produce identical BER** at every Eb/N0 point. The neural estimator had collapsed to the LS solution on TR 38.901 due to insufficient training data diversity. This was resolved by retraining on Rayleigh (Section 4).
 - **ISTA** starts poorly at low SNR (0.395 at 0 dB) but converges to ~3.3 x 10^-4 at 20 dB, comparable to LS [4]. Its iterative shrinkage approach needs a minimum SNR threshold (~8 dB) before becoming competitive.
-- **DFT** has the worst BER floor (~4-8 x 10^-3) and actually degrades at higher SNR. Note: the medium factory comparison is not fully fair.
-- All methods exhibit a **BER floor** on TR 38.901, indicating channel estimation error dominates over noise at high SNR (see Section 3.4).
+- **DFT is now close to Adaptive/PSO across most Eb/N0 points**, with no high-SNR BER rebound.
+- All methods exhibit a **BER floor** on TR 38.901, but advanced estimators (Adaptive/PSO/DFT) push the floor down to ~3-5 x 10^-5 (see Section 3.4).
 
 ### 3.2 Latency
 
@@ -120,13 +119,13 @@ The final estimate is h_hat = h_ls + complex(delta_re, delta_im). Training used 
 | Adaptive | ~474 |
 | ISTA | ~479 |
 | Neural | ~474 |
-| DFT (medium) | ~818 |
+| DFT | ~476 |
 
-Latency is stable across Eb/N0 for all methods. LS, PSO, Adaptive, ISTA, and Neural all cluster around 470-480 ms. DFT is 1.7x slower due to the medium factory configuration and DFT processing overhead.
+Latency is stable across Eb/N0 for all methods. LS, PSO, Adaptive, ISTA, Neural, and DFT all cluster around 470-480 ms.
 
 **Why latency is flat across Eb/N0.** The per-frame processing pipeline (channel estimation, equalization, demapping, LDPC decoding) has fixed computational cost regardless of the operating SNR. Unlike runtime (which depends on how many Monte Carlo batches are needed to accumulate enough block errors), latency measures the wall-clock time for a single batch. The number of LDPC decoding iterations is fixed at 20 (not early-terminated), so even at high SNR where decoding converges faster internally, the iteration count -- and therefore the latency -- remains constant.
 
-**Why DFT latency is higher.** The DFT estimator was tested on the medium factory (25x25 m, 8 UTs) rather than the small factory (15x15 m, 4 UTs) used by other methods. The larger resource grid (more UTs) increases the per-batch computation for channel estimation, equalization, and LDPC decoding, explaining the 1.7x latency increase.
+**Why DFT latency matches other methods.** The DFT run uses the same small-factory setup (15x15 m, 4 UTs) as LS/Adaptive/PSO/ISTA/Neural, so per-batch computational cost is comparable.
 
 **URLLC implications.** For Ultra-Reliable Low-Latency Communication (URLLC), 3GPP targets a user-plane latency of 1 ms for critical factory applications. The measured latencies of ~470-480 ms represent the batch-level simulation time (64 frames processed together) rather than single-frame physical layer latency. The actual over-the-air latency for a single OFDM frame at 30 kHz SCS with 14 symbols is approximately 0.5 ms, well within URLLC bounds. However, the computational overhead of advanced estimators (Adaptive, PSO) would add to processing latency in a real-time implementation and must be considered in the latency budget.
 
@@ -137,13 +136,14 @@ Latency is stable across Eb/N0 for all methods. LS, PSO, Adaptive, ISTA, and Neu
 | Method | Total Runtime | Relative to LS |
 |---|---|---|
 | ISTA | 91.7 s | 0.11x |
-| DFT | 96.5 s | 0.12x |
 | LS | 817.7 s | 1.0x |
 | Neural | 817.4 s | 1.0x |
+| DFT | 5,124 s (1.4 h) | 6.3x |
 | Adaptive | 5,838 s (1.6 h) | 7.1x |
 | PSO | 82,703 s (23.0 h) | 101x |
 
-- **ISTA and DFT are fastest** (~92-97 s), about 9x faster than LS due to fewer Monte Carlo batches needed [4].
+- **ISTA is the fastest method** (~92 s), about 9x faster than LS due to fewer Monte Carlo batches needed [4].
+- **DFT is now 6.3x slower than LS** (5,124 s), but still ~12% faster than Adaptive. The stronger BER at high SNR requires many more Monte Carlo batches before meeting stopping criteria [3].
 - **Adaptive is 7x slower than LS** but delivers 10x better BER -- a strong cost-benefit tradeoff [2][3].
 - **PSO is 101x slower than LS** for marginal improvement over Adaptive [5]. The particle swarm optimization explores many candidate solutions per batch, making it computationally expensive. **Not recommended for production use.**
 - **LS and Neural have identical runtime**, confirming functional equivalence (on the untrained model).
@@ -165,7 +165,7 @@ At high SNR, the noise term becomes negligible and the interpolation bias domina
 
 **Impact of modulation order.** Higher-order constellations (16-QAM, 64-QAM) have smaller decision regions and are more sensitive to residual estimation error. The same estimation MSE that causes a floor of ~3 x 10^-4 with QPSK produces a floor of ~1.5 x 10^-3 with 16-QAM and ~1.1 x 10^-2 with 64-QAM (Section 5.1).
 
-**How advanced estimators reduce the floor.** Adaptive and PSO estimators achieve a lower floor (~3-4 x 10^-5) by applying frequency-domain smoothing (LMMSE) and delay-domain denoising (DFT truncation) [2][3]. JIDD-SCMA eliminates the floor entirely through joint iterative processing, where the decoder feeds soft information back to the detector [7][8].
+**How advanced estimators reduce the floor.** Adaptive, PSO, and DFT estimators achieve a lower floor (~3-5 x 10^-5) by applying frequency-domain smoothing (LMMSE) and/or delay-domain denoising (DFT truncation) [2][3]. JIDD-SCMA eliminates the floor entirely through joint iterative processing, where the decoder feeds soft information back to the detector [7][8].
 
 ### 3.5 Adaptive vs PSO Runtime
 
@@ -425,9 +425,9 @@ The waterfall region spans 5-8 dB with BER dropping **5 orders of magnitude in 3
 | Method | Total Runtime | Relative to LS |
 |---|---|---|
 | ISTA | 91.7 s | 0.11x |
-| DFT | 96.5 s | 0.12x |
 | LS (UMi) | 817.7 s | 1.0x |
 | Neural (UMi) | 817.4 s | 1.0x |
+| DFT (UMi) | 5,124 s (1.4 h) | 6.3x |
 | LS (Rayleigh, QPSK) | 4,727 s | 5.8x |
 | Adaptive | 5,838 s (1.6 h) | 7.1x |
 | Neural (Rayleigh, 16-QAM) | 14,027 s (3.9 h) | 17.2x |
@@ -448,8 +448,8 @@ Neural Rayleigh runtimes are longer than LS UMi primarily because Rayleigh achie
 | 1 | **Neural estimator outperforms LS by 160x on Rayleigh** (QPSK, 0 dB) after retraining | Deep learning CE is viable when trained on the target channel |
 | 2 | Neural achieves zero BER 2 dB earlier than LS across all modulations | ~2 dB SNR gain = significant power saving for factory devices |
 | 3 | Neural adds no latency overhead vs LS (~0.3% difference) | Drop-in replacement for LS in real-time systems |
-| 4 | Adaptive is the best classical estimator on TR 38.901 (BER ~3e-5) | Default choice for frequency-selective channels |
-| 5 | PSO matches Adaptive but costs 14x more runtime | Not practical for production |
+| 4 | Adaptive, PSO, and DFT form the top classical tier on TR 38.901 (BER ~3-5e-5) | DFT/Adaptive provide near-PSO reliability with much lower runtime |
+| 5 | PSO shows no clear BER edge over Adaptive/DFT but costs 14-16x more runtime | Not practical for production |
 | 6 | JIDD-SCMA achieves zero BER above 9 dB | Best for URLLC scenarios |
 | 7 | BER floor on TR 38.901 is due to interpolation bias, not coding | Need better estimation or joint processing to break through |
 | 8 | 64-QAM BER floor is 37x worse than QPSK on TR 38.901 | Higher modulation needs better estimation |
@@ -475,7 +475,7 @@ Neural Rayleigh runtimes are longer than LS UMi primarily because Rayleigh achie
 
 4. **Run Adaptive estimator on higher-order modulation.** The 64-QAM BER floor with LS (1.1e-2) may improve 10x with Adaptive estimation. This would validate whether Adaptive + 64-QAM is viable for high-throughput factory applications.
 
-5. **Re-run DFT on small factory.** The current comparison is unfair since DFT was tested on the medium factory while all others used small. A fair comparison would clarify whether DFT's poor performance is inherent or an artifact of the test configuration.
+5. **Benchmark DFT vs Adaptive across channels and factory sizes.** The new small-factory DFT run reaches ~3e-5 BER with 6.3x LS runtime. A structured sweep (small/medium/large and Rayleigh/Rician/TR 38.901) is needed to map where DFT or Adaptive is preferable.
 
 6. **Test Adaptive estimator on Rayleigh/Rician channels.** LS already achieves zero BER on Rayleigh above 8 dB. Adaptive could potentially reach zero BER at even lower SNR (4-6 dB), demonstrating its value across channel types.
 

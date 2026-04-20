@@ -16,7 +16,7 @@ ESTIMATOR_SOURCES = {
     "LS": RESULTS / "20260319_103327_ls_umi_qpsk_s" / "estimators" / "stage_results_v2.csv",
     "ISTA": RESULTS / "20260319_102908_ista_umi_qpsk_s" / "estimators" / "stage_results_v2.csv",
     "Neural": RESULTS / "20260319_110248_neural_umi_qpsk_s" / "estimators" / "stage_results_v2.csv",
-    "DFT (medium factory)": RESULTS / "20260319_083829_dft_umi_qpsk_m" / "estimators" / "stage_results_v2.csv",
+    "DFT": RESULTS / "20260415_052116_dft_umi_qpsk_s" / "estimators" / "stage_results_v2.csv",
     "Adaptive": RESULTS / "20260318_094228_adaptive_umi_qpsk" / "estimators" / "stage_results_v2.csv",
 }
 
@@ -121,7 +121,7 @@ def plot_runtime_comparison():
     labels = []
     runtimes = []
     for label, path in ESTIMATOR_SOURCES.items():
-        labels.append(label.replace(" (medium factory)", "\n(medium)"))
+        labels.append(label)
         runtimes.append(get_runtime_total(path))
     for label, path in JIDD_SOURCES.items():
         short = label.replace("JIDD-SCMA ", "JIDD\n")
