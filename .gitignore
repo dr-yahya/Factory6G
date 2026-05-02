@@ -54,3 +54,4 @@ models/saved_model/
 *.npz
 
 thesis_writing/
+*weekly_messages.md

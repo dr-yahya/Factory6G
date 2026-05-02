@@ -182,6 +182,19 @@ Generated summaries and research-facing tables live under `reports/`. Some
 older result documentation may mention legacy result filenames; the current
 runtime writes `stage_results_v2.*` and `summary_v2.*`.
 
+## Progress Report Log
+
+Each dated weekly folder includes the stakeholder message draft and, when
+available, a concise evidence deck. The table links one primary readable
+progress report per date.
+
+| Date | Progress report | Focus |
+|---|---|---|
+| 2026-03-27 | [Factory6G weekly messages](reports/weekly/2026-03-27/factory6g_weekly_messages.md) | March PHY benchmark: Adaptive/PSO estimator evidence, TR 38.901 BER floor, modulation/factory-size impact, and corrected JIDD-SCMA result. |
+| 2026-04-20 | [Factory6G weekly messages](reports/weekly/2026-04-20/factory6g_weekly_messages.md) | April neural-estimator update: retrained Neural vs LS Rayleigh evidence, corrected DFT comparison, TR 38.901 estimator tier, and remaining large-factory/JIDD findings. |
+| 2026-04-27 | [Factory6G weekly messages](reports/weekly/2026-04-27/factory6g_weekly_messages.md) | AI resource-manager recovery, Docker workflow validation, and Rayleigh QPSK benchmark evidence. |
+| 2026-05-01 | [Factory6G weekly messages](reports/weekly/2026-05-01/factory6g_weekly_messages.md) | BER-first DRL resource-manager workflow, Rayleigh/UMi benchmark runs, and Docker validation evidence. |
+
 ## Quick Validation
 
 Validate the CLI syntax inside Docker:
