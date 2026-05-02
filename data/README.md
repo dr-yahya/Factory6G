@@ -85,6 +85,7 @@ Expected root attributes:
 Expected columns:
 
 - `scenario`
+- `channel_model_type`
 - `ebno_db`
 - `sample_index`
 - `channel_energy`
@@ -92,9 +93,15 @@ Expected columns:
 - `per_ut_power`
 - `oracle_utility`
 - `oracle_avg_ber`
+- `oracle_ber_upper_confidence`
 - `oracle_throughput_eff`
+- `oracle_throughput_bits`
 - `oracle_latency_ms`
 - `oracle_candidates`
+- `oracle_eligible_candidates`
+- `oracle_objective`
+- `oracle_source_manager`
+- `oracle_source_priority`
 
 Expected logical shapes:
 
@@ -128,6 +135,12 @@ Generate the RM training parquet:
 python scripts/generate_dataset.py --config config.json --output data/rm_training_data_sionna_1k.parquet --samples 1000 --batch-size 1 --scenario umi --min-ebno 0 --max-ebno 20 --seed 42 --tries 16 --latency-weight 0.002
 ```
 
+Generate a BER-first RM training parquet:
+
+```bash
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/generate_dataset.py --config config.json --output data/rm_training_data_ber_first_tr38901.parquet --samples 1000 --batch-size 1 --scenario umi --channel tr38901 --min-ebno 0 --max-ebno 20 --ebno-grid 0,2,4,6,8,10,12,14,16,18,20 --seed 42 --tries 32 --objective ber_first --random-active-count 2 --random-power-min 0.85 --label-active-count 2
+```
+
 Train the RM CNN:
 
 ```bash
@@ -138,6 +151,19 @@ Train the DRL-style policy checkpoint:
 
 ```bash
 python scripts/train_drl_resource_manager.py --config config.json --data data/rm_training_data_sionna_1k.parquet --output-dir models/drl_resource_manager_policy
+```
+
+Train the BER-first DRL-style policy checkpoint:
+
+```bash
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/generate_dataset.py --config config.json --output data/rm_training_data_ber_first_tr38901.parquet --samples 1000 --batch-size 1 --scenario umi --channel tr38901 --min-ebno 0 --max-ebno 20 --ebno-grid 0,2,4,6,8,10,12,14,16,18,20 --seed 42 --tries 32 --objective ber_first --random-active-count 2 --random-power-min 0.85 --label-active-count 2
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/train_drl_resource_manager.py --config config.json --data data/rm_training_data_ber_first_tr38901.parquet --output-dir models/ber_drl_resource_manager_policy --initial-checkpoint models/ber_drl_resource_manager_policy --value-target ber_log_reliability --ber-clip 0.01 --ber-floor 1e-7 --sample-weight-mode ber_confidence --sample-weight-strength 1.5 --schedule-loss-weight 1.5 --power-loss-weight 0.75
+```
+
+Generate the BER comparison report:
+
+```bash
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/generate_rm_ber_report.py
 ```
 
 Run standalone DRL policy inference against a parquet sample:

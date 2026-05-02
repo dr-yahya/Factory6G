@@ -395,6 +395,8 @@ class DRLResourceManager(ResourceManager):
         history_alpha: float = 0.15,
         max_power: float = 1.0,
         min_active_power: float = 0.2,
+        policy_score_weight: float = 1.0,
+        channel_gain_weight: float = 0.0,
     ) -> None:
         self.needs_channel_feedback = True
         self.num_active = max(1, int(num_active))
@@ -403,6 +405,8 @@ class DRLResourceManager(ResourceManager):
         self.history_alpha = float(np.clip(history_alpha, 0.01, 1.0))
         self.max_power = float(max_power)
         self.min_active_power = float(min_active_power)
+        self.policy_score_weight = float(policy_score_weight)
+        self.channel_gain_weight = float(channel_gain_weight)
         self.model = None
         self.model_path = model_path
         self.policy_checkpoint = None
@@ -468,6 +472,12 @@ class DRLResourceManager(ResourceManager):
 
             channel_energy = channel_energy_from_h_hat(feedback.h_hat)[0]
             sched_scores, power_scores = self._predict_policy(channel_energy, fairness_debt, ebno_db, num_ut)
+            sched_scores = (
+                self.policy_score_weight * sched_scores
+                + self.channel_gain_weight * norm_rates
+                + self.fairness_weight * fairness_debt
+            )
+            power_scores = self.policy_score_weight * power_scores + self.channel_gain_weight * norm_rates
             mask, power_out = project_policy_to_directives(
                 sched_scores,
                 power_scores,
@@ -506,6 +516,9 @@ def create_resource_manager(
 ) -> ResourceManager:
     name_lower = name.lower()
     kwargs = dict(manager_kwargs or {})
+    if "ber_drl" in name_lower or "ber-drl" in name_lower or "berdrl" in name_lower:
+        kwargs.setdefault("model_path", "models/ber_drl_resource_manager_policy")
+        return DRLResourceManager(num_active=num_active, **kwargs)
     if "static" in name_lower:
         return StaticResourceManager(active_ut_mask=[1] * num_ut, per_ut_power=[1.0] * num_ut)
     if "round" in name_lower:

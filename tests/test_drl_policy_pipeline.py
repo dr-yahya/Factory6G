@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 
 import numpy as np
 import tensorflow as tf
@@ -19,6 +20,7 @@ from src.models.drl_policy import (
     project_policy_to_directives,
     save_policy_checkpoint,
 )
+from scripts.tools.train_drl_resource_manager import _ber_log_reliability_target
 from src.models.resource_manager import create_resource_manager
 from src.sim.types import ResourceManagerFeedback
 
@@ -116,6 +118,23 @@ def _train_and_save_checkpoint(tmp_path):
     return checkpoint_dir, channel_energy, ebno_db
 
 
+def _patch_root_module_to_keras_src_models(policy_model_path):
+    with zipfile.ZipFile(policy_model_path, "r") as src_archive:
+        archive_entries = [(info, src_archive.read(info.filename)) for info in src_archive.infolist()]
+        config_payload = src_archive.read("config.json")
+        config_json = json.loads(config_payload.decode("utf-8"))
+        config_json["module"] = "keras.src.models.functional"
+        patched_config = json.dumps(config_json).encode("utf-8")
+
+    patched_path = policy_model_path.with_suffix(".patched.keras")
+    with zipfile.ZipFile(patched_path, "w") as dst_archive:
+        for info, payload in archive_entries:
+            if info.filename == "config.json":
+                payload = patched_config
+            dst_archive.writestr(info, payload)
+    patched_path.replace(policy_model_path)
+
+
 def test_drl_policy_checkpoint_round_trip(tmp_path):
     checkpoint_dir, channel_energy, ebno_db = _train_and_save_checkpoint(tmp_path)
 
@@ -144,6 +163,18 @@ def test_drl_policy_checkpoint_round_trip(tmp_path):
     assert all(0.0 <= value <= 1.0 for value in power)
 
 
+def test_drl_policy_checkpoint_loads_keras_src_models_archive(tmp_path):
+    checkpoint_dir, channel_energy, ebno_db = _train_and_save_checkpoint(tmp_path)
+    _patch_root_module_to_keras_src_models(checkpoint_dir / POLICY_MODEL_FILENAME)
+
+    checkpoint = load_policy_checkpoint(checkpoint_dir)
+    state = build_policy_state(channel_energy[0], ebno_db[0], fairness_debt=np.ones(4, dtype=np.float32))
+    outputs = predict_policy_outputs(checkpoint, state)
+
+    assert np.asarray(outputs["schedule_output"]).shape == (4,)
+    assert np.asarray(outputs["power_output"]).shape == (4,)
+
+
 def test_drl_resource_manager_loads_policy_checkpoint(tmp_path):
     checkpoint_dir, _, _ = _train_and_save_checkpoint(tmp_path)
     manager = create_resource_manager(
@@ -161,3 +192,56 @@ def test_drl_resource_manager_loads_policy_checkpoint(tmp_path):
     assert sum(directives.active_ut_mask) == 2
     assert len(directives.per_ut_power) == 4
     assert all(0.0 <= value <= 1.0 for value in directives.per_ut_power)
+
+
+def test_ber_drl_resource_manager_uses_independent_checkpoint_path(tmp_path):
+    checkpoint_dir, _, _ = _train_and_save_checkpoint(tmp_path)
+    manager = create_resource_manager(
+        "ber_drl",
+        num_ut=4,
+        num_active=2,
+        cnn_model_path=None,
+        drl_model_path="unused-drl-path",
+        manager_kwargs={"model_path": str(checkpoint_dir)},
+    )
+    directives = manager.get_runtime_directives({"num_ut": 4}, ebno_db=5.0, feedback=_make_feedback())
+
+    assert getattr(manager, "policy_checkpoint", None) is not None
+    assert directives.active_ut_mask is not None
+    assert directives.per_ut_power is not None
+    assert sum(directives.active_ut_mask) == 2
+    assert len(directives.per_ut_power) == 4
+
+
+def test_drl_policy_channel_gain_guard_biases_projection_to_stronger_users(tmp_path):
+    checkpoint_dir, _, _ = _train_and_save_checkpoint(tmp_path)
+    manager = create_resource_manager(
+        "ber_drl",
+        num_ut=4,
+        num_active=2,
+        cnn_model_path=None,
+        drl_model_path="unused-drl-path",
+        manager_kwargs={
+            "model_path": str(checkpoint_dir),
+            "channel_gain_weight": 100.0,
+            "fairness_weight": 0.0,
+            "min_active_power": 0.85,
+        },
+    )
+    directives = manager.get_runtime_directives({"num_ut": 4}, ebno_db=5.0, feedback=_make_feedback())
+
+    assert directives.active_ut_mask == [1, 1, 0, 0]
+    assert directives.per_ut_power is not None
+    assert all(value == 0.0 or value >= 0.85 for value in directives.per_ut_power)
+
+
+def test_ber_log_reliability_target_separates_low_ber_values():
+    target = _ber_log_reliability_target(
+        np.array([1e-7, 1e-5, 1e-3, 1e-2], dtype=np.float32),
+        ber_clip=1e-2,
+        ber_floor=1e-7,
+    ).reshape(-1)
+
+    assert np.all(np.diff(target) < 0.0)
+    assert target[0] == 1.0
+    assert target[-1] == 0.0

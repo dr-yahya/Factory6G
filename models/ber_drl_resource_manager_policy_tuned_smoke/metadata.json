@@ -1,0 +1,38 @@
+{
+  "format": "factory6g_drl_policy_v1",
+  "version": 1,
+  "created_at_utc": "2026-04-29T06:43:03.399532+00:00",
+  "model_filename": "policy.keras",
+  "normalization_filename": "normalization.npz",
+  "history_filename": "history.json",
+  "config_path": "config.json",
+  "data_path": "data/rm_training_data_ber_tune_smoke.parquet",
+  "num_samples": 6,
+  "num_ut": 4,
+  "fft_size": 128,
+  "state_dim": 130,
+  "checkpoint_type": "offline_actor_pretraining",
+  "policy_outputs": [
+    "schedule_output",
+    "power_output",
+    "value_output"
+  ],
+  "training_args": {
+    "epochs": 1,
+    "batch_size": 2,
+    "learning_rate": 0.001,
+    "validation_split": 0.0,
+    "hidden_dim": 128,
+    "dropout": 0.2,
+    "value_loss_weight": 0.1,
+    "schedule_loss_weight": 1.5,
+    "power_loss_weight": 0.75,
+    "value_target": "ber_log_reliability",
+    "ber_clip": 0.01,
+    "ber_floor": 1e-07,
+    "sample_weight_mode": "ber_confidence",
+    "sample_weight_strength": 1.5,
+    "initial_checkpoint": "models/ber_drl_resource_manager_policy",
+    "seed": 42
+  }
+}

@@ -4,7 +4,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import tempfile
 from typing import Any
+import zipfile
 
 import numpy as np
 
@@ -79,12 +81,30 @@ def load_rm_policy_dataset(data_path: str) -> dict[str, np.ndarray]:
         if "oracle_utility" in df.columns
         else np.zeros(len(df), dtype=np.float32)
     )
+    avg_ber = (
+        df["oracle_avg_ber"].to_numpy(dtype=np.float32)
+        if "oracle_avg_ber" in df.columns
+        else np.ones(len(df), dtype=np.float32)
+    )
+    ber_upper = (
+        df["oracle_ber_upper_confidence"].to_numpy(dtype=np.float32)
+        if "oracle_ber_upper_confidence" in df.columns
+        else np.ones(len(df), dtype=np.float32)
+    )
+    source_priority = (
+        df["oracle_source_priority"].to_numpy(dtype=np.float32)
+        if "oracle_source_priority" in df.columns
+        else np.zeros(len(df), dtype=np.float32)
+    )
     return {
         "channel_energy": channel_energy,
         "active_ut_mask": active_mask,
         "per_ut_power": power,
         "ebno_db": ebno_db,
         "oracle_utility": utility,
+        "oracle_avg_ber": avg_ber,
+        "oracle_ber_upper_confidence": ber_upper,
+        "oracle_source_priority": source_priority,
     }
 
 
@@ -250,6 +270,8 @@ def compile_policy_model(
     *,
     learning_rate: float = 1e-3,
     value_loss_weight: float = 0.1,
+    schedule_loss_weight: float = 1.0,
+    power_loss_weight: float = 0.5,
 ) -> None:
     import tensorflow as tf
 
@@ -261,8 +283,8 @@ def compile_policy_model(
             "value_output": "mse",
         },
         loss_weights={
-            "schedule_output": 1.0,
-            "power_output": 0.5,
+            "schedule_output": float(schedule_loss_weight),
+            "power_output": float(power_loss_weight),
             "value_output": value_loss_weight,
         },
         metrics={
@@ -273,18 +295,169 @@ def compile_policy_model(
     )
 
 
-def _load_model_compat(model_path: str):
+def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
     import tensorflow as tf
 
     class _CompatibleDense(tf.keras.layers.Dense):
         def __init__(self, *args, quantization_config=None, **kwargs):
             super().__init__(*args, **kwargs)
 
+    def _is_keras_module_mismatch_error(exc: Exception) -> bool:
+        message = str(exc)
+        return (
+            "Could not deserialize class" in message
+            and "keras.src.models." in message
+            and "cannot be imported" in message
+        )
+
+    def _first_positive_int(*candidates: Any) -> int | None:
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed > 0:
+                return parsed
+        return None
+
+    def _first_non_negative_float(*candidates: Any) -> float | None:
+        for value in candidates:
+            if value is None:
+                continue
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError):
+                continue
+            if parsed >= 0.0:
+                return parsed
+        return None
+
+    def _infer_policy_architecture(path: str) -> tuple[int, int, int, int, float]:
+        archive_path = Path(path)
+        if archive_path.suffix != ".keras":
+            raise ValueError(f"Compatibility loader requires a .keras policy archive, got: {path}")
+
+        config_json: dict[str, Any] = {}
+        with zipfile.ZipFile(archive_path, "r") as src_archive:
+            if "config.json" in src_archive.namelist():
+                config_payload = src_archive.read("config.json")
+                config_json = json.loads(config_payload.decode("utf-8"))
+
+        layers = config_json.get("config", {}).get("layers", [])
+        if not isinstance(layers, list):
+            layers = []
+
+        input_layer_cfg: dict[str, Any] = {}
+        schedule_output_cfg: dict[str, Any] = {}
+        user_dense_cfg: dict[str, Any] = {}
+        context_dropout_cfg: dict[str, Any] = {}
+        for layer in layers:
+            if not isinstance(layer, dict):
+                continue
+            name = layer.get("name")
+            layer_cfg = layer.get("config")
+            if not isinstance(layer_cfg, dict):
+                continue
+            if name == "policy_state":
+                input_layer_cfg = layer_cfg
+            elif name == "schedule_output":
+                schedule_output_cfg = layer_cfg
+            elif name == "user_dense":
+                user_dense_cfg = layer_cfg
+            elif name == "context_dropout":
+                context_dropout_cfg = layer_cfg
+
+        input_shape = input_layer_cfg.get("batch_shape") or input_layer_cfg.get("batch_input_shape")
+        input_num_ut = None
+        input_state_dim = None
+        if isinstance(input_shape, list) and len(input_shape) >= 3:
+            input_num_ut = input_shape[1]
+            input_state_dim = input_shape[2]
+
+        output_shape = schedule_output_cfg.get("target_shape")
+        output_dim = output_shape[0] if isinstance(output_shape, list) and output_shape else None
+
+        training_args = metadata.get("training_args", {}) if isinstance(metadata, dict) else {}
+        if not isinstance(training_args, dict):
+            training_args = {}
+
+        num_ut = _first_positive_int(
+            input_num_ut,
+            output_dim,
+            metadata.get("num_ut") if isinstance(metadata, dict) else None,
+        )
+        state_dim = _first_positive_int(
+            input_state_dim,
+            metadata.get("state_dim") if isinstance(metadata, dict) else None,
+        )
+        resolved_output_dim = _first_positive_int(output_dim, num_ut)
+        hidden_dim = _first_positive_int(
+            user_dense_cfg.get("units"),
+            training_args.get("hidden_dim"),
+            128,
+        )
+        dropout_rate = _first_non_negative_float(
+            context_dropout_cfg.get("rate"),
+            training_args.get("dropout"),
+            0.2,
+        )
+
+        if num_ut is None or state_dim is None or resolved_output_dim is None or hidden_dim is None or dropout_rate is None:
+            raise RuntimeError(
+                f"Could not infer policy architecture from checkpoint metadata/config for {path}. "
+                "Expected fields include num_ut, state_dim, and schedule_output target_shape."
+            )
+        return num_ut, state_dim, resolved_output_dim, hidden_dim, dropout_rate
+
+    def _load_from_weights_archive(path: str):
+        num_ut, state_dim, output_dim, hidden_dim, dropout_rate = _infer_policy_architecture(path)
+        model = create_policy_model(
+            input_shape=(num_ut, state_dim),
+            output_dim=output_dim,
+            hidden_dim=hidden_dim,
+            dropout_rate=dropout_rate,
+        )
+
+        archive_path = Path(path)
+        with zipfile.ZipFile(archive_path, "r") as src_archive:
+            if "model.weights.h5" not in src_archive.namelist():
+                raise FileNotFoundError(f"model.weights.h5 is missing in policy archive: {path}")
+            with tempfile.NamedTemporaryFile(suffix=".weights.h5", delete=False) as tmp_file:
+                weights_path = Path(tmp_file.name)
+                weights_path.write_bytes(src_archive.read("model.weights.h5"))
+
+        try:
+            model.load_weights(str(weights_path))
+        finally:
+            weights_path.unlink(missing_ok=True)
+        return model
+
+    base_exc: Exception | None = None
     try:
         return tf.keras.models.load_model(model_path, compile=False)
-    except Exception:
+    except Exception as exc:
+        base_exc = exc
+
+    try:
         with tf.keras.utils.custom_object_scope({"Dense": _CompatibleDense}):
             return tf.keras.models.load_model(model_path, compile=False)
+    except Exception as compat_exc:
+        if _is_keras_module_mismatch_error(base_exc) or _is_keras_module_mismatch_error(compat_exc):
+            try:
+                return _load_from_weights_archive(model_path)
+            except Exception as weights_exc:
+                raise RuntimeError(
+                    "Keras deserialization mismatch while loading DRL policy checkpoint. "
+                    "The artifact appears to be saved with standalone Keras module paths "
+                    "(keras.src.models.*) while this runtime expects tf.keras internals. "
+                    "The loader attempted architecture reconstruction + weight restore from "
+                    "the .keras archive but failed. "
+                    "Regenerate the checkpoint in Docker with "
+                    "'python scripts/tools/train_drl_resource_manager.py --output-dir models/drl_resource_manager_policy'."
+                ) from weights_exc
+        raise compat_exc
 
 
 def save_policy_checkpoint(
@@ -356,7 +529,7 @@ def load_policy_checkpoint(checkpoint_path: str | Path) -> PolicyCheckpoint:
         }
 
     normalization = PolicyNormalization.from_npz(normalization_path) if normalization_path.exists() else None
-    model = _load_model_compat(str(model_path))
+    model = _load_model_compat(str(model_path), metadata=metadata)
     return PolicyCheckpoint(
         model=model,
         metadata=metadata,

@@ -1,0 +1,37 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260428_103926",
+  "stage_order": [
+    "resource_managers"
+  ],
+  "stage_paths": {
+    "resource_managers": {
+      "dir": "results/20260428_103926_ber_drl_umi_qpsk_s/resource_managers",
+      "json": "results/20260428_103926_ber_drl_umi_qpsk_s/resource_managers/stage_results_v2.json",
+      "csv": "results/20260428_103926_ber_drl_umi_qpsk_s/resource_managers/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "resource_managers": {
+      "ber_drl": {
+        "ber": 0.00016874358081976406,
+        "ber_upper_confidence": 0.0001704168136023806,
+        "latency_ms": 508.84856068705614,
+        "throughput_bits_per_batch": 196574.82366206218,
+        "energy_joules_per_batch": 0.000186450999999996,
+        "avg_power_w": 0.00036646834142063775,
+        "runtime_sec": 917.2144160396415,
+        "bit_errors": 23350.18181818182,
+        "total_bits": 317164450.90909094,
+        "block_errors": 68.63636363636364,
+        "total_blocks": 206487.27272727274,
+        "num_batches": 1613.1818181818182
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "resource_managers": {
+      "ber_drl": 10089.358576436058
+    }
+  }
+}

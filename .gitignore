@@ -52,3 +52,5 @@ models/saved_model/
 
 
 *.npz
+
+thesis_writing/

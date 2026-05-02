@@ -1,0 +1,23 @@
+{
+  "loss": [
+    3.2992618083953857
+  ],
+  "schedule_output_loss": [
+    1.9696930646896362
+  ],
+  "power_output_loss": [
+    0.41880717873573303
+  ],
+  "value_output_loss": [
+    0.30616727471351624
+  ],
+  "schedule_output_accuracy": [
+    0.5
+  ],
+  "power_output_mse": [
+    0.41880717873573303
+  ],
+  "value_output_mse": [
+    0.30616727471351624
+  ]
+}

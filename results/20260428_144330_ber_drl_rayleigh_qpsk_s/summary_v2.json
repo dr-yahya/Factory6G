@@ -1,0 +1,37 @@
+{
+  "schema_version": "2.0",
+  "run_id": "20260428_144330",
+  "stage_order": [
+    "resource_managers"
+  ],
+  "stage_paths": {
+    "resource_managers": {
+      "dir": "results/20260428_144330_ber_drl_rayleigh_qpsk_s/resource_managers",
+      "json": "results/20260428_144330_ber_drl_rayleigh_qpsk_s/resource_managers/stage_results_v2.json",
+      "csv": "results/20260428_144330_ber_drl_rayleigh_qpsk_s/resource_managers/stage_results_v2.csv"
+    }
+  },
+  "aggregate_means": {
+    "resource_managers": {
+      "ber_drl": {
+        "ber": 1.1490330551609847e-07,
+        "ber_upper_confidence": 1.3062553421862624e-07,
+        "latency_ms": 506.9937309278481,
+        "throughput_bits_per_batch": 196607.97740909093,
+        "energy_joules_per_batch": 0.00018645099999999409,
+        "avg_power_w": 0.00036775855501967186,
+        "runtime_sec": 1144.450168470831,
+        "bit_errors": 45.18181818181818,
+        "total_bits": 393216000.0,
+        "block_errors": 0.18181818181818182,
+        "total_blocks": 256000.0,
+        "num_batches": 2000.0
+      }
+    }
+  },
+  "runtime_totals_sec": {
+    "resource_managers": {
+      "ber_drl": 12588.95185317914
+    }
+  }
+}

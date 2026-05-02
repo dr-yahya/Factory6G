@@ -4,7 +4,7 @@ import argparse
 import os
 import sys
 
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(project_root)
 
 import numpy as np
@@ -14,6 +14,7 @@ from src.models.drl_policy import (
     build_policy_training_inputs,
     compile_policy_model,
     create_policy_model,
+    load_policy_checkpoint,
     load_rm_policy_dataset,
     save_policy_checkpoint,
 )
@@ -49,6 +50,51 @@ def _validate_shapes(
         )
 
 
+def _ber_reliability_target(avg_ber: np.ndarray, ber_clip: float) -> np.ndarray:
+    clip = max(float(ber_clip), 1e-12)
+    ber = np.clip(np.asarray(avg_ber, dtype=np.float32), 0.0, clip)
+    return (1.0 - (ber / clip)).astype(np.float32).reshape(-1, 1)
+
+
+def _ber_log_reliability_target(avg_ber: np.ndarray, ber_clip: float, ber_floor: float) -> np.ndarray:
+    floor = max(float(ber_floor), 1e-12)
+    clip = max(float(ber_clip), floor * 10.0)
+    ber = np.clip(np.asarray(avg_ber, dtype=np.float32), floor, clip)
+    log_floor = np.log10(floor)
+    log_clip = np.log10(clip)
+    reliability = 1.0 - ((np.log10(ber) - log_floor) / max(log_clip - log_floor, 1e-6))
+    return np.clip(reliability, 0.0, 1.0).astype(np.float32).reshape(-1, 1)
+
+
+def _sample_weights(
+    dataset: dict[str, np.ndarray],
+    target: np.ndarray,
+    *,
+    mode: str,
+    strength: float,
+) -> dict[str, np.ndarray] | None:
+    if mode == "none":
+        return None
+
+    target_flat = np.asarray(target, dtype=np.float32).reshape(-1)
+    if mode == "reliability":
+        weights = 1.0 + float(strength) * target_flat
+    elif mode == "ber_confidence":
+        ber_upper = np.asarray(dataset["oracle_ber_upper_confidence"], dtype=np.float32)
+        scale = np.maximum(np.percentile(ber_upper, 75), 1e-9)
+        confidence = 1.0 - np.clip(ber_upper / scale, 0.0, 1.0)
+        weights = 1.0 + float(strength) * confidence
+    else:
+        raise ValueError(f"Unknown sample weight mode: {mode}")
+
+    weights = np.asarray(weights, dtype=np.float32)
+    return {
+        "schedule_output": weights,
+        "power_output": weights,
+        "value_output": weights,
+    }
+
+
 def train_drl_resource_manager(args: argparse.Namespace) -> None:
     tf.random.set_seed(args.seed)
     np.random.seed(args.seed)
@@ -58,7 +104,12 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
     y_mask = dataset["active_ut_mask"]
     y_power = dataset["per_ut_power"]
     ebno_db = dataset["ebno_db"]
-    y_utility = dataset["oracle_utility"].reshape(-1, 1)
+    if args.value_target == "ber_reliability":
+        y_utility = _ber_reliability_target(dataset["oracle_avg_ber"], args.ber_clip)
+    elif args.value_target == "ber_log_reliability":
+        y_utility = _ber_log_reliability_target(dataset["oracle_avg_ber"], args.ber_clip, args.ber_floor)
+    else:
+        y_utility = dataset["oracle_utility"].reshape(-1, 1)
 
     _validate_shapes(
         channel_energy,
@@ -69,16 +120,28 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
     )
 
     x_state, normalization = build_policy_training_inputs(channel_energy, ebno_db)
-    model = create_policy_model(
-        input_shape=tuple(x_state.shape[1:]),
-        output_dim=int(y_mask.shape[1]),
-        hidden_dim=args.hidden_dim,
-        dropout_rate=args.dropout,
-    )
+    if args.initial_checkpoint:
+        checkpoint = load_policy_checkpoint(args.initial_checkpoint)
+        model = checkpoint.model
+        expected_input = tuple(x_state.shape[1:])
+        actual_input = tuple(model.input_shape[1:])
+        if actual_input != expected_input:
+            raise ValueError(
+                f"Initial checkpoint input shape {actual_input} does not match dataset state shape {expected_input}."
+            )
+    else:
+        model = create_policy_model(
+            input_shape=tuple(x_state.shape[1:]),
+            output_dim=int(y_mask.shape[1]),
+            hidden_dim=args.hidden_dim,
+            dropout_rate=args.dropout,
+        )
     compile_policy_model(
         model,
         learning_rate=args.lr,
         value_loss_weight=args.value_loss_weight,
+        schedule_loss_weight=args.schedule_loss_weight,
+        power_loss_weight=args.power_loss_weight,
     )
     model.summary()
 
@@ -92,6 +155,13 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
             )
         )
 
+    sample_weight = _sample_weights(
+        dataset,
+        y_utility,
+        mode=args.sample_weight_mode,
+        strength=args.sample_weight_strength,
+    )
+
     history = model.fit(
         x_state,
         {
@@ -99,6 +169,7 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
             "power_output": y_power,
             "value_output": y_utility,
         },
+        sample_weight=sample_weight,
         epochs=args.epochs,
         batch_size=args.batch_size,
         validation_split=args.validation_split,
@@ -124,6 +195,14 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
             "hidden_dim": args.hidden_dim,
             "dropout": args.dropout,
             "value_loss_weight": args.value_loss_weight,
+            "schedule_loss_weight": args.schedule_loss_weight,
+            "power_loss_weight": args.power_loss_weight,
+            "value_target": args.value_target,
+            "ber_clip": args.ber_clip,
+            "ber_floor": args.ber_floor,
+            "sample_weight_mode": args.sample_weight_mode,
+            "sample_weight_strength": args.sample_weight_strength,
+            "initial_checkpoint": args.initial_checkpoint,
             "seed": args.seed,
         },
     }
@@ -161,6 +240,44 @@ if __name__ == "__main__":
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--value-loss-weight", type=float, default=0.1)
+    parser.add_argument("--schedule-loss-weight", type=float, default=1.0)
+    parser.add_argument("--power-loss-weight", type=float, default=0.5)
+    parser.add_argument(
+        "--value-target",
+        choices=["utility", "ber_reliability", "ber_log_reliability"],
+        default="utility",
+        help="Target used for the policy value head.",
+    )
+    parser.add_argument(
+        "--ber-clip",
+        type=float,
+        default=0.1,
+        help="BER value mapped to zero reliability when --value-target=ber_reliability.",
+    )
+    parser.add_argument(
+        "--ber-floor",
+        type=float,
+        default=1e-7,
+        help="BER value mapped to full reliability when --value-target=ber_log_reliability.",
+    )
+    parser.add_argument(
+        "--sample-weight-mode",
+        choices=["none", "reliability", "ber_confidence"],
+        default="none",
+        help="Optional sample weighting for fine-tuning BER-first policy heads.",
+    )
+    parser.add_argument(
+        "--sample-weight-strength",
+        type=float,
+        default=1.0,
+        help="Multiplier for --sample-weight-mode.",
+    )
+    parser.add_argument(
+        "--initial-checkpoint",
+        type=str,
+        default=None,
+        help="Existing policy checkpoint to fine-tune instead of training a new model from scratch.",
+    )
     parser.add_argument("--early-stop-patience", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
     train_drl_resource_manager(parser.parse_args())
