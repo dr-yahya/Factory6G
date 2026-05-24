@@ -95,7 +95,18 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _summary_path_for_stage(stage_json: Path) -> Path:
+    for parent in stage_json.parents:
+        candidate = parent / "summary_v2.json"
+        if candidate.exists():
+            return candidate
     return stage_json.parents[1] / "summary_v2.json"
+
+
+def _summary_stage_key(stage_json: Path, summary_path: Path) -> str:
+    try:
+        return stage_json.parent.relative_to(summary_path.parent).as_posix()
+    except ValueError:
+        return stage_json.parent.name
 
 
 def _channel_label(stage_payload: dict[str, Any], stage_json: Path) -> str:
@@ -126,15 +137,20 @@ def _aggregate_metrics(
     stage_payload: dict[str, Any],
     summary_payload: dict[str, Any],
     method: str,
+    stage_key: str,
 ) -> dict[str, float]:
+    stage_name = str(stage_payload.get("stage") or "resource_managers")
+    aggregate_by_stage = summary_payload.get("aggregate_means", {})
     aggregate = (
-        summary_payload.get("aggregate_means", {})
-        .get("resource_managers", {})
-        .get(method, {})
-    )
+        aggregate_by_stage.get(stage_key, {})
+        or aggregate_by_stage.get(stage_name, {})
+    ).get(method, {})
+    runtime_by_stage = summary_payload.get("runtime_totals_sec", {})
     runtime_total = (
-        summary_payload.get("runtime_totals_sec", {})
-        .get("resource_managers", {})
+        (
+            runtime_by_stage.get(stage_key, {})
+            or runtime_by_stage.get(stage_name, {})
+        )
         .get(method)
     )
 
@@ -162,11 +178,12 @@ def load_report_rows(stage_json_paths: list[Path]) -> list[ReportRow]:
         stage_payload = _load_json(stage_json)
         summary_path = _summary_path_for_stage(stage_json)
         summary_payload = _load_json(summary_path) if summary_path.exists() else {}
+        stage_key = _summary_stage_key(stage_json, summary_path)
         run_id = str(stage_payload.get("run_id") or stage_json.parents[1].name)
         channel_label = _channel_label(stage_payload, stage_json)
         methods = sorted(stage_payload.get("methods", {}).keys())
         for method in methods:
-            metrics = _aggregate_metrics(stage_payload, summary_payload, method)
+            metrics = _aggregate_metrics(stage_payload, summary_payload, method, stage_key)
             rows.append(
                 ReportRow(
                     run_id=run_id,

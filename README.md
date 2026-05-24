@@ -194,6 +194,7 @@ progress report per date.
 | 2026-04-20 | [Factory6G weekly messages](reports/weekly/2026-04-20/factory6g_weekly_messages.md) | April neural-estimator update: retrained Neural vs LS Rayleigh evidence, corrected DFT comparison, TR 38.901 estimator tier, and remaining large-factory/JIDD findings. |
 | 2026-04-27 | [Factory6G weekly messages](reports/weekly/2026-04-27/factory6g_weekly_messages.md) | AI resource-manager recovery, Docker workflow validation, and Rayleigh QPSK benchmark evidence. |
 | 2026-05-01 | [Factory6G weekly messages](reports/weekly/2026-05-01/factory6g_weekly_messages.md) | BER-first DRL resource-manager workflow, Rayleigh/UMi benchmark runs, and Docker validation evidence. |
+| 2026-05-23 | [Factory6G weekly messages](reports/weekly/2026-05-23/factory6g_weekly_messages.md) | Cross-channel resource-manager BER screening across Rayleigh, Rician, and UMI/TR38901, with [evidence deck](reports/weekly/2026-05-23/factory6g_weekly_evidence.pptx) and [BER comparison](reports/weekly/2026-05-23/resource_manager_ber_comparison.md); `ber_drl` matched the Rayleigh best baseline and ranked second on Rician and UMI/TR38901 in the shortened run. |
 
 ## Quick Validation
 

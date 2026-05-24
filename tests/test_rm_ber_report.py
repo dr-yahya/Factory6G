@@ -138,3 +138,70 @@ def test_rm_ber_report_reranks_same_channel_across_stage_files(tmp_path):
         "ber_drl": 2,
         "drl": 3,
     }
+
+
+def test_rm_ber_report_uses_top_level_summary_for_nested_channel_stage(tmp_path):
+    run_dir = tmp_path / "cross_channel_run"
+    stage_dir = run_dir / "rician" / "resource_managers"
+    stage_dir.mkdir(parents=True)
+    stage_json = stage_dir / "stage_results_v2.json"
+    summary_json = run_dir / "summary_v2.json"
+
+    stage_json.write_text(
+        json.dumps(
+            {
+                "run_id": "cross_channel",
+                "stage": "resource_managers",
+                "ebno_db_range": [0.0],
+                "config_snapshot": {
+                    "system": {
+                        "channel_model_type": "rician",
+                        "scenario": "umi",
+                    }
+                },
+                "methods": {
+                    "ber_drl": {
+                        "ber": [0.4],
+                        "ber_upper_confidence": [0.5],
+                        "runtime_sec": [1.0],
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    summary_json.write_text(
+        json.dumps(
+            {
+                "aggregate_means": {
+                    "rician/resource_managers": {
+                        "ber_drl": {
+                            "ber": 0.03,
+                            "ber_upper_confidence": 0.04,
+                            "throughput_bits_per_batch": 200.0,
+                            "latency_ms": 4.0,
+                            "avg_power_w": 0.3,
+                            "num_batches": 2.0,
+                            "bit_errors": 6.0,
+                            "total_bits": 200.0,
+                        },
+                    }
+                },
+                "runtime_totals_sec": {
+                    "rician/resource_managers": {
+                        "ber_drl": 12.0,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rows = report_module.load_report_rows([stage_json])
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.channel_label == "Rician"
+    assert row.ber == 0.03
+    assert row.ber_upper_confidence == 0.04
+    assert row.runtime_total_sec == 12.0

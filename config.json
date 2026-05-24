@@ -8,9 +8,9 @@
     "plot_results": true
   },
   "monte_carlo": {
-    "batch_size": 64,
+    "batch_size": 20,
     "min_batches": 10,
-    "max_batches": 2000,
+    "max_batches": 20,
     "target_block_errors": 100,
     "target_ber": null,
     "stop_policy": "threshold",
