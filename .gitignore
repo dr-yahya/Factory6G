@@ -41,7 +41,6 @@ ENV/
 .DS_Store
 Thumbs.db
 
-
 # TensorFlow
 *.pb
 checkpoints/
@@ -50,8 +49,16 @@ models/saved_model/
 # Sionna cache
 .sionna_cache/
 
-
+# Large training arrays (manifests may be tracked)
 *.npz
 
+# Full simulation runs (local workspace; see results/README.md)
+results/*
+!results/README.md
+
+# Local regenerable script outputs (see outputs/README.md)
+outputs/*
+!outputs/README.md
+
+# Thesis workspace — granular tracking added in a follow-up commit
 thesis_writing/
-*weekly_messages.md

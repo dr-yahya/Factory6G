@@ -13,7 +13,7 @@ import matplotlib.patches as patches
 from pathlib import Path
 
 def draw_system_design():
-    output_dir = Path("results/system_design")
+    output_dir = Path("outputs/system_design")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     fig, ax = plt.subplots(figsize=(16, 10))

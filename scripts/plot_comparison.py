@@ -66,7 +66,7 @@ def main() -> None:
     ax.legend(fontsize=10)
     fig.tight_layout()
 
-    out_path = base / "results" / "comparison_jidd_vs_ls_rayleigh.png"
+    out_path = base / "outputs" / "comparison_jidd_vs_ls_rayleigh.png"
     fig.savefig(out_path, dpi=300)
     plt.close(fig)
     print(f"[plot] Saved comparison plot to {out_path}")

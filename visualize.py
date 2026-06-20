@@ -56,7 +56,7 @@ def _parse_args() -> argparse.Namespace:
         help=f"Comma-separated factory sizes: {', '.join(sorted(_VALID_SIZES))}.",
     )
     parser.add_argument(
-        "--output-dir", default="results/visualizations",
+        "--output-dir", default="outputs/visualizations",
         help="Root directory for PNG outputs.",
     )
     parser.add_argument(
