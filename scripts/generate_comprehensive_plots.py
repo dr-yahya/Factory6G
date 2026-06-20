@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS = os.path.join(BASE, "results")
-PLOTS_DIR = os.path.join(BASE, "reports", "plots")
+PLOTS_DIR = os.path.join(BASE, "reports", "evidence", "estimator-benchmarks")
 os.makedirs(PLOTS_DIR, exist_ok=True)
 
 plt.rcParams.update({
@@ -397,4 +397,4 @@ else:
     print("\n11. No neural vs LS run found — skipping. Run simulation first.")
 
 
-print("\nAll plots generated successfully in reports/plots/")
+print("\nAll plots generated successfully in reports/evidence/estimator-benchmarks/")

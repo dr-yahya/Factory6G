@@ -10,7 +10,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path("/app")
 RESULTS = PROJECT_ROOT / "results"
-PLOTS_DIR = PROJECT_ROOT / "reports" / "plots"
+PLOTS_DIR = PROJECT_ROOT / "reports" / "evidence" / "estimator-benchmarks"
 
 ESTIMATOR_SOURCES = {
     "LS": RESULTS / "20260319_103327_ls_umi_qpsk_s" / "estimators" / "stage_results_v2.csv",

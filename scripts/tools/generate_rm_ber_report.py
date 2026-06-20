@@ -11,12 +11,10 @@ from typing import Any
 
 DEFAULT_STAGE_PATHS = [
     Path(
-        "results/20260420_040402_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_rayleigh_qpsk_s/"
-        "resource_managers/stage_results_v2.json"
+        "reports/evidence/rm-ber-first-apr-2026/rayleigh/resource_managers/stage_results_v2.json"
     ),
     Path(
-        "results/20260420_043640_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_umi_qpsk_s/"
-        "resource_managers/stage_results_v2.json"
+        "reports/evidence/rm-ber-first-apr-2026/umi/resource_managers/stage_results_v2.json"
     ),
 ]
 
@@ -262,6 +260,16 @@ def _acceptance_lines(rows: list[ReportRow]) -> list[str]:
     return lines
 
 
+def _ber_plot_path(stage_json: Path) -> Path | None:
+    for candidate in (
+        stage_json.parents[1] / "ber_vs_ebno.png",
+        stage_json.parent / "ber_vs_ebno.png",
+    ):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _write_markdown(rows: list[ReportRow], output_md: Path) -> None:
     output_md.parent.mkdir(parents=True, exist_ok=True)
     generated_at = datetime.now(timezone.utc).isoformat()
@@ -315,10 +323,16 @@ def _write_markdown(rows: list[ReportRow], output_md: Path) -> None:
             append_table(trained_rows)
         else:
             lines.append("No trained-model benchmark row found for this channel.")
-        plot_paths = sorted({Path(row.stage_json).parent / "ber_vs_ebno.png" for row in channel_rows})
+        plot_paths: list[str] = []
+        for row in channel_rows:
+            plot_path = _ber_plot_path(Path(row.stage_json))
+            if plot_path is None:
+                continue
+            posix = plot_path.as_posix()
+            if posix not in plot_paths:
+                plot_paths.append(posix)
         for plot_path in plot_paths:
-            if plot_path.exists():
-                lines.append(f"\nBER plot: `{plot_path.as_posix()}`")
+            lines.append(f"\nBER plot: `{plot_path}`")
         lines.append("")
 
     lines.extend(

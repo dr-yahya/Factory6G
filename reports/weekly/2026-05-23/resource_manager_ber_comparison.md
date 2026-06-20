@@ -32,7 +32,7 @@ This report ranks resource managers by mean BER. BER upper confidence is used as
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 4 | ber_drl | trained | 0 | 2.4379e-06 | 6.1440e+04 | 277.563 | 66.9467 | 6.7176e-04 |
 
-BER plot: `results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_ber_drl_rayleigh_rician_umi_qpsk_s/rayleigh/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-23/assets/rm_rayleigh_ber_vs_ebno.png`
 
 ### Rician
 
@@ -54,7 +54,7 @@ BER plot: `results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_qu
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 2 | ber_drl | trained | 1.8200e-05 | 2.2427e-05 | 6.1439e+04 | 275.604 | 66.5267 | 6.7654e-04 |
 
-BER plot: `results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_ber_drl_rayleigh_rician_umi_qpsk_s/rician/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-23/assets/rm_rician_ber_vs_ebno.png`
 
 ### UMI/TR38901
 
@@ -76,7 +76,7 @@ BER plot: `results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_qu
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 2 | ber_drl | trained | 2.6042e-05 | 3.1064e-05 | 6.1438e+04 | 275.903 | 66.5623 | 6.7601e-04 |
 
-BER plot: `results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_ber_drl_rayleigh_rician_umi_qpsk_s/tr38901/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-23/assets/rm_tr38901_ber_vs_ebno.png`
 
 ## Research Anchors
 

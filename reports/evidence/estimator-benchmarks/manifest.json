@@ -1,0 +1,21 @@
+{
+  "bundle_id": "estimator-benchmarks",
+  "description": "Cross-cutting PHY estimator and channel benchmark plots promoted from local results runs.",
+  "promoted_at": "2026-06-19",
+  "artifacts": [
+    "channel_model_ber_vs_ebno.png",
+    "combined_ber.png",
+    "estimator_ber_vs_ebno.png",
+    "estimator_latency_vs_ebno.png",
+    "estimator_runtime.png",
+    "estimator_throughput_vs_ebno.png",
+    "factory_size_ber_vs_ebno.png",
+    "jidd_ber_comparison.png",
+    "modulation_ber_vs_ebno.png",
+    "modulation_latency_vs_ebno.png",
+    "neural_vs_ls_direct_ber.png",
+    "neural_vs_ls_latency.png",
+    "neural_vs_ls_modulation_ber.png",
+    "runtime_comparison.png"
+  ]
+}

@@ -31,9 +31,9 @@ This report ranks resource managers by mean BER. BER upper confidence is used as
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 7 | ber_drl | trained | 1.1490e-07 | 1.3063e-07 | 1.9661e+05 | 506.994 | 1.2589e+04 | 3.6776e-04 |
 
-BER plot: `results/20260420_040402_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_rayleigh_qpsk_s/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-01/assets/rm_baseline_rayleigh_ber_vs_ebno.png`
 
-BER plot: `results/20260428_144330_ber_drl_rayleigh_qpsk_s/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-01/assets/rm_ber_drl_rayleigh_ber_vs_ebno.png`
 
 ### UMI/TR38901
 
@@ -55,9 +55,9 @@ BER plot: `results/20260428_144330_ber_drl_rayleigh_qpsk_s/resource_managers/ber
 |---:|---|---|---:|---:|---:|---:|---:|---:|
 | 4 | ber_drl | trained | 1.6874e-04 | 1.7042e-04 | 1.9657e+05 | 508.849 | 1.0089e+04 | 3.6647e-04 |
 
-BER plot: `results/20260420_043640_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_umi_qpsk_s/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-01/assets/rm_baseline_umi_ber_vs_ebno.png`
 
-BER plot: `results/20260428_103926_ber_drl_umi_qpsk_s/resource_managers/ber_vs_ebno.png`
+BER plot: `reports/weekly/2026-05-01/assets/rm_ber_drl_umi_ber_vs_ebno.png`
 
 ## Research Anchors
 

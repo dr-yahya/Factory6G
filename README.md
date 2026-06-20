@@ -26,8 +26,9 @@ plotting environment stays consistent.
 | `config/` | Auxiliary configuration files, including factory size profiles. |
 | `data/` | Generated training datasets and dataset documentation. See `data/README.md`. |
 | `models/` | Trained channel-estimator and resource-manager artifacts. |
-| `results/` | Simulation outputs: logs, JSON/CSV result tables, and plots. |
-| `reports/` | Generated research summaries, comparison tables, and weekly report assets. |
+| `results/` | Local full simulation runs (gitignored). See `results/README.md`. |
+| `reports/` | Progress reports and curated evidence summaries. |
+| `reports/evidence/` | Cross-cutting promoted plots, tables, and stage summaries. |
 | `tests/` | Unit and integration tests for config, CLI flow, estimators, resource managers, plotting, datasets, and DRL policy loading. |
 | `system_design/` | Static system-design images. |
 | `dr_athirah_simulation/` | Reference MATLAB-origin PHY/MAC/APP layer material and JIDD-SCMA assets. |
@@ -194,7 +195,7 @@ progress report per date.
 | 2026-04-20 | [Factory6G weekly messages](reports/weekly/2026-04-20/factory6g_weekly_messages.md) | April neural-estimator update: retrained Neural vs LS Rayleigh evidence, corrected DFT comparison, TR 38.901 estimator tier, and remaining large-factory/JIDD findings. |
 | 2026-04-27 | [Factory6G weekly messages](reports/weekly/2026-04-27/factory6g_weekly_messages.md) | AI resource-manager recovery, Docker workflow validation, and Rayleigh QPSK benchmark evidence. |
 | 2026-05-01 | [Factory6G weekly messages](reports/weekly/2026-05-01/factory6g_weekly_messages.md) | BER-first DRL resource-manager workflow, Rayleigh/UMi benchmark runs, and Docker validation evidence. |
-| 2026-05-23 | [Factory6G weekly messages](reports/weekly/2026-05-23/factory6g_weekly_messages.md) | Cross-channel resource-manager BER screening across Rayleigh, Rician, and UMI/TR38901, with [evidence deck](reports/weekly/2026-05-23/factory6g_weekly_evidence.pptx) and [BER comparison](reports/weekly/2026-05-23/resource_manager_ber_comparison.md); `ber_drl` matched the Rayleigh best baseline and ranked second on Rician and UMI/TR38901 in the shortened run. |
+| 2026-05-23 | [Factory6G weekly messages](reports/weekly/2026-05-23/factory6g_weekly_messages.md) | Cross-channel resource-manager BER screening across Rayleigh, Rician, and UMI/TR38901, with [evidence deck](reports/weekly/2026-05-23/factory6g_weekly_evidence.pptx), [BER comparison](reports/weekly/2026-05-23/resource_manager_ber_comparison.md), and [synthetic channel curves](reports/weekly/2026-05-23/resource_manager_channel_comparison_synthetic.md); `ber_drl` matched the Rayleigh best baseline and ranked second on Rician and UMI/TR38901 in the shortened run. |
 
 ## Quick Validation
 

@@ -1,0 +1,23 @@
+{
+  "bundle_id": "rm-cross-channel-may-2026",
+  "description": "May 2026 cross-channel resource-manager screening benchmark (Rayleigh, Rician, UMI/TR38901).",
+  "promoted_at": "2026-06-19",
+  "source_run": "results/20260523_173452_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_ber_drl_rayleigh_rician_umi_qpsk_s",
+  "channels": [
+    {
+      "label": "rayleigh",
+      "stage_json": "rayleigh/resource_managers/stage_results_v2.json",
+      "ber_plot": "rayleigh/ber_vs_ebno.png"
+    },
+    {
+      "label": "rician",
+      "stage_json": "rician/resource_managers/stage_results_v2.json",
+      "ber_plot": "rician/ber_vs_ebno.png"
+    },
+    {
+      "label": "tr38901",
+      "stage_json": "tr38901/resource_managers/stage_results_v2.json",
+      "ber_plot": "tr38901/ber_vs_ebno.png"
+    }
+  ]
+}

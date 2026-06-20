@@ -1,0 +1,19 @@
+{
+  "bundle_id": "rm-ber-first-apr-2026",
+  "description": "April 2026 BER-first resource-manager baseline benchmarks (Rayleigh and UMI/TR38901).",
+  "promoted_at": "2026-06-19",
+  "source_runs": [
+    {
+      "label": "rayleigh_baseline",
+      "run_dir": "results/20260420_040402_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_rayleigh_qpsk_s",
+      "stage_json": "rayleigh/resource_managers/stage_results_v2.json",
+      "ber_plot": "rayleigh/ber_vs_ebno.png"
+    },
+    {
+      "label": "umi_baseline",
+      "run_dir": "results/20260420_043640_static_round_robin_max_throughput_pf_wmmse_queue_aware_drl_umi_qpsk_s",
+      "stage_json": "umi/resource_managers/stage_results_v2.json",
+      "ber_plot": "umi/ber_vs_ebno.png"
+    }
+  ]
+}
