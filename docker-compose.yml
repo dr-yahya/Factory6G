@@ -40,6 +40,19 @@ services:
     entrypoint: ["python", "train.py"]
     command: ["--data", "data/channel_train.npz", "--output", "models/neural_estimator.keras"]
 
+  thesis:              # Build thesis/main.pdf (XeLaTeX + biber via latexmk)
+    image: texlive/texlive:latest
+    volumes:
+      - ./thesis:/work
+    working_dir: /work
+    entrypoint: ["latexmk"]
+    command:
+      - -synctex=1
+      - -interaction=nonstopmode
+      - -file-line-error
+      - -xelatex
+      - main.tex
+
   # To resume an interrupted run, override the command on the existing service:
   #   CPU: docker compose run simulation --config config.json --resume /app/results/20260315_092517_simulation
   #   GPU: docker compose run simulation-gpu --config config.json --resume /app/results/20260315_092517_simulation

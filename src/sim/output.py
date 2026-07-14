@@ -12,6 +12,15 @@ from src.sim.stages.common import (
     POINT_STATUS_RESOLVED,
     POINT_STATUS_UPPER_BOUND_ONLY,
 )
+from src.visualization.thesis_plot_style import (
+    apply_thesis_rcparams,
+    method_color,
+    method_marker,
+    order_methods_dict,
+    style_ebno_axis,
+    THESIS_FIGSIZE,
+    THESIS_DPI,
+)
 
 
 SCHEMA_VERSION = "2.0"
@@ -212,6 +221,7 @@ def write_overview_plots(
             ebno_range=ebno_range,
             title=f"{title_base}: BER vs Eb/No",
             output_path=overview_dir / "ber_vs_ebno.png",
+            stage_hint=stage_name,
         )
         _plot_ber_raw(
             plt=plt,
@@ -219,6 +229,7 @@ def write_overview_plots(
             ebno_range=ebno_range,
             title=f"{title_base}: Raw BER vs Eb/No",
             output_path=overview_dir / "ber_raw_vs_ebno.png",
+            stage_hint=stage_name,
         )
         _plot_metric_vs_ebno(
             plt=plt,
@@ -228,6 +239,7 @@ def write_overview_plots(
             ylabel="Latency (ms)",
             title=f"{title_base}: Latency vs Eb/No",
             output_path=overview_dir / "latency_vs_ebno.png",
+            stage_hint=stage_name,
         )
         _plot_metric_vs_ebno(
             plt=plt,
@@ -237,6 +249,7 @@ def write_overview_plots(
             ylabel="Throughput (bits/batch)",
             title=f"{title_base}: Throughput vs Eb/No",
             output_path=overview_dir / "throughput_vs_ebno.png",
+            stage_hint=stage_name,
         )
         _plot_metric_vs_ebno(
             plt=plt,
@@ -246,8 +259,10 @@ def write_overview_plots(
             ylabel="Average Power (W)",
             title=f"{title_base}: Power vs Eb/No",
             output_path=overview_dir / "power_vs_ebno.png",
+            stage_hint=stage_name,
         )
 
+        apply_thesis_rcparams(plt)
         names = list(merged_runtime.keys())
         values = [merged_runtime[n] for n in names]
         fig_rt, ax_rt = plt.subplots(1, 1, figsize=(max(9, len(names) * 0.8 + 2), 6))
@@ -257,7 +272,7 @@ def write_overview_plots(
         ax_rt.grid(True, axis="y", alpha=0.3)
         plt.setp(ax_rt.get_xticklabels(), rotation=30, ha="right", fontsize=8)
         fig_rt.tight_layout()
-        fig_rt.savefig(overview_dir / "runtime_by_method.png", dpi=300)
+        fig_rt.savefig(overview_dir / "runtime_by_method.png", dpi=THESIS_DPI)
         plt.close(fig_rt)
 
         print(f"[plot] Overview plots ({stage_name}): {overview_dir}")
@@ -269,7 +284,8 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    stage_name = payload["stage"].replace("_", " ").title()
+    stage_key = payload["stage"]
+    stage_name = stage_key.replace("_", " ").title()
     ebno_range = payload["ebno_db_range"]
     methods = payload["methods"]
     runtime_totals = payload.get("runtime_totals_sec", {})
@@ -280,6 +296,7 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
         ebno_range=ebno_range,
         title=f"{stage_name}: BER vs Eb/No",
         output_path=stage_dir / "ber_vs_ebno.png",
+        stage_hint=stage_key,
     )
     _plot_ber_raw(
         plt=plt,
@@ -287,6 +304,7 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
         ebno_range=ebno_range,
         title=f"{stage_name}: Raw BER vs Eb/No",
         output_path=stage_dir / "ber_raw_vs_ebno.png",
+        stage_hint=stage_key,
     )
     _plot_metric_vs_ebno(
         plt=plt,
@@ -296,6 +314,7 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
         ylabel="Latency (ms)",
         title=f"{stage_name}: Latency vs Eb/No",
         output_path=stage_dir / "latency_vs_ebno.png",
+        stage_hint=stage_key,
     )
     _plot_metric_vs_ebno(
         plt=plt,
@@ -305,6 +324,7 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
         ylabel="Throughput (bits/batch)",
         title=f"{stage_name}: Throughput vs Eb/No",
         output_path=stage_dir / "throughput_vs_ebno.png",
+        stage_hint=stage_key,
     )
     _plot_metric_vs_ebno(
         plt=plt,
@@ -314,9 +334,11 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
         ylabel="Average Power (W)",
         title=f"{stage_name}: Power vs Eb/No",
         output_path=stage_dir / "power_vs_ebno.png",
+        stage_hint=stage_key,
     )
 
-    fig_runtime, ax_runtime = plt.subplots(1, 1, figsize=(9, 6))
+    apply_thesis_rcparams(plt)
+    fig_runtime, ax_runtime = plt.subplots(1, 1, figsize=THESIS_FIGSIZE)
     names = list(runtime_totals.keys())
     values = [runtime_totals[name] for name in names]
     ax_runtime.bar(names, values)
@@ -324,7 +346,7 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
     ax_runtime.set_title(f"{stage_name}: Runtime by Method")
     ax_runtime.grid(True, axis="y", alpha=0.3)
     fig_runtime.tight_layout()
-    fig_runtime.savefig(stage_dir / "runtime_by_method.png", dpi=300)
+    fig_runtime.savefig(stage_dir / "runtime_by_method.png", dpi=THESIS_DPI)
     plt.close(fig_runtime)
 
 
@@ -335,11 +357,13 @@ def _plot_ber_publication(
     ebno_range: list[float],
     title: str,
     output_path: Path,
+    stage_hint: str | None = None,
 ) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(9, 6))
-    markers = ["o", "s", "D", "^", "v", "x", "*", "+"]
+    apply_thesis_rcparams(plt)
+    fig, ax = plt.subplots(1, 1, figsize=THESIS_FIGSIZE)
     x = np.asarray(ebno_range, dtype=float)
-    for idx, (name, metric_map) in enumerate(methods.items()):
+    ordered = order_methods_dict(methods, stage_hint=stage_hint)
+    for name, metric_map in ordered.items():
         if "ber" not in metric_map:
             continue
 
@@ -349,22 +373,22 @@ def _plot_ber_publication(
 
         upper_mask = statuses == POINT_STATUS_UPPER_BOUND_ONLY
         valid_mask = ber > 0
-        marker = markers[idx % len(markers)]
-        color = None
+        marker = method_marker(name, stage_hint=stage_hint)
+        color = method_color(name, stage_hint=stage_hint)
 
         if np.any(valid_mask):
-            handle = ax.semilogy(
+            ax.semilogy(
                 x[valid_mask],
                 ber[valid_mask],
                 marker=marker,
-                linewidth=2,
+                linewidth=1.8,
+                color=color,
                 label=name,
             )
-            color = handle[0].get_color()
 
         upper_show = upper_mask & ~valid_mask
         if np.any(upper_show):
-            handle = ax.semilogy(
+            ax.semilogy(
                 x[upper_show],
                 upper[upper_show],
                 marker=marker,
@@ -372,15 +396,10 @@ def _plot_ber_publication(
                 linestyle="--",
                 linewidth=1.5,
                 color=color,
-                label=name if color is None else "_nolegend_",
+                label=name if not np.any(valid_mask) else "_nolegend_",
             )
-            if color is None:
-                color = handle[0].get_color()
 
-    ax.set_xlabel("Eb/No (dB)")
-    ax.set_ylabel("BER")
-    ax.set_title(title)
-    ax.grid(True, which="both", alpha=0.3)
+    style_ebno_axis(ax, ylabel="BER", title=title)
     ax.legend()
     ax.text(
         0.01,
@@ -391,7 +410,7 @@ def _plot_ber_publication(
         alpha=0.75,
     )
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300)
+    fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 
 
@@ -402,30 +421,30 @@ def _plot_ber_raw(
     ebno_range: list[float],
     title: str,
     output_path: Path,
+    stage_hint: str | None = None,
 ) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(9, 6))
-    markers = ["o", "s", "D", "^", "v", "x", "*", "+"]
+    apply_thesis_rcparams(plt)
+    fig, ax = plt.subplots(1, 1, figsize=THESIS_FIGSIZE)
     x = np.asarray(ebno_range, dtype=float)
+    ordered = order_methods_dict(methods, stage_hint=stage_hint)
 
-    for idx, (name, metric_map) in enumerate(methods.items()):
+    for name, metric_map in ordered.items():
         if "ber" not in metric_map:
             continue
         values = _coerce_float_array(metric_map["ber"])
         ax.semilogy(
             x,
             values,
-            marker=markers[idx % len(markers)],
+            marker=method_marker(name, stage_hint=stage_hint),
+            color=method_color(name, stage_hint=stage_hint),
             label=name,
-            linewidth=2,
+            linewidth=1.8,
         )
 
-    ax.set_xlabel("Eb/No (dB)")
-    ax.set_ylabel("BER")
-    ax.set_title(title)
-    ax.grid(True, which="both", alpha=0.3)
+    style_ebno_axis(ax, ylabel="BER", title=title)
     ax.legend()
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300)
+    fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 
 
@@ -438,27 +457,27 @@ def _plot_metric_vs_ebno(
     ylabel: str,
     title: str,
     output_path: Path,
+    stage_hint: str | None = None,
 ) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(9, 6))
-    markers = ["o", "s", "D", "^", "v", "x", "*", "+"]
-    for idx, (name, metric_map) in enumerate(methods.items()):
+    apply_thesis_rcparams(plt)
+    fig, ax = plt.subplots(1, 1, figsize=THESIS_FIGSIZE)
+    ordered = order_methods_dict(methods, stage_hint=stage_hint)
+    for name, metric_map in ordered.items():
         if metric not in metric_map:
             continue
         values = _coerce_float_array(metric_map[metric])
         ax.plot(
             ebno_range,
             values,
-            marker=markers[idx % len(markers)],
+            marker=method_marker(name, stage_hint=stage_hint),
+            color=method_color(name, stage_hint=stage_hint),
             label=name,
-            linewidth=2,
+            linewidth=1.8,
         )
-    ax.set_xlabel("Eb/No (dB)")
-    ax.set_ylabel(ylabel)
-    ax.set_title(title)
-    ax.grid(True, which="both", alpha=0.3)
+    style_ebno_axis(ax, ylabel=ylabel, title=title)
     ax.legend()
     fig.tight_layout()
-    fig.savefig(output_path, dpi=300)
+    fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 
 
