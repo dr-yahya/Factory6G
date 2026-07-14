@@ -60,15 +60,6 @@ results/*
 outputs/*
 !outputs/README.md
 
-# Thesis workspace — track markdown source, tools, and cited figures only
-thesis_writing/rendered_*/
-thesis_writing/generated_*/
-thesis_writing/.*/
-thesis_writing/.lo_profile*/
-thesis_writing/**/*.pdf
-thesis_writing/**/*.docx
-thesis_writing/**/*.html
-thesis_writing/**/*.png
-!thesis_writing/figures/
-!thesis_writing/figures/**
-thesis_writing/**/__pycache__/
+# Thesis and thesis writing (local; keep out of the software repo)
+thesis/
+thesis_writing/
