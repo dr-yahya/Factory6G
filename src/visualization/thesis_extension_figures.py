@@ -93,15 +93,16 @@ def _plot_ber_publication(
             )
     style_ebno_axis(ax, ylabel="BER", title=title)
     ax.legend()
-    ax.text(
+    # Place outside axes so the note does not collide with y-tick labels.
+    fig.text(
+        0.5,
         0.01,
-        0.02,
-        "dashed/open = 95% BER upper bound (zero observed errors)",
-        transform=ax.transAxes,
-        fontsize=9,
-        alpha=0.75,
+        "Dashed/open markers: 95% BER upper bound (zero observed errors)",
+        ha="center",
+        fontsize=FIG_CALLOUT_PT,
+        alpha=0.85,
     )
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.0, 0.04, 1.0, 1.0))
     fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 
@@ -239,7 +240,7 @@ def plot_multi_panel_ber(
 
     apply_thesis_rcparams(plt)
     n = len(panels)
-    fig, axes = plt.subplots(1, n, figsize=(3.5 * n, 4.0), squeeze=False)
+    fig, axes = plt.subplots(1, n, figsize=(2.9 * n, 3.6), squeeze=False)
     axes_flat = axes.flatten()
     stage_hint = "estimators"
 
@@ -284,7 +285,7 @@ def plot_multi_panel_metric(
 
     apply_thesis_rcparams(plt)
     n = len(panels)
-    fig, axes = plt.subplots(1, n, figsize=(3.5 * n, 4.0), squeeze=False)
+    fig, axes = plt.subplots(1, n, figsize=(2.9 * n, 3.6), squeeze=False)
     axes_flat = axes.flatten()
     stage_hint = None
     if panels:
@@ -350,10 +351,10 @@ def plot_rm_pareto(
     output_path: Path,
 ) -> None:
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
 
     apply_thesis_rcparams(plt)
     channels = ["rayleigh", "rician", "tr38901"]
-    channel_colors = {"rayleigh": "#1e3a5f", "rician": "#047857", "tr38901": "#c2410c"}
     channel_markers = {"rayleigh": "o", "rician": "s", "tr38901": "D"}
 
     fig, ax = plt.subplots(figsize=THESIS_FIGSIZE)
@@ -362,26 +363,17 @@ def plot_rm_pareto(
         idx = _ebno_index(payload, ebno_db)
         for scheduler in CANONICAL_SCHEDULERS:
             metric_map = payload["methods"][scheduler]
-            ber, status = _effective_ber(metric_map, idx)
+            ber, _status = _effective_ber(metric_map, idx)
             throughput = float(metric_map["throughput_bits_per_batch"][idx])
             ax.scatter(
                 throughput,
                 max(ber, 1e-12),
-                color=channel_colors[channel],
+                color=method_color(scheduler, stage_hint="resource_managers"),
                 marker=channel_markers[channel],
                 s=55,
                 edgecolors="black",
                 linewidths=0.4,
-                label=CHANNEL_LABELS[channel] if scheduler == CANONICAL_SCHEDULERS[0] else "_nolegend_",
                 zorder=3,
-            )
-            ax.annotate(
-                RM_LABELS[scheduler],
-                (throughput, max(ber, 1e-12)),
-                textcoords="offset points",
-                xytext=(4, 4),
-                fontsize=8,
-                alpha=0.85,
             )
 
     ax.set_xscale("log")
@@ -389,13 +381,50 @@ def plot_rm_pareto(
     ax.set_xlabel("Throughput (bits/batch)")
     ax.set_ylabel("BER")
     ax.set_title(
-        rf"Throughput--reliability trade-off at $E_b/N_0 = {ebno_db:.0f}\,\mathrm{{dB}}$ (Run~B)",
+        rf"Throughput--reliability trade-off at $E_b/N_0 = {ebno_db:.0f}\,\mathrm{{dB}}$ (Run B)",
         fontsize=FIG_TITLE_PT,
     )
     ax.grid(True, which="both", alpha=0.35)
-    handles, labels = ax.get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
-    ax.legend(by_label.values(), by_label.keys(), fontsize=FIG_CALLOUT_PT)
+
+    channel_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker=channel_markers[ch],
+            color="0.2",
+            linestyle="None",
+            markersize=7,
+            label=CHANNEL_LABELS[ch],
+        )
+        for ch in channels
+    ]
+    scheduler_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color=method_color(sched, stage_hint="resource_managers"),
+            linestyle="None",
+            markersize=7,
+            markeredgecolor="black",
+            markeredgewidth=0.4,
+            label=RM_LABELS[sched],
+        )
+        for sched in CANONICAL_SCHEDULERS
+    ]
+    # Compact single legend below axes (column-friendly).
+    all_handles = channel_handles + scheduler_handles
+    ax.legend(
+        handles=all_handles,
+        fontsize=FIG_CALLOUT_PT,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.18),
+        ncol=4,
+        frameon=True,
+        borderaxespad=0.0,
+        columnspacing=0.9,
+        handletextpad=0.35,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
     fig.savefig(output_path, dpi=THESIS_DPI, bbox_inches="tight")

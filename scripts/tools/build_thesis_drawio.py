@@ -18,21 +18,25 @@ SUNWAY_NAVY = "#233369"
 
 # Canonical figure style (thesis/CONTEXT.md → Table typography anchor, Figure typographic tiers)
 FONT_FAMILY = "Times New Roman"
-FONT_TITLE = 12
-FONT_SUBTITLE = 11
-FONT_BOX = 11  # matches LaTeX \small table cells in 12pt report
-FONT_NOTE = 10
-FONT_EDGE = 10
-FONT_BADGE = 11
+# XML pts are calibrated for printed legibility at \linewidth (~145 mm), not raw documentclass pts.
+# Aug 2026: larger box text per supervisor feedback; wrap earlier so labels stay inside shapes.
+FONT_TITLE = 24
+FONT_SUBTITLE = 19
+FONT_BOX = 22
+FONT_NOTE = 18
+FONT_EDGE = 18
+FONT_BADGE = 22
 
-CANVAS_LANDSCAPE = (1200, 750)
-CANVAS_PORTRAIT = (900, 1050)
+# Slightly narrower landscape → larger printed text at LaTeX \linewidth.
+CANVAS_LANDSCAPE = (1100, 980)
+CANVAS_PORTRAIT = (900, 1250)
 
 # Per-line character caps (Figure label line breaking). See thesis/CONTEXT.md.
-LABEL_MAX_CHARS_BOX = 28
-LABEL_MAX_CHARS_NARROW = 22
-LABEL_MAX_CHARS_NOTE = 52
-LABEL_MAX_CHARS_SUBTITLE = 78
+# Tighter caps force earlier wraps so larger fonts stay inside boxes.
+LABEL_MAX_CHARS_BOX = 16
+LABEL_MAX_CHARS_NARROW = 12
+LABEL_MAX_CHARS_NOTE = 30
+LABEL_MAX_CHARS_SUBTITLE = 46
 
 _SEMANTIC_BREAKS = (" · ", " → ", "; ", " — ", " – ", ", ")
 
@@ -118,11 +122,11 @@ def estimate_box_dims(
     *,
     font_pt: int = FONT_BOX,
     min_w: float = 72,
-    min_h: float = 32,
-    h_pad: float = 14,
-    w_pad: float = 16,
+    min_h: float = 36,
+    h_pad: float = 18,
+    w_pad: float = 18,
     char_width_factor: float = 0.58,
-    line_height_factor: float = 1.4,
+    line_height_factor: float = 1.45,
 ) -> tuple[float, float]:
     """Minimum shape size so wrapped text fits at locked tier (Figure shape text fitting)."""
     lines = label.replace("<br>", "\n").split("\n")
@@ -151,7 +155,8 @@ class DrawioBuilder:
             f"text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;"
             f"fontFamily={FONT_FAMILY};fontSize={FONT_TITLE};fontStyle=1;fontColor={SUNWAY_NAVY};"
         )
-        self.cells.append((tid, {"value": _cell_value(text), "style": style, "vertex": "1", "x": x, "y": y, "w": w, "h": 32}))
+        title_h = max(36, int(FONT_TITLE * 1.6) + 8)
+        self.cells.append((tid, {"value": _cell_value(text), "style": style, "vertex": "1", "x": x, "y": y, "w": w, "h": title_h}))
         return tid
 
     def subtitle(self, x: float, y: float, w: float, text: str) -> str:
@@ -159,8 +164,9 @@ class DrawioBuilder:
         text = normalize_label(text, max_chars=LABEL_MAX_CHARS_SUBTITLE)
         n_lines = max(1, len(text.split("<br>")))
         style = f"text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontFamily={FONT_FAMILY};fontSize={FONT_SUBTITLE};fontColor=#64748b;"
+        sub_h = n_lines * int(FONT_SUBTITLE * 1.4) + 8
         self.cells.append(
-            (tid, {"value": _cell_value(text), "style": style, "vertex": "1", "x": x, "y": y, "w": w, "h": n_lines * 14 + 8})
+            (tid, {"value": _cell_value(text), "style": style, "vertex": "1", "x": x, "y": y, "w": w, "h": sub_h})
         )
         return tid
 
@@ -170,7 +176,7 @@ class DrawioBuilder:
         fill, stroke = PALETTE[role]
         style = (
             f"whiteSpace=wrap;html=1;fillColor={fill};strokeColor={stroke};"
-            f"fontFamily={FONT_FAMILY};fontSize={FONT_NOTE};rounded=0;dashed=1;"
+            f"fontFamily={FONT_FAMILY};fontSize={FONT_NOTE};align=center;verticalAlign=middle;rounded=0;dashed=1;"
         )
         auto_w, auto_h = estimate_box_dims(text, font_pt=FONT_NOTE, min_w=w, min_h=h)
         w, h = max(w, auto_w), max(h, auto_h)
@@ -180,19 +186,23 @@ class DrawioBuilder:
 
     def step_badge(self, x: float, y: float, n: int) -> str:
         cid = self._nid()
+        badge = max(34, int(FONT_BADGE * 2.1))
         style = (
             f"ellipse;whiteSpace=wrap;html=1;fillColor={PALETTE['accent'][0]};"
             f"strokeColor={PALETTE['accent'][1]};fontFamily={FONT_FAMILY};fontSize={FONT_BADGE};fontStyle=1;"
+            f"align=center;verticalAlign=middle;"
         )
-        self.cells.append((cid, {"value": str(n), "style": style, "vertex": "1", "step_badge": True, "x": x, "y": y, "w": 28, "h": 28}))
+        self.cells.append(
+            (cid, {"value": str(n), "style": style, "vertex": "1", "step_badge": True, "x": x, "y": y, "w": badge, "h": badge})
+        )
         return cid
 
-    def step_badge_near_tl(self, node_id: str, n: int, gap: float = 6) -> str:
+    def step_badge_near_tl(self, node_id: str, n: int, gap: float = 8) -> str:
         """Numbered circle just outside top-left corner—close, no overlap with node fill."""
         x, y, _w, _h = self._geom[node_id]
-        badge_w, badge_h = 28, 28
-        bx = x - badge_w - gap
-        by = y - badge_h - gap
+        badge = max(34, int(FONT_BADGE * 2.1))
+        bx = x - badge - gap
+        by = y - badge - gap
         return self.step_badge(bx, by, n)
 
     def box(
@@ -207,9 +217,11 @@ class DrawioBuilder:
         ellipse: bool = False,
         *,
         fixed_width: bool = False,
+        max_chars: int | None = None,
     ) -> str:
         cid = self._nid()
-        max_chars = LABEL_MAX_CHARS_NARROW if fixed_width else LABEL_MAX_CHARS_BOX
+        if max_chars is None:
+            max_chars = LABEL_MAX_CHARS_NARROW if fixed_width else LABEL_MAX_CHARS_BOX
         label = normalize_label(label, max_chars=max_chars)
         fill, stroke = PALETTE[role]
         auto_w, auto_h = estimate_box_dims(label, font_pt=FONT_BOX, min_w=w, min_h=h)
@@ -224,6 +236,8 @@ class DrawioBuilder:
             f"strokeColor={stroke}",
             f"fontFamily={FONT_FAMILY}",
             f"fontSize={FONT_BOX}",
+            "align=center",
+            "verticalAlign=middle",
             "rounded=0",
         ]
         if dashed:
@@ -269,13 +283,27 @@ class DrawioBuilder:
         x, y, w, h = self._geom[node_id]
         return y + h
 
+    def equalize_heights(self, node_ids: list[str]) -> float:
+        """Force a row of boxes to a shared height (tallest wins) for grid alignment."""
+        if not node_ids:
+            return 0.0
+        max_h = max(self._geom[nid][3] for nid in node_ids)
+        id_set = set(node_ids)
+        for cid, data in self.cells:
+            if cid in id_set and "h" in data:
+                data["h"] = max_h
+                x, y, w, _ = self._geom[cid]
+                self._geom[cid] = (x, y, w, max_h)
+        return max_h
+
     def row_label(self, x: float, y: float, w: float, h: float, text: str) -> str:
         """Solid Sunway-navy row label (research-framework left column)."""
         cid = self._nid()
         text = normalize_label(text, max_chars=LABEL_MAX_CHARS_NARROW)
         style = (
             f"whiteSpace=wrap;html=1;fillColor={SUNWAY_NAVY};strokeColor={SUNWAY_NAVY};"
-            f"fontFamily={FONT_FAMILY};fontSize={FONT_BOX};fontColor=#ffffff;fontStyle=1;rounded=0;"
+            f"fontFamily={FONT_FAMILY};fontSize={FONT_BOX};fontColor=#ffffff;fontStyle=1;"
+            f"align=center;verticalAlign=middle;rounded=0;"
         )
         auto_w, auto_h = estimate_box_dims(text, font_pt=FONT_BOX, min_w=w, min_h=h)
         h = max(h, auto_h)
@@ -291,16 +319,25 @@ class DrawioBuilder:
         dashed: bool = False,
         color: str | None = None,
         points: list[tuple[float, float]] | None = None,
+        label: str = "",
+        thick: bool = False,
     ) -> None:
         eid = self._nid()
         style = EDGE_DASHED if dashed else EDGE
         if color:
             style = style.replace("strokeColor=#455a64", f"strokeColor={color}")
+        if thick:
+            style += "strokeWidth=3;"
+        if label:
+            style += (
+                f"fontFamily={FONT_FAMILY};fontSize={FONT_EDGE};fontColor=#233369;"
+                "labelBackgroundColor=#ffffff;fontStyle=1;"
+            )
         self.cells.append(
             (
                 eid,
                 {
-                    "value": "",
+                    "value": _cell_value(normalize_label(label, max_chars=LABEL_MAX_CHARS_NOTE)) if label else "",
                     "style": style,
                     "edge": "1",
                     "source": src,
@@ -317,8 +354,10 @@ class DrawioBuilder:
         waypoints: list[tuple[float, float]],
         dashed: bool = False,
         color: str | None = None,
+        label: str = "",
+        thick: bool = False,
     ) -> None:
-        self.edge(src, dst, dashed=dashed, color=color, points=waypoints)
+        self.edge(src, dst, dashed=dashed, color=color, points=waypoints, label=label, thick=thick)
 
     def to_xml(self) -> str:
         mxfile = Element("mxfile", {"host": "app.diagrams.net", "agent": "build_thesis_drawio", "version": "24.7.17"})
@@ -384,60 +423,76 @@ class DrawioBuilder:
 
 
 def build_integrated_pipeline() -> str:
-    """Landscape canvas; horizontal two-row integrated PHY/MAC pipeline."""
-    pw, ph = CANVAS_LANDSCAPE
+    """Two-lane flow: a PHY link-level chain on top feeds a MAC stage below.
+
+    The single vertical arrow between the lanes is the point of the figure --
+    the scheduler is driven by the estimator's *estimated* CSI (and its error),
+    in a fixed order, on one shared set of channel samples, without joint
+    end-to-end training.
+    """
+    pw, ph = 1180, 792
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 48
     cw = pw - 2 * mx
-    row_gap = 28
     col_gap = 18
-    n_cols = 5
-    bw = (cw - (n_cols - 1) * col_gap) // n_cols
+    sec = PALETTE["secondary"][1]
+    grn = PALETTE["success"][1]
+    ntl = PALETTE["neutral"][1]
 
-    d.title(mx, 16, cw, "Integrated ML PHY/MAC pipeline")
-    d.subtitle(
-        mx,
-        50,
-        cw,
-        "Joint integrated evaluation — estimation error propagates into MAC scheduling on shared factory geometry.",
+    d.title(mx, 12, cw, "How the two stages are evaluated together")
+
+    # --- Shared-samples band feeding the chain -----------------------------
+    band = d.box(
+        mx, 62, cw, 58,
+        "Same channel samples per batch  ·  Eb/N0 sweep  ·  identical across the methods compared",
+        "neutral", fixed_width=True, max_chars=96,
     )
 
-    y1 = 88
-    xs = [mx + i * (bw + col_gap) for i in range(n_cols)]
-
-    tx = d.box(xs[0], y1, bw, 72, "OFDM transmitter<br>5G LDPC · QAM · resource grid<br>pilots @ sym 2, 11", "accent")
-    ch = d.box(xs[1], y1, bw, 72, "Factory channel model<br>Rayleigh · Rician · TR 38.901 UMi<br>profile s/m/l/apple", "primary")
-    rx = d.box(xs[2], y1, bw, 72, "Receiver front-end<br>FFT · pilot extraction<br>per-UT batch tensors", "primary")
-    ce = d.box(xs[3], y1, bw, 72, "Channel estimation<br>LS · DFT · LMMSE · adaptive · neural<br>pluggable receiver estimators", "secondary")
-    phy = d.box(xs[4], y1, bw, 72, "PHY decode chain<br>LMMSE equalise · demap · LDPC<br>batch BER accounting", "primary")
-    row1_h = max(d.bottom(n) for n in (tx, ch, rx, ce, phy))
-
-    couple_y = row1_h + 12
-    d.subtitle(xs[3], couple_y, 2 * bw + col_gap, "Integrated ML coupling (PHY estimate → MAC policy)")
-    y2 = couple_y + 34
-
-    mc = d.box(xs[0], y2, bw, 72, "Monte Carlo harness<br>Eb/N0 sweep 0–20 dB<br>shared channel context (P1)", "accent")
-    met = d.box(xs[1], y2, bw, 72, "End-to-end metrics<br>BER · throughput · latency<br>power · runtime", "success")
-    rd = d.box(xs[2], y2, bw, 72, "MAC resource directives<br>per-UT mask · power scale<br>MAC → PHY coupling", "neutral", dashed=True)
-    cqs = d.box(xs[3], y2, bw, 72, "Channel-quality state<br>H_hat · err_var · Eb/N0<br>feedback to scheduler", "primary")
-    rmm = d.box(xs[4], y2, bw, 72, "Resource manager<br>PF · WMMSE · queue-aware DRL<br>BER-aware DRL policies", "secondary")
-    row2_h = max(d.bottom(n) for n in (mc, met, rd, cqs, rmm))
-
-    d.group_rect(xs[3] - 10, y2 - 12, 2 * bw + col_gap + 20, row2_h - y2 + 22)
-
-    for a, b in [(tx, ch), (ch, rx), (rx, ce), (ce, phy), (met, mc), (cqs, rmm), (rmm, rd)]:
+    # --- PHY lane --------------------------------------------------------
+    phy_y, phy_h = 196, 118
+    d.subtitle(mx, 150, cw, "PHY link-level chain (held fixed)")
+    n = 5
+    bw = (cw - (n - 1) * col_gap) // n
+    xs = [mx + i * (bw + col_gap) for i in range(n)]
+    cx = [x + bw / 2 for x in xs]
+    tx = d.box(xs[0], phy_y, bw, phy_h, "OFDM<br>transmit", "accent", fixed_width=True, max_chars=14)
+    ch = d.box(xs[1], phy_y, bw, phy_h, "Factory<br>channel", "primary", fixed_width=True, max_chars=14)
+    ce = d.box(xs[2], phy_y, bw, phy_h, "Channel<br>estimation", "secondary", fixed_width=True, max_chars=14)
+    dec = d.box(xs[3], phy_y, bw, phy_h, "Equalise +<br>decode", "primary", fixed_width=True, max_chars=14)
+    ber = d.box(xs[4], phy_y, bw, phy_h, "Decoded<br>BER", "success", fixed_width=True, max_chars=14)
+    for a, b in [(tx, ch), (ch, ce), (ce, dec), (dec, ber)]:
         d.edge(a, b)
+    d.edge(band, ch, color=ntl, points=[(cx[1], 150)])
 
-    margin_r = xs[4] + bw + 36
-    margin_l = mx - 12
-    d.route(phy, met, [(margin_r, d._center(phy)[1]), (margin_r, d._center(met)[1])], color=PALETTE["success"][1])
-    d.edge(mc, tx, color=PALETTE["accent"][1])
-    d.edge(ce, cqs, color=PALETTE["secondary"][1])
-    d.route(rd, tx, [(margin_l, d._center(rd)[1]), (margin_l, d._center(tx)[1])], dashed=True, color=PALETTE["accent"][1])
+    # --- MAC lane -------------------------------------------------------
+    mac_y, mac_h = 452, 118
+    d.subtitle(mx, 406, cw, "MAC resource management (the stage compared)")
+    rm = d.box(xs[2], mac_y, bw, mac_h, "Resource<br>manager", "secondary", fixed_width=True, max_chars=14)
+    sch = d.box(xs[3], mac_y, bw, mac_h, "Scheduling +<br>power", "secondary", fixed_width=True, max_chars=14)
+    d.edge(rm, sch, color=sec)
 
-    ny = row2_h + row_gap
-    d.note(mx, ny, cw // 2 - 8, 56, "Fixed-order stages (P3): estimator benchmark → RM on estimated CSI<br>comparative metrics per operating point", "neutral")
-    d.note(mx + cw // 2 + 8, ny, cw // 2 - 8, 48, "Decoupled baseline: CE curves without MAC impact (not primary narrative)", "warning")
+    # --- Coupling: the whole point of the figure ----------------------
+    d.edge(
+        ce, rm, color=sec, thick=True,
+        label="estimated CSI + error variance (not perfect CSI)",
+    )
+
+    # --- Metrics: everything reported together ----------------------
+    met_y = 608
+    met = d.box(
+        mx, met_y, cw, 56,
+        "Reported together, on the same runs:  BER · throughput · latency · power · runtime",
+        "success", fixed_width=True, max_chars=96,
+    )
+    d.edge(ber, met, color=grn, points=[(cx[4], met_y - 12)])
+    d.edge(sch, met, color=grn, points=[(cx[3], met_y - 12)])
+
+    # --- One-line reading of the figure -------------------------
+    d.box(
+        mx, met_y + 88, cw, 46,
+        "Fixed order: estimate, then schedule  ·  shared samples  ·  not trained end-to-end",
+        "neutral", fixed_width=True, max_chars=96,
+    )
     return d.to_xml()
 
 
@@ -459,42 +514,42 @@ def build_lr_taxonomy() -> str:
     d.title(mx, 16, cw, "Smart-factory wireless literature map")
     d.subtitle(
         mx,
-        50,
+        52,
         cw,
         "Chapter 2 — classical vs ML families for CE and RM; decoupled vs integrated PHY–MAC evaluation.",
     )
 
-    y = 88
-    req = d.box(mx, y, cw, 52, "Industrial requirements<br>URLLC · latency · mobility · heterogeneous UTs", "accent")
+    y = 108
+    req = d.box(mx, y, cw, 64, "Industrial requirements<br>URLLC · latency · mobility · heterogeneous UTs", "accent")
     y = bottom(req) + row_gap
 
     root = d.box(
         mx,
         y,
         cw,
-        60,
+        72,
         "6G / B5G smart-factory wireless<br>industrial IoT · AGV/robotics · factory RF · network slicing",
         "primary",
     )
     y = bottom(root) + row_gap
 
-    met = d.box(mx, y, cw, 52, "Evaluation metrics<br>BER · throughput · latency · power · fairness", "success")
+    met = d.box(mx, y, cw, 64, "Evaluation metrics<br>BER · throughput · latency · power · fairness", "success")
     y = bottom(met) + row_gap
 
     dec = d.box(
         mx,
         y,
         cw,
-        48,
+        64,
         "Typical literature: decoupled CE/RM benchmarks<br>CE curves without MAC impact · perfect-CSI schedulers",
         "neutral",
         dashed=True,
     )
-    y = bottom(dec) + row_gap + 8
+    y = bottom(dec) + row_gap + 10
 
     d.subtitle(lx, y, col_w, "Channel estimation branch")
     d.subtitle(rx, y, col_w, "Resource management branch")
-    y += 30
+    y += 36
 
     ce_cls = d.box(
         lx,
@@ -600,7 +655,7 @@ def build_phy_stack() -> str:
         return y + h
 
     d.title(mx, 16, cw, "Physical-layer stack")
-    d.subtitle(mx, 50, cw, "LDPC–QAM–OFDM batch chain; BER metric propagates to Chapter 4 results.")
+    d.subtitle(mx, 52, cw, "LDPC–QAM–OFDM batch chain; BER metric propagates to Chapter 4 results.")
 
     pre_rx: list[tuple[str, str]] = [
         ("Info bits · per batch", "accent"),
@@ -616,21 +671,21 @@ def build_phy_stack() -> str:
         ("BER metrics · bit/block errors per batch", "success"),
     ]
 
-    y = 88
+    y = 108
     ids: list[str] = []
     for label, role in pre_rx:
         html_label = label.replace(" · ", "<br>")
-        ids.append(d.box(bx, y, stack_w, 48, html_label, role))
+        ids.append(d.box(bx, y, stack_w, 56, html_label, role))
         y = bottom(ids[-1]) + row_gap
 
-    subtitle_y = y + 6
+    subtitle_y = y + 8
     d.subtitle(bx, subtitle_y, stack_w, "Receiver chain (estimate → equalise → decode → metrics)")
-    y = subtitle_y + 30
+    y = subtitle_y + 36
     rx_top = y
 
     for label, role in post_rx:
         html_label = label.replace(" · ", "<br>")
-        ids.append(d.box(bx, y, stack_w, 48, html_label, role))
+        ids.append(d.box(bx, y, stack_w, 56, html_label, role))
         y = bottom(ids[-1]) + row_gap
 
     d.group_rect(bx - 12, rx_top - 10, stack_w + 24, bottom(ids[-1]) - rx_top + 18)
@@ -641,8 +696,8 @@ def build_phy_stack() -> str:
     rm = d.box(
         bx + stack_w + 20,
         grid_y,
-        max(rm_w, 160),
-        grid_h,
+        max(rm_w, 200),
+        max(grid_h, 88),
         "MAC resource directives<br>mask · power scale<br>from scheduler stage",
         "warning",
         dashed=True,
@@ -660,48 +715,48 @@ def build_monte_carlo() -> str:
     """Portrait canvas; vertical trunk with horizontal parallel-stage branches."""
     pw, ph = CANVAS_PORTRAIT
     d = DrawioBuilder(page_w=pw, page_h=ph)
-    mx = 48
+    mx = 64
     cw = pw - 2 * mx
-    row_gap = 12
-    col_gap = 16
-    tw = min(300, cw - 80)
+    row_gap = 16
+    col_gap = 20
+    tw = min(340, cw - 100)
     tx = (pw - tw) // 2
 
     d.title(mx, 16, cw, "Monte Carlo orchestration flow")
-    d.subtitle(mx, 50, cw, "Integrated evaluation design — shared channel context (P1); stopping policy gates each Eb/N0 point.")
+    d.subtitle(mx, 52, cw, "Integrated evaluation design — shared channel context (P1); stopping policy gates each Eb/N0 point.")
 
-    y = 88
-    start = d.box(tx, y, tw, 46, "Monte Carlo entry<br>reproducible environment", "success", ellipse=True)
+    y = 108
+    start = d.box(tx, y, tw, 56, "Monte Carlo entry<br>reproducible environment", "success", ellipse=True)
     d.step_badge_near_tl(start, 1)
     y = d.bottom(start) + row_gap
 
-    cfg = d.box(tx, y, tw, 50, "Configuration and seeds<br>GPU/CPU · output directory", "neutral")
+    cfg = d.box(tx, y, tw, 60, "Configuration and seeds<br>GPU/CPU · output directory", "neutral")
     d.step_badge_near_tl(cfg, 2)
     y = d.bottom(cfg) + row_gap
 
-    ebn0 = d.box(tx - 12, y, tw + 24, 54, "Eb/N0 sweep 0…20 dB (step 2)<br>outer Monte Carlo loop", "accent")
+    ebn0 = d.box(tx - 12, y, tw + 24, 64, "Eb/N0 sweep 0…20 dB (step 2)<br>outer Monte Carlo loop", "accent")
     d.step_badge_near_tl(ebn0, 3)
     y = d.bottom(ebn0) + row_gap
 
-    batch = d.box(tx - 8, y, tw + 16, 54, "Prepare shared channel context<br>channel · noise · source bits", "primary")
+    batch = d.box(tx - 8, y, tw + 16, 64, "Prepare shared channel context<br>channel · noise · source bits", "primary")
     d.step_badge_near_tl(batch, 4)
-    y = d.bottom(batch) + row_gap + 16
+    y = d.bottom(batch) + row_gap + 20
 
     col_w = (cw - 2 * col_gap) // 3
     branch_y = y
-    est = d.box(mx, branch_y, col_w, 62, "Estimator stage (fixed order)<br>all methods · same context<br>BER curves per method", "secondary")
+    est = d.box(mx, branch_y, col_w, 78, "Estimator stage (fixed order)<br>all methods · same context<br>BER curves per method", "secondary")
     d.step_badge_near_tl(est, 5)
-    rm = d.box(mx + col_w + col_gap, branch_y, col_w, 62, "RM stage<br>h_hat → directives<br>throughput · latency · power", "warning")
+    rm = d.box(mx + col_w + col_gap, branch_y, col_w, 78, "RM stage<br>h_hat → directives<br>throughput · latency · power", "warning")
     d.step_badge_near_tl(rm, 6)
-    stop = d.box(mx + 2 * (col_w + col_gap), branch_y, col_w, 62, "Stopping policy<br>min/max batches · target blocks<br>≥30 bit errors → resolved", "success")
+    stop = d.box(mx + 2 * (col_w + col_gap), branch_y, col_w, 78, "Stopping policy<br>min/max batches · target blocks<br>≥30 bit errors → resolved", "success")
     d.step_badge_near_tl(stop, 7)
-    y = max(d.bottom(est), d.bottom(rm), d.bottom(stop)) + row_gap + 24
+    y = max(d.bottom(est), d.bottom(rm), d.bottom(stop)) + row_gap + 28
 
-    out = d.box(tx - 8, y, tw + 16, 54, "Structured result artefacts<br>metrics tables · thesis figures", "neutral")
+    out = d.box(tx - 8, y, tw + 16, 64, "Structured result artefacts<br>metrics tables · thesis figures", "neutral")
     d.step_badge_near_tl(out, 8)
     y = d.bottom(out) + row_gap
 
-    end = d.box(tx + 12, y, tw - 24, 46, "Experiment complete<br>locked run IDs · Ch.4", "success", ellipse=True)
+    end = d.box(tx + 12, y, tw - 24, 56, "Experiment complete<br>locked run IDs · Ch.4", "success", ellipse=True)
 
     d.edge(start, cfg)
     d.edge(cfg, ebn0)
@@ -741,19 +796,19 @@ def build_factory_topology() -> str:
     d.title(mx, 16, cw, "Factory deployment topology")
     d.subtitle(
         mx,
-        50,
+        52,
         cw,
         "Plan-view geometry — size presets scale room, machines, and UT count; couples to Rayleigh/Rician/TR 38.901 models.",
     )
 
-    sidebar_w = 176
-    right_w = 196
+    sidebar_w = 230
+    right_w = 210
     room_x = mx + sidebar_w + col_gap
-    room_y = 96
+    room_y = 108
     room_w = pw - room_x - mx - right_w - col_gap
-    room_h = 400
-    pad = 20
-    elem_gap = 16
+    room_h = 480
+    pad = 18
+    elem_gap = 14
 
     # --- Left sidebar: even vertical stack ---
     sy = room_y
@@ -762,24 +817,31 @@ def build_factory_topology() -> str:
         sy,
         sidebar_w,
         48,
-        "Size presets<br>s: 15×15 m · 5 machines · 4 UT<br>m: 25×25 m · 10 · 8 UT<br>l: 40×40 m · 20 · 16 UT<br>apple: 60×35 m · 22 · 8 UT",
+        "Size presets<br>"
+        "s: 15×15 m · 5 mach · 4 UT<br>"
+        "m: 25×25 m · 10 · 8 UT<br>"
+        "l: 40×40 m · 20 · 16 UT<br>"
+        "apple: 60×35 m · 22 · 8 UT",
         "neutral",
+        fixed_width=True,
     )
     mat_box = d.box(
         mx,
         d.bottom(size_box) + row_gap,
         sidebar_w,
         48,
-        "Materials (ray trace)<br>Metal (high σ) · Concrete (εr≈7)<br>blocking / scattering",
+        "Materials (ray trace)<br>Metal (high σ)<br>Concrete (εr≈7)<br>blocking / scattering",
         "neutral",
+        fixed_width=True,
     )
     d.box(
         mx,
         d.bottom(mat_box) + row_gap,
         sidebar_w,
         48,
-        "Mobility<br>static (v=0) · AGV (v>0)",
+        "Mobility<br>static (v=0)<br>AGV (v>0)",
         "accent",
+        fixed_width=True,
     )
 
     # --- Factory hall ---
@@ -792,32 +854,32 @@ def build_factory_topology() -> str:
     )
 
     bs_label = "Base station (BS)<br>8 antennas · 3.5 GHz<br>TR 38.901 antenna"
-    ut_label = "UT 1<br>1 antenna · QPSK"
-    mach_label = "Machine<br>metal σ"
+    ut_label = "UT 1<br>1 ant · QPSK"
+    mach_label = "Machine<br>metal"
     bs_w, bs_h = estimate_box_dims(normalize_label(bs_label))
     ut_w, ut_h = estimate_box_dims(normalize_label(ut_label))
     mach_w, mach_h = estimate_box_dims(normalize_label(mach_label))
 
     inner_left = room_x + pad
     inner_right = room_x + room_w - pad
-    inner_top = room_y + 30
-    uplink_y = room_y + room_h - 26
+    inner_top = room_y + 52
+    uplink_y = room_y + room_h - 30
     inner_bottom = uplink_y - elem_gap
 
     bs_x = room_x + (room_w - bs_w) / 2
     bs_y = inner_top
     bs = d.box(bs_x, bs_y, bs_w, bs_h, bs_label, "primary")
 
-    ut_y_top = d.bottom(bs) + elem_gap + 8
+    ut_y_top = d.bottom(bs) + elem_gap + 10
     ut_y_bot = inner_bottom - ut_h
     ut_x_left = inner_left
     ut_x_right = inner_right - ut_w
 
     ut_ids = [
-        d.box(ut_x_left, ut_y_bot, ut_w, ut_h, "UT 1<br>1 antenna · QPSK", "success"),
-        d.box(ut_x_right, ut_y_bot, ut_w, ut_h, "UT 2<br>1 antenna · QPSK", "success"),
-        d.box(ut_x_left, ut_y_top, ut_w, ut_h, "UT 3<br>1 antenna · QPSK", "success"),
-        d.box(ut_x_right, ut_y_top, ut_w, ut_h, "UT 4<br>1 antenna · QPSK", "success"),
+        d.box(ut_x_left, ut_y_bot, ut_w, ut_h, "UT 1<br>1 ant · QPSK", "success"),
+        d.box(ut_x_right, ut_y_bot, ut_w, ut_h, "UT 2<br>1 ant · QPSK", "success"),
+        d.box(ut_x_left, ut_y_top, ut_w, ut_h, "UT 3<br>1 ant · QPSK", "success"),
+        d.box(ut_x_right, ut_y_top, ut_w, ut_h, "UT 4<br>1 ant · QPSK", "success"),
     ]
 
     # Five machines in one evenly spaced row between the UT tiers.
@@ -909,22 +971,22 @@ def build_estimator_comparison() -> str:
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 48
     cw = pw - 2 * mx
-    row_gap = 8
-    col_gap = 8
-    label_w = 112
+    row_gap = 10
+    col_gap = 10
+    label_w = 140
     n_cols = 5
     col_w = (cw - label_w - col_gap - n_cols * col_gap) // n_cols
 
     d.title(mx, 16, cw, "Channel estimator comparison")
     d.subtitle(
         mx,
-        50,
+        52,
         cw,
         "Ch.3 conceptual map — five canonical estimators on shared channel realisations (P1); BER curves in Ch.4.",
     )
 
     hx = mx + label_w + col_gap
-    y = 88
+    y = 108
 
     headers: list[tuple[str, str]] = [
         ("LS", "primary"),
@@ -934,9 +996,10 @@ def build_estimator_comparison() -> str:
         ("Neural", "secondary"),
     ]
 
-    header_ids = [d.box(mx, y, label_w, 48, "Dimension", "neutral", fixed_width=True)]
+    header_ids = [d.box(mx, y, label_w, 56, "Dimension", "neutral", fixed_width=True)]
     for i, (name, role) in enumerate(headers):
-        header_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 48, name, role, fixed_width=True))
+        header_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 56, name, role, fixed_width=True))
+    d.equalize_heights(header_ids)
     y = max(d.bottom(n) for n in header_ids) + row_gap
 
     rows: list[tuple[str, list[str]]] = [
@@ -1003,19 +1066,21 @@ def build_estimator_comparison() -> str:
     ]
 
     for row_label, cells in rows:
-        row_ids = [d.box(mx, y, label_w, 48, row_label, "neutral", fixed_width=True)]
+        row_ids = [d.box(mx, y, label_w, 56, row_label, "neutral", fixed_width=True)]
         for i, text in enumerate(cells):
-            row_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 48, text, "neutral", fixed_width=True))
+            row_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 56, text, "neutral", fixed_width=True))
+        d.equalize_heights(row_ids)
         y = max(d.bottom(n) for n in row_ids) + row_gap
 
     d.note(
         mx,
-        y + 10,
+        y + 12,
         cw,
-        40,
+        48,
         "All estimators evaluated on identical shared channel contexts per batch (P1) · PSO omitted from canonical Ch.4 run.",
         "accent",
     )
+    d.page_h = max(ph, int(y + 90))
     return d.to_xml()
 
 
@@ -1023,24 +1088,24 @@ def build_rm_comparison() -> str:
     """Landscape canvas; columnar comparison of eight canonical resource managers (no step badges)."""
     pw, ph = CANVAS_LANDSCAPE
     d = DrawioBuilder(page_w=pw, page_h=ph)
-    mx = 48
+    mx = 40
     cw = pw - 2 * mx
-    row_gap = 6
-    col_gap = 5
-    label_w = 88
+    row_gap = 8
+    col_gap = 6
+    label_w = 120
     n_cols = 8
     col_w = (cw - label_w - col_gap - (n_cols - 1) * col_gap) // n_cols
 
     d.title(mx, 16, cw, "Resource manager comparison")
     d.subtitle(
         mx,
-        50,
+        52,
         cw,
         "Ch.3 conceptual map — eight canonical schedulers on shared channel-quality feedback; Ch.4 plots hold BER/throughput curves.",
     )
 
     hx = mx + label_w + col_gap
-    y = 88
+    y = 108
 
     headers: list[tuple[str, str]] = [
         ("Static", "primary"),
@@ -1053,9 +1118,10 @@ def build_rm_comparison() -> str:
         ("BER-DRL", "secondary"),
     ]
 
-    header_ids = [d.box(mx, y, label_w, 44, "Dimension", "neutral", fixed_width=True)]
+    header_ids = [d.box(mx, y, label_w, 52, "Dimension", "neutral", fixed_width=True)]
     for i, (name, role) in enumerate(headers):
-        header_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 44, name, role, fixed_width=True))
+        header_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 52, name, role, fixed_width=True))
+    d.equalize_heights(header_ids)
     y = max(d.bottom(n) for n in header_ids) + row_gap
 
     rows: list[tuple[str, list[str]]] = [
@@ -1140,19 +1206,21 @@ def build_rm_comparison() -> str:
     ]
 
     for row_label, cells in rows:
-        row_ids = [d.box(mx, y, label_w, 44, row_label, "neutral", fixed_width=True)]
+        row_ids = [d.box(mx, y, label_w, 52, row_label, "neutral", fixed_width=True)]
         for i, text in enumerate(cells):
-            row_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 44, text, "neutral", fixed_width=True))
+            row_ids.append(d.box(hx + i * (col_w + col_gap), y, col_w, 52, text, "neutral", fixed_width=True))
+        d.equalize_heights(row_ids)
         y = max(d.bottom(n) for n in row_ids) + row_gap
 
     d.note(
         mx,
-        y + 8,
+        y + 10,
         cw,
-        40,
+        48,
         "Canonical Ch.4 RM sweep: eight schedulers · shared estimated CSI feedback (P2) · CNN supervisor omitted.",
         "accent",
     )
+    d.page_h = max(ph, int(y + 90))
     return d.to_xml()
 
 
@@ -1163,18 +1231,18 @@ def build_drl_rm_architecture() -> str:
     mx = 48
     cw = pw - 2 * mx
     row_gap = 14
-    gap = 28
+    gap = 20
     group_pad = 8
 
     d.title(mx, 16, cw, "Learned RM inference loop")
-    d.subtitle(mx, 50, cw, "DRL and BER-DRL actors — shared state, distinct checkpoints")
+    d.subtitle(mx, 52, cw, "DRL and BER-DRL actors — shared state, distinct checkpoints")
 
     # Left column + actor/output row share top band; actors equal size (fixed_width)
-    lw = 196
-    box_h = 72
-    actor_w = 212
-    actor_h = 96
-    actor_y = 92
+    lw = 210
+    box_h = 88
+    actor_w = 220
+    actor_h = 110
+    actor_y = 108
 
     fb = d.box(
         mx,
@@ -1202,7 +1270,7 @@ def build_drl_rm_architecture() -> str:
     out_x = ber_x + actor_w + gap
 
     group_w = group_right - group_x
-    d.subtitle(group_x + group_pad, actor_y - group_pad - 22, group_w - 2 * group_pad, "Parallel learned scheduler actors")
+    d.subtitle(group_x + group_pad, actor_y - group_pad - 28, group_w - 2 * group_pad, "Parallel learned scheduler actors")
     d.group_rect(group_x, actor_y - group_pad, group_w, actor_h + 2 * group_pad)
 
     drl = d.box(
@@ -1262,19 +1330,19 @@ def build_drl_rm_architecture() -> str:
 
 def build_lr_eval_coupling() -> str:
     """Landscape canvas; three-column literature evaluation-coupling patterns (Ch2 §2.7)."""
-    pw, ph = 1200, 820
+    pw, ph = CANVAS_LANDSCAPE
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 48
     cw = pw - 2 * mx
-    col_gap = 72
+    col_gap = 64
     n_cols = 3
     col_w = (cw - (n_cols - 1) * col_gap) // n_cols
-    row_gap = 22
-    inner_pad = 16
-    inner_gap = 12
-    title_row_h = 34
-    before_flow_gap = 18
-    box_h = 54
+    row_gap = 24
+    inner_pad = 18
+    inner_gap = 14
+    title_row_h = max(36, int(FONT_TITLE * 1.6) + 8)
+    before_flow_gap = 20
+    box_h = 72
 
     d.title(mx, 16, cw, "Literature evaluation coupling patterns")
     d.subtitle(
@@ -1321,7 +1389,7 @@ def build_lr_eval_coupling() -> str:
         },
     ]
 
-    panel_y = 98
+    panel_y = 108
     col_x = [mx + i * (col_w + col_gap) for i in range(n_cols)]
     inner_w = col_w - 2 * inner_pad
     bw = (inner_w - 2 * inner_gap) // 3
@@ -1336,7 +1404,7 @@ def build_lr_eval_coupling() -> str:
         sty = ty + title_row_h
         sub_norm = normalize_label(col["subtitle"], max_chars=LABEL_MAX_CHARS_SUBTITLE)
         sub_lines = max(1, len(sub_norm.split("<br>")))
-        sub_h = sub_lines * 14 + 8
+        sub_h = sub_lines * int(FONT_SUBTITLE * 1.4) + 8
         d.subtitle(cx + inner_pad, sty, inner_w, col["subtitle"])
 
         fy = sty + sub_h + before_flow_gap
@@ -1354,7 +1422,7 @@ def build_lr_eval_coupling() -> str:
             cx + inner_pad,
             ny,
             inner_w,
-            40,
+            48,
             col["footer"],
             col["footer_role"],
         )
@@ -1366,19 +1434,20 @@ def build_lr_eval_coupling() -> str:
     _, flow_cy = d._center(flow_ids[0][1])
     gap1_cx = col_x[0] + col_w + col_gap / 2
     gap2_cx = col_x[1] + col_w + col_gap / 2
-    d.center_text(gap1_cx - 28, flow_cy - 18, 56, 36, "broken<br>link", color="#be123c")
-    d.center_text(gap2_cx - 20, flow_cy - 12, 40, 24, "rare")
+    d.center_text(gap1_cx - 36, flow_cy - 22, 72, 44, "broken<br>link", color="#be123c")
+    d.center_text(gap2_cx - 28, flow_cy - 16, 56, 32, "rare")
 
-    footer_y = panel_bottom + row_gap + 10
+    footer_y = panel_bottom + row_gap + 12
     d.note(
         mx,
         footer_y,
         cw,
-        44,
+        52,
         "Integrated end-to-end evaluation under shared factory geometry remains underrepresented "
         "(cf. taxonomy gap)",
         "neutral",
     )
+    d.page_h = max(ph, int(footer_y + 80))
     return d.to_xml()
 
 
@@ -1388,92 +1457,122 @@ def build_decoupled_vs_integrated() -> str:
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 48
     cw = pw - 2 * mx
-    col_gap = 24
+    col_gap = 28
     panel_w = (cw - col_gap) // 2
     lx, rx = mx, mx + panel_w + col_gap
-    row_gap = 10
+    row_gap = 14
 
     d.title(mx, 16, cw, "Decoupled vs integrated evaluation")
     d.subtitle(
         mx,
-        50,
+        52,
         cw,
         "Literature PHY/MAC splits versus staged coupled benchmarking (P1–P3)",
     )
 
-    ly = 88
-    lh = 280
-    d.group_rect(lx, ly, panel_w, lh)
-    d.subtitle(lx + 10, ly + 8, panel_w - 20, "Typical decoupled evaluation")
-    d.group_rect(rx, ly, panel_w, lh)
-    d.subtitle(rx + 10, ly + 8, panel_w - 20, "Integrated evaluation design (this thesis)")
-
-    inner_gap = 14
-    inner_mx = lx + 16
-    inner_w = panel_w - 32
+    ly = 108
+    inner_gap = 16
+    inner_mx = lx + 18
+    inner_w = panel_w - 36
     bw = (inner_w - 2 * inner_gap) // 3
-    y1 = ly + 40
+    y1 = ly + 48
 
-    ce_ch = d.box(inner_mx, y1, bw, 52, "Channel<br>draw", "neutral", dashed=True, fixed_width=True)
-    ce_est = d.box(inner_mx + bw + inner_gap, y1, bw, 52, "Estimator<br>comparison", "primary", fixed_width=True)
-    ce_met = d.box(inner_mx + 2 * (bw + inner_gap), y1, bw, 52, "BER / MSE<br>PHY-only", "success", fixed_width=True)
+    d.subtitle(lx + 10, ly + 10, panel_w - 20, "Typical decoupled evaluation")
+    d.subtitle(rx + 10, ly + 10, panel_w - 20, "Integrated evaluation design (this thesis)")
+
+    ce_ch = d.box(inner_mx, y1, bw, 64, "Channel<br>draw", "neutral", dashed=True, fixed_width=True)
+    ce_est = d.box(inner_mx + bw + inner_gap, y1, bw, 64, "Estimator<br>comparison", "primary", fixed_width=True)
+    ce_met = d.box(inner_mx + 2 * (bw + inner_gap), y1, bw, 64, "BER / MSE<br>PHY-only", "success", fixed_width=True)
     d.edge(ce_ch, ce_est)
     d.edge(ce_est, ce_met)
-    ce_note = d.note(inner_mx, d.bottom(ce_ch) + 6, inner_w, 28, "No RM / MAC impact", "warning")
+    ce_note = d.note(inner_mx, d.bottom(ce_ch) + 8, inner_w, 36, "No RM / MAC impact", "warning")
 
-    y2 = d.bottom(ce_note) + row_gap + 8
-    rm_ch = d.box(inner_mx, y2, bw, 52, "Channel<br>model", "neutral", dashed=True, fixed_width=True)
-    rm_sched = d.box(inner_mx + bw + inner_gap, y2, bw, 52, "Scheduler<br>perfect CSI / rate tables", "warning", fixed_width=True)
-    rm_out = d.box(inner_mx + 2 * (bw + inner_gap), y2, bw, 52, "Sum-rate /<br>throughput", "accent", fixed_width=True)
+    y2 = d.bottom(ce_note) + row_gap + 10
+    rm_ch = d.box(inner_mx, y2, bw, 64, "Channel<br>model", "neutral", dashed=True, fixed_width=True)
+    rm_sched = d.box(inner_mx + bw + inner_gap, y2, bw, 64, "Scheduler<br>perfect CSI / rate tables", "warning", fixed_width=True)
+    rm_out = d.box(inner_mx + 2 * (bw + inner_gap), y2, bw, 64, "Sum-rate /<br>throughput", "accent", fixed_width=True)
     d.edge(rm_ch, rm_sched, dashed=True)
     d.edge(rm_sched, rm_out, dashed=True)
-    d.note(inner_mx, d.bottom(rm_out) + 8, inner_w, 32, "No h_hat error propagation (broken cross-layer link)", "neutral")
+    left_note = d.note(
+        inner_mx,
+        d.bottom(rm_out) + 10,
+        inner_w,
+        40,
+        "No h_hat error propagation (broken cross-layer link)",
+        "neutral",
+    )
 
-    # Integrated pipeline: two rows of three (six boxes cannot fit one row at tier-11 widths).
-    ix = rx + 16
-    igap = 12
+    # Integrated pipeline: two rows of three (six boxes cannot fit one row at locked widths).
+    ix = rx + 18
+    igap = 14
     row_bw = (inner_w - 2 * igap) // 3
-    iy = ly + 52
-    ch = d.box(ix, iy, row_bw, 58, "Shared channel<br>draw (P1)", "primary", fixed_width=True)
-    ce = d.box(ix + row_bw + igap, iy, row_bw, 58, "CE stage", "secondary", fixed_width=True)
-    fb = d.box(ix + 2 * (row_bw + igap), iy, row_bw, 58, "h_hat + err_var<br>(P2)", "primary", fixed_width=True)
+    iy = ly + 56
+    ch = d.box(ix, iy, row_bw, 72, "Shared channel<br>draw (P1)", "primary", fixed_width=True)
+    ce = d.box(ix + row_bw + igap, iy, row_bw, 72, "CE stage", "secondary", fixed_width=True)
+    fb = d.box(ix + 2 * (row_bw + igap), iy, row_bw, 72, "h_hat + err_var<br>(P2)", "primary", fixed_width=True)
     d.edge(ch, ce)
     d.edge(ce, fb)
 
-    iy2 = d.bottom(ch) + 14
-    rm = d.box(ix, iy2, row_bw, 58, "RM stage", "secondary", fixed_width=True)
-    rd = d.box(ix + row_bw + igap, iy2, row_bw, 58, "MAC resource<br>directives", "accent", dashed=True, fixed_width=True)
-    met = d.box(ix + 2 * (row_bw + igap), iy2, row_bw, 58, "BER / throughput<br>(P3)", "success", fixed_width=True)
+    iy2 = d.bottom(ch) + 16
+    rm = d.box(ix, iy2, row_bw, 72, "RM stage", "secondary", fixed_width=True)
+    rd = d.box(ix + row_bw + igap, iy2, row_bw, 72, "MAC resource<br>directives", "accent", dashed=True, fixed_width=True)
+    met = d.box(ix + 2 * (row_bw + igap), iy2, row_bw, 72, "BER / throughput<br>(P3)", "success", fixed_width=True)
     d.edge(fb, rm)
     d.edge(rm, rd)
     d.edge(rd, met)
 
-    ny = ly + lh + row_gap + 12
+    panel_bottom = max(d.bottom(left_note), d.bottom(met)) + 16
+    d.group_rect(lx, ly, panel_w, panel_bottom - ly)
+    d.group_rect(rx, ly, panel_w, panel_bottom - ly)
+
+    ny = panel_bottom + row_gap + 14
     d.note(
         mx,
         ny,
         cw,
-        44,
+        52,
         "P4 factory scenarios (Rayleigh / Rician / TR 38.901) · P5 end-to-end BER / throughput / latency · "
         "full PHY/MAC chain → Figure integrated pipeline",
         "neutral",
     )
+    d.page_h = max(ph, int(ny + 80))
     return d.to_xml()
 
 
 def build_research_framework() -> str:
-    """Landscape research-framework grid: problems → objectives → methodology → outcomes."""
-    pw, ph = CANVAS_LANDSCAPE
+    """Full-page portrait research framework that fits above the footer.
+
+    Keeps the detailed roadmap wording and nested methodology. Canvas aspect is
+    tuned so ``width=\\linewidth, height=0.80\\textheight`` fills the figure
+    page without colliding with the page number or caption.
+    """
+    # Slot budget: ~145 mm wide × ~0.80\textheight tall (~198 mm) for the graphic;
+    # remaining text-block height holds the caption above the footer.
+    pw, ph = 1200, 1640
     d = DrawioBuilder(page_w=pw, page_h=ph)
-    mx = 32
-    label_w = 108
+    mx = 18
+    label_w = 118
     gap = 10
     content_x = mx + label_w + gap
     content_w = pw - content_x - mx
     col_gap = 12
     col_w = (content_w - 2 * col_gap) // 3
-    row_gap = 10
     arrow_color = "#c62828"
+    mc = 26
+
+    top_margin = 14
+    bottom_margin = 14
+    n_gaps = 5
+    gap_budget = 55
+    row_gap = gap_budget / n_gaps
+    usable = ph - top_margin - bottom_margin - gap_budget
+    # Stretch rows to consume the canvas (methodology keeps nested detail).
+    h_title = usable * 0.08
+    h_problems = usable * 0.145
+    h_objectives = usable * 0.155
+    h_methodology = usable * 0.36
+    h_outcome = usable * 0.15
+    h_significance = usable * 0.11
 
     def col_x(i: int) -> float:
         return content_x + i * (col_w + col_gap)
@@ -1481,30 +1580,35 @@ def build_research_framework() -> str:
     def down_arrow(src: str, dst: str) -> None:
         d.edge(src, dst, color=arrow_color)
 
-    def row_h(nodes: list[str], y0: float) -> float:
-        return max(d.bottom(n) for n in nodes) - y0
+    def force_height(node_ids: list[str], height: float) -> None:
+        id_set = set(node_ids)
+        for cid, data in d.cells:
+            if cid in id_set and "h" in data:
+                data["h"] = height
+                x, y, w, _ = d._geom[cid]
+                d._geom[cid] = (x, y, w, height)
 
-    def label_row(y0: float, nodes: list[str], text: str) -> None:
-        d.row_label(mx, y0, label_w, row_h(nodes, y0), text)
+    def label_row(y0: float, height: float, text: str) -> None:
+        d.row_label(mx, y0, label_w, height, text)
 
-    # --- Row 1: Title (full width) ---
-    y = 24
-    title = d.box(
+    def cell(x: float, y: float, w: float, text: str, role: str, *, min_h: float) -> str:
+        return d.box(x, y, w, min_h, text, role, fixed_width=True, max_chars=mc)
+
+    # --- Row 1: Title ---
+    y = top_margin
+    title = cell(
         content_x,
         y,
         content_w,
-        36,
-        normalize_label(
-            "Integrated Machine Learning for Channel Estimation and "
-            "Resource Management in 6G Smart-Factory Wireless Systems",
-            max_chars=LABEL_MAX_CHARS_NARROW,
-        ),
+        "Integrated Machine Learning for Channel Estimation and "
+        "Resource Management in 6G Smart-Factory Wireless Systems",
         "primary",
-        fixed_width=True,
+        min_h=h_title,
     )
-    label_row(y, [title], "Title")
+    force_height([title], h_title)
+    label_row(y, h_title, "Title")
 
-    # --- Row 2: Problems ---
+    # --- Row 2: Problems (restored wording) ---
     y = d.bottom(title) + row_gap
     problem_labels = [
         "Industrial halls impose multipath, metallic scattering, and mobility "
@@ -1515,121 +1619,120 @@ def build_research_framework() -> str:
         "policies compose into URLLC-grade factory reliability.",
     ]
     probs = [
-        d.box(col_x(i), y, col_w, 36, normalize_label(text, max_chars=LABEL_MAX_CHARS_NARROW), "primary", fixed_width=True)
+        cell(col_x(i), y, col_w, text, "primary", min_h=h_problems)
         for i, text in enumerate(problem_labels)
     ]
-    label_row(y, probs, "Problems")
+    force_height(probs, h_problems)
+    label_row(y, h_problems, "Problems")
     for p in probs:
         down_arrow(title, p)
 
-    # --- Row 3: Objectives ---
+    # --- Row 3: Objectives (restored wording) ---
     y = max(d.bottom(p) for p in probs) + row_gap
     objective_labels = [
-        "RQ1: Compare learned and classical estimators on BER, confidence, and "
-        "runtime across factory channel models.",
-        "RQ2: Compare ML/DRL and classical schedulers on throughput, latency, and "
-        "fairness under identical estimated CSI.",
-        "RQ3: Interpret integrated end-to-end outcomes under methodology "
-        "principles P1–P5 versus decoupled PHY-only or MAC-only readings.",
+        "RQ1: Compare a neural and an LS estimator on BER, stopping "
+        "confidence, and runtime under a factory channel model.",
+        "RQ2: Compare classical and learned schedulers on throughput, latency, "
+        "power, and fairness under identical estimated CSI.",
+        "RQ3: Test whether joint PHY/MAC reading changes trade-offs relative to "
+        "PHY-only or MAC-only views of the same runs.",
     ]
     objs = [
-        d.box(col_x(i), y, col_w, 36, normalize_label(text, max_chars=LABEL_MAX_CHARS_NARROW), "secondary", fixed_width=True)
+        cell(col_x(i), y, col_w, text, "secondary", min_h=h_objectives)
         for i, text in enumerate(objective_labels)
     ]
-    label_row(y, objs, "Objectives")
+    force_height(objs, h_objectives)
+    label_row(y, h_objectives, "Objectives")
     for p, o in zip(probs, objs):
         down_arrow(p, o)
 
-    # --- Row 4: Methodology (nested sub-steps; group height follows content) ---
+    # --- Row 4: Methodology (restored nested steps) ---
     y = max(d.bottom(o) for o in objs) + row_gap
-    inner_pad = 8
-    sub_gap = 6
+    inner_pad = 12
+    sub_gap = 10
     inner_w = col_w - 2 * inner_pad
     meth_steps = [
         [
-            "Survey decoupled CE/RM evaluation and factory wireless requirements.",
-            "Anchor scenarios: Rayleigh, Rician, TR 38.901 UMi (P4).",
-            "Model NLOS and mobility via stochastic profiles and ray-tracing propagation.",
+            "Review separate CE/RM evaluation practice in factory wireless.",
+            "Neural vs LS estimator on Rayleigh QPSK; transceiver chain fixed.",
+            "Report BER, stopping confidence, and runtime.",
         ],
         [
-            "Integrated evaluation methodology (P1–P5) for staged PHY–MAC coupling.",
-            "CE stage: classical and neural estimators on shared channel draws (P1).",
-            "RM stage: ML/DRL schedulers on estimated CSI and error variance (P2–P3).",
+            "Staged joint evaluation: same samples, estimated CSI at scheduler.",
+            "Eight schedulers: six classical plus two DRL on estimated CSI.",
+            "Sweep Rayleigh, Rician, and TR 38.901 UMi; report throughput, "
+            "latency, power, fairness.",
         ],
         [
-            "Monte Carlo link simulation (Sionna) with Eb/N0 sweeps.",
-            "Benchmark against LS, PF, WMMSE, and static baselines.",
-            "Report BER, throughput, and latency on locked canonical runs.",
+            "Monte Carlo OFDM link simulation with Eb/N0 sweeps.",
+            "Read the same runs jointly, then as PHY-only and MAC-only views.",
+            "Test whether ranking, trade-off, or gain attribution changes.",
         ],
     ]
+    sub_h = (h_methodology - 2 * inner_pad - 2 * sub_gap) / 3
     meth_tops: list[str] = []
     meth_bottoms: list[str] = []
-    meth_cols: list[str] = []
 
     for i, steps in enumerate(meth_steps):
         gx = col_x(i)
         sub_ids: list[str] = []
-        sy = y + inner_pad
-        for step in steps:
-            sub_id = d.box(
-                gx + inner_pad,
-                sy,
-                inner_w,
-                32,
-                normalize_label(step, max_chars=LABEL_MAX_CHARS_NARROW),
-                "neutral",
-                fixed_width=True,
-            )
+        for j, step in enumerate(steps):
+            sy = y + inner_pad + j * (sub_h + sub_gap)
+            sub_id = cell(gx + inner_pad, sy, inner_w, step, "neutral", min_h=sub_h)
             sub_ids.append(sub_id)
-            sy = d.bottom(sub_id) + sub_gap
-        group_h = d.bottom(sub_ids[-1]) + inner_pad - y
-        d.group_rect(gx, y, col_w, group_h)
+        force_height(sub_ids, sub_h)
+        for j, sid in enumerate(sub_ids):
+            x0, _, w0, _ = d._geom[sid]
+            yj = y + inner_pad + j * (sub_h + sub_gap)
+            d._geom[sid] = (x0, yj, w0, sub_h)
+            for cid, data in d.cells:
+                if cid == sid:
+                    data["y"] = yj
+                    data["h"] = sub_h
+        d.group_rect(gx, y, col_w, h_methodology)
         meth_tops.append(sub_ids[0])
         meth_bottoms.append(sub_ids[-1])
-        meth_cols.append(sub_ids[-1])
 
-    label_row(y, meth_cols, "Methodology")
+    label_row(y, h_methodology, "Methodology")
     for o, top_id in zip(objs, meth_tops):
         down_arrow(o, top_id)
 
-    # --- Row 5: Outcome ---
-    y = max(d.bottom(n) for n in meth_cols) + row_gap
+    # --- Row 5: Outcome (restored wording; no Chapter 4 numbers) ---
+    y = y + h_methodology + row_gap
     outcome_labels = [
-        "Neural estimation delivers 160–415× lower BER than LS at low Eb/N0 on "
-        "shared channel contexts (RQ1).",
-        "BER-aware DRL achieves ~25× lower BER than static scheduling on Rician "
-        "links at 0 dB (RQ2).",
-        "TR 38.901 UMi shows ~10× BER gain over static at matched throughput; "
-        "integrated readings expose MAC-dominated trade-offs (RQ3).",
+        "Estimator comparison under shared samples: relative BER, confidence, "
+        "and runtime for neural versus LS (RQ1).",
+        "Scheduler comparison under estimated CSI: throughput, latency, power, "
+        "fairness, and BER across classical and learned policies (RQ2).",
+        "Joint PHY/MAC interpretation of the same runs versus "
+        "PHY-only or MAC-only readings (RQ3).",
     ]
     results = [
-        d.box(col_x(i), y, col_w, 36, normalize_label(text, max_chars=LABEL_MAX_CHARS_NARROW), "success", fixed_width=True)
+        cell(col_x(i), y, col_w, text, "success", min_h=h_outcome)
         for i, text in enumerate(outcome_labels)
     ]
-    label_row(y, results, "Outcome")
+    force_height(results, h_outcome)
+    label_row(y, h_outcome, "Outcome")
     for mb, r in zip(meth_bottoms, results):
         down_arrow(mb, r)
 
-    # --- Row 6: Significance (full width) ---
+    # --- Row 6: Significance (restored wording) ---
     y = max(d.bottom(r) for r in results) + row_gap
-    sig = d.box(
+    sig = cell(
         content_x,
         y,
         content_w,
-        36,
-        normalize_label(
-            "An integrated ML evaluation framework for robust, efficient, and scalable "
-            "6G wireless in Industry 5.0 smart factories.",
-            max_chars=LABEL_MAX_CHARS_NARROW,
-        ),
+        "A joint PHY/MAC evaluation methodology for machine-learning channel "
+        "estimation and resource management in 6G smart-factory wireless.",
         "accent",
-        fixed_width=True,
+        min_h=h_significance,
     )
-    label_row(y, [sig], "Significance Impact")
+    force_height([sig], h_significance)
+    label_row(y, h_significance, "Significance<br>Impact")
     for r in results:
         down_arrow(r, sig)
 
-    d.page_h = max(ph, int(d.bottom(sig)) + 24)
+    d.page_h = ph
     return d.to_xml()
 
 

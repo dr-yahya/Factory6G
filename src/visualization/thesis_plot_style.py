@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-# Matches LaTeX \small in 12pt report (dense body table cell text). See thesis/CONTEXT.md.
-TABLE_FONT_PT = 11
-FIG_TITLE_PT = 12
-FIG_CALLOUT_PT = 10
+# Printed at \linewidth (~145 mm). Aug 2026: larger labels for Ch1 engagement figures
+# (supervisor: figure text too small); wrap earlier so callouts stay readable.
+TABLE_FONT_PT = 15
+FIG_TITLE_PT = 16
+FIG_CALLOUT_PT = 14
 # Per-line character caps for matplotlib annotations (Figure label line breaking).
-FIG_LABEL_MAX_CHARS = 28
-FIG_NOTE_MAX_CHARS = 52
+FIG_LABEL_MAX_CHARS = 22
+FIG_NOTE_MAX_CHARS = 40
 
 _SEMANTIC_BREAKS = (" · ", " → ", "; ", " — ", " – ", ", ")
 
@@ -64,8 +65,8 @@ def wrap_figure_text(text: str, *, max_chars: int = FIG_LABEL_MAX_CHARS) -> str:
     return "\n".join(lines_out)
 
 
-# Thesis body figures: ~7 in × 4.5 in at 300 dpi fits A4 with margins.
-THESIS_FIGSIZE = (7.0, 4.5)
+# Thesis body figures: slightly under linewidth (~5.7 in) so fonts stay near body size in print.
+THESIS_FIGSIZE = (5.8, 3.8)
 THESIS_DPI = 300
 EBNO_XLABEL = r"$E_b/N_0$ (dB)"
 

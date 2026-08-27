@@ -187,15 +187,24 @@ runtime writes `stage_results_v2.*` and `summary_v2.*`.
 
 Each dated weekly folder includes the stakeholder message draft and, when
 available, a concise evidence deck. The table links one primary readable
-progress report per date.
+progress report per date. These weekly packages are the evidence trail for
+remote/Friday progress updates used in the Semester 5 Meeting Log (alongside
+Microsoft Teams supervisory meetings on 10 Feb, 26 Feb, 16 Mar, and 2 Apr 2026).
 
 | Date | Progress report | Focus |
 |---|---|---|
+| 2026-01-15 | [Factory6G weekly messages](reports/weekly/2026-01-15/factory6g_weekly_messages.md) | Sem-5 plan and Chapter 2 literature-review structure; transition toward learned estimators and AI resource management. |
 | 2026-03-27 | [Factory6G weekly messages](reports/weekly/2026-03-27/factory6g_weekly_messages.md) | March PHY benchmark: Adaptive/PSO estimator evidence, TR 38.901 BER floor, modulation/factory-size impact, and corrected JIDD-SCMA result. |
 | 2026-04-20 | [Factory6G weekly messages](reports/weekly/2026-04-20/factory6g_weekly_messages.md) | April neural-estimator update: retrained Neural vs LS Rayleigh evidence, corrected DFT comparison, TR 38.901 estimator tier, and remaining large-factory/JIDD findings. |
 | 2026-04-27 | [Factory6G weekly messages](reports/weekly/2026-04-27/factory6g_weekly_messages.md) | AI resource-manager recovery, Docker workflow validation, and Rayleigh QPSK benchmark evidence. |
 | 2026-05-01 | [Factory6G weekly messages](reports/weekly/2026-05-01/factory6g_weekly_messages.md) | BER-first DRL resource-manager workflow, Rayleigh/UMi benchmark runs, and Docker validation evidence. |
+| 2026-05-15 | [Factory6G weekly messages](reports/weekly/2026-05-15/factory6g_weekly_messages.md) | Special Absence start (11 May 2026); remote Friday weekly cadence and absence milestone plan. |
 | 2026-05-23 | [Factory6G weekly messages](reports/weekly/2026-05-23/factory6g_weekly_messages.md) | Cross-channel resource-manager BER screening across Rayleigh, Rician, and UMI/TR38901, with [evidence deck](reports/weekly/2026-05-23/factory6g_weekly_evidence.pptx), [BER comparison](reports/weekly/2026-05-23/resource_manager_ber_comparison.md), and [synthetic channel curves](reports/weekly/2026-05-23/resource_manager_channel_comparison_synthetic.md); `ber_drl` matched the Rayleigh best baseline and ranked second on Rician and UMI/TR38901 in the shortened run. |
+| 2026-05-29 | [Factory6G weekly messages](reports/weekly/2026-05-29/factory6g_weekly_messages.md) | Remote thesis drafting (Chapters 3–6) and Chapter 4 evidence-family organization under Special Absence. |
+| 2026-06-05 | [Factory6G weekly messages](reports/weekly/2026-06-05/factory6g_weekly_messages.md) | Softbound drafting status; remaining large-factory BER and longer UMi RM/BER-DRL validation gaps. |
+| 2026-06-12 | [Factory6G weekly messages](reports/weekly/2026-06-12/factory6g_weekly_messages.md) | Softbound thesis package progress; Chapters 1–5 substantially in place. |
+| 2026-06-19 | [Factory6G weekly messages](reports/weekly/2026-06-19/factory6g_weekly_messages.md) | Curated evidence promotion and lean-git zones for tracked thesis claims. |
+| 2026-06-26 | [Factory6G weekly messages](reports/weekly/2026-06-26/factory6g_weekly_messages.md) | Sem-5 softbound package ready for supervisor review and signature. |
 
 ## Quick Validation
 

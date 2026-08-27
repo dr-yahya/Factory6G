@@ -31,11 +31,17 @@ def _save(fig: Any, path: Path) -> None:
 
 
 def plot_urllc_tradeoff(*, output_path: Path) -> None:
-    """Reliability--latency design space with throughput as marker scale (motivation)."""
+    """Reliability--latency design space with throughput as marker scale (motivation).
+
+    Layout is spaced so callouts never overlap the markers or each other: the two
+    top service classes are labelled above the axes, the two lower ones below their
+    markers, the band label sits in clear space inside the band, and the
+    marker-size note sits in the empty mid-field.
+    """
     import matplotlib.pyplot as plt
 
     apply_thesis_rcparams(plt)
-    fig, ax = plt.subplots(figsize=THESIS_FIGSIZE)
+    fig, ax = plt.subplots(figsize=(6.2, 4.2))
 
     # Illustrative service-class anchors (not measured results).
     services = {
@@ -43,44 +49,47 @@ def plot_urllc_tradeoff(*, output_path: Path) -> None:
             "latency_ms": 1.0,
             "reliability_pct": 99.999,
             "throughput": 80,
-            "xytext": (-14, 12),
-            "ha": "right",
+            "xytext": (-10, 24),
+            "ha": "center",
             "va": "bottom",
         },
-        "URLLC\n(general)": {
+        "URLLC (general)": {
             "latency_ms": 5.0,
             "reliability_pct": 99.99,
             "throughput": 120,
-            "xytext": (12, 12),
+            "xytext": (48, -30),
             "ha": "left",
-            "va": "bottom",
+            "va": "center",
         },
         "eMBB": {
             "latency_ms": 40.0,
             "reliability_pct": 99.0,
             "throughput": 400,
-            "xytext": (10, -14),
-            "ha": "left",
+            "xytext": (0, -22),
+            "ha": "center",
             "va": "top",
         },
         "mMTC": {
             "latency_ms": 500.0,
             "reliability_pct": 99.0,
             "throughput": 60,
-            "xytext": (10, -12),
-            "ha": "left",
+            "xytext": (0, -22),
+            "ha": "center",
             "va": "top",
         },
     }
 
     ax.axvspan(0.3, 10.0, ymin=0.55, ymax=1.0, color=SUNWAY_NAVY, alpha=0.08, zorder=0)
     ax.text(
-        0.45,
-        99.9985,
-        "Factory URLLC target band",
-        fontsize=FIG_CALLOUT_PT,
+        0.42,
+        99.60,
+        "Factory URLLC\ntarget band",
+        fontsize=FIG_CALLOUT_PT - 2,
         color=SUNWAY_NAVY,
-        va="top",
+        ha="left",
+        va="center",
+        linespacing=1.2,
+        zorder=2,
     )
 
     for index, (label, spec) in enumerate(services.items()):
@@ -102,59 +111,38 @@ def plot_urllc_tradeoff(*, output_path: Path) -> None:
             xy=(spec["latency_ms"], spec["reliability_pct"]),
             xytext=spec["xytext"],
             textcoords="offset points",
-            fontsize=FIG_CALLOUT_PT,
+            fontsize=FIG_CALLOUT_PT - 1,
             ha=spec.get("ha", "left"),
             va=spec.get("va", "center"),
             color=color,
+            linespacing=1.2,
             arrowprops=dict(
                 arrowstyle="-",
                 color=color,
                 lw=0.9,
-                shrinkA=0,
+                shrinkA=2,
                 shrinkB=max(2.0, marker_radius_pt * 0.35),
                 relpos=(0.5, 0.5),
             ),
             zorder=4,
         )
 
-    integrated_callout = wrap_figure_text(
-        "Integrated PHY--MAC evaluation (BER $\\leftrightarrow$ scheduling)",
-        max_chars=FIG_NOTE_MAX_CHARS,
-    )
+    ax.set_xscale("log")
+    ax.set_xlim(0.4, 900)
+    ax.set_ylim(98.55, 100.05)
+    ax.set_xlabel("End-to-end latency (ms)")
+    ax.set_ylabel("Reliability (%)")
+    ax.grid(True, which="both", alpha=0.35)
     ax.annotate(
-        integrated_callout,
-        xy=(7.5, 99.955),
-        xytext=(32.0, 99.26),
-        fontsize=FIG_CALLOUT_PT,
+        "Marker area $\\propto$ throughput demand",
+        xy=(0.60, 0.60),
+        xycoords="axes fraction",
+        fontsize=FIG_CALLOUT_PT - 2,
         color=SUNWAY_GREY,
         ha="center",
         va="center",
-        bbox=dict(boxstyle="round,pad=0.25", facecolor="white", edgecolor="none", alpha=0.9),
-        arrowprops=dict(
-            arrowstyle="->",
-            color=SUNWAY_GREY,
-            lw=1.4,
-            connectionstyle="arc3,rad=-0.22",
-            shrinkA=8,
-            shrinkB=0,
-            relpos=(0.0, 0.5),
-        ),
-        zorder=4,
-    )
-
-    ax.set_xscale("log")
-    ax.set_xlim(0.4, 800)
-    ax.set_ylim(98.8, 100.002)
-    ax.set_xlabel("End-to-end latency (ms)")
-    ax.set_ylabel("Reliability (\\%)")
-    ax.grid(True, which="both", alpha=0.35)
-    ax.text(
-        0.02,
-        0.04,
-        "Marker area $\\propto$ throughput demand (illustrative)",
-        transform=ax.transAxes,
-        fontsize=FIG_CALLOUT_PT,
-        color=SUNWAY_GREY,
+        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor=SUNWAY_GREY, alpha=0.9),
+        zorder=5,
     )
 
     fig.tight_layout()
@@ -167,7 +155,7 @@ def plot_fading_scenarios(*, output_path: Path) -> None:
     import matplotlib.pyplot as plt
 
     apply_thesis_rcparams(plt)
-    fig, axes = plt.subplots(1, 3, figsize=(7.0, 2.85))
+    fig, axes = plt.subplots(1, 3, figsize=(5.8, 2.6))
     envelope_ylabel = wrap_figure_text("Envelope PDF (probability density)")
 
     # (a) Rayleigh channel magnitude |h|
@@ -270,7 +258,7 @@ def plot_lr_eval_coupling(*, output_path: Path) -> None:
     import matplotlib.pyplot as plt
 
     apply_thesis_rcparams(plt)
-    fig, ax = plt.subplots(figsize=(7.0, 3.35))
+    fig, ax = plt.subplots(figsize=(5.8, 3.2))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")

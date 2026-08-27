@@ -401,15 +401,16 @@ def _plot_ber_publication(
 
     style_ebno_axis(ax, ylabel="BER", title=title)
     ax.legend()
-    ax.text(
+    # Place outside axes so the note does not collide with y-tick labels.
+    fig.text(
+        0.5,
         0.01,
-        0.02,
-        "dashed/open = 95% BER upper bound (zero observed errors)",
-        transform=ax.transAxes,
+        "Dashed/open markers: 95% BER upper bound (zero observed errors)",
+        ha="center",
         fontsize=9,
-        alpha=0.75,
+        alpha=0.85,
     )
-    fig.tight_layout()
+    fig.tight_layout(rect=(0.0, 0.04, 1.0, 1.0))
     fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 

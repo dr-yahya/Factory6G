@@ -90,7 +90,7 @@ def plot_ch04_ber_heatmap(
             matrix[row, col] = max(ber, 1e-12)
             statuses[row][col] = status
 
-    fig, ax = plt.subplots(figsize=(7.0, 4.6))
+    fig, ax = plt.subplots(figsize=(5.8, 3.9))
     im = ax.imshow(matrix, cmap="YlOrRd", norm=LogNorm(vmin=1e-5, vmax=1e-2), aspect="auto")
 
     ax.set_xticks(range(len(channels)))
