@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Export thesis/figures/*.drawio to matching PNGs via draw.io desktop CLI.
+# Export thesis/figures/src/*.drawio to matching PNGs in thesis/figures/ via the draw.io desktop CLI.
 #
 # Setup (once on macOS):
 #   brew install --cask drawio
@@ -7,17 +7,18 @@
 #
 # Usage:
 #   ./scripts/tools/export_thesis_drawio.sh
-#   ./scripts/tools/export_thesis_drawio.sh thesis/figures/fig_phy_stack.drawio
+#   ./scripts/tools/export_thesis_drawio.sh thesis/figures/src/fig_phy_stack.drawio
 
 # After editing in draw.io desktop or via drawio-skill:
 #   Connectors → Arrange → To back (boxes above lines).
 #   Methodology flows only: step badges near top-left corner (~6px outside, no overlap);
-#   badges above connectors. See thesis/CONTEXT.md → Step-number badges.
+#   badges above connectors. See thesis/notes/CONTEXT.md → Step-number badges.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../" && pwd)"
-FIGDIR="${ROOT}/thesis/figures"
+FIGDIR="${ROOT}/thesis/figures"          # exported PNGs live here
+SRCDIR="${FIGDIR}/src"                    # .drawio sources live here
 SCALE="${DRAWIO_EXPORT_SCALE:-2}"
 BORDER="${DRAWIO_EXPORT_BORDER:-8}"
 
@@ -32,7 +33,7 @@ fi
 
 export_one() {
   local src="$1"
-  local dst="${src%.drawio}.png"
+  local dst="${FIGDIR}/$(basename "${src%.drawio}").png"
   echo "Exporting ${src} -> ${dst}"
   drawio \
     --export \
@@ -50,9 +51,9 @@ if [[ $# -gt 0 ]]; then
   done
 else
   shopt -s nullglob
-  files=("${FIGDIR}"/*.drawio)
+  files=("${SRCDIR}"/*.drawio)
   if [[ ${#files[@]} -eq 0 ]]; then
-    echo "No .drawio files in ${FIGDIR}" >&2
+    echo "No .drawio files in ${SRCDIR}" >&2
     exit 1
   fi
   for f in "${files[@]}"; do
@@ -64,4 +65,4 @@ echo "Done."
 echo "Pre-export checklist:"
 echo "  • Connectors behind boxes (Arrange → To back in draw.io desktop)"
 echo "  • Step badges (methodology flows only): near top-left corner (~6px outside), no box overlap, above connectors"
-echo "  See thesis/CONTEXT.md → Step-number badges, Manual draw.io z-order"
+echo "  See thesis/notes/CONTEXT.md → Step-number badges, Manual draw.io z-order"

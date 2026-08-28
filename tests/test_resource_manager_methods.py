@@ -7,9 +7,9 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 
-from src.models.resource_manager import create_resource_manager
-from src.sim.config import load_config
-from src.sim.types import ResourceManagerFeedback
+from factory6g.models.resource_manager import create_resource_manager
+from factory6g.sim.config import load_config
+from factory6g.sim.types import ResourceManagerFeedback
 
 
 def _make_feedback() -> ResourceManagerFeedback:

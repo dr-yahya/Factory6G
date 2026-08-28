@@ -11,13 +11,12 @@ import sys
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from src.sim.output import _plot_ber_raw
+from factory6g.sim.output import _plot_ber_raw
 
 results_dir = project_root / "results"
 json_files = sorted(results_dir.rglob("stage_results_v2.json"))

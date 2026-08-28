@@ -12,13 +12,12 @@ import sys
 from pathlib import Path
 
 project_root = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(project_root))
 
 import matplotlib
 
 matplotlib.use("Agg")
 
-from src.visualization.thesis_engagement_figures import (
+from factory6g.visualization.thesis_engagement_figures import (
     plot_fading_scenarios,
     plot_urllc_tradeoff,
 )

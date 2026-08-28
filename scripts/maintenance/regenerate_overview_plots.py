@@ -15,12 +15,11 @@ from collections import defaultdict
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
 
 import matplotlib
 matplotlib.use("Agg")
 
-from src.sim.output import write_overview_plots
+from factory6g.sim.output import write_overview_plots
 
 results_dir = project_root / "results"
 run_dirs = sorted(

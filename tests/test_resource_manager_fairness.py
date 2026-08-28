@@ -3,11 +3,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from src.models.model import Model
-from src.models.resource_manager import StaticResourceManager
-from src.sim import simulation as simulation_module
-from src.sim.config import load_config
-from src.sim.simulation import run_simulation_loop
+from factory6g.models.model import Model
+from factory6g.models.resource_manager import StaticResourceManager
+from factory6g.sim import simulation as simulation_module
+from factory6g.sim.config import load_config
+from factory6g.sim.simulation import run_simulation_loop
 
 from .conftest import make_tiny_config, write_config
 

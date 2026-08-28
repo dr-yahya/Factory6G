@@ -16,9 +16,8 @@ import numpy as np
 import tensorflow as tf
 
 project_root = Path(__file__).resolve().parents[1]
-sys.path.append(str(project_root))
 
-from src.sim.config import load_config
+from factory6g.sim.config import load_config
 
 
 DEFAULT_PROFILE_CONFIG = Path("config/factory_size_profiles.json")
@@ -850,7 +849,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Generate S/M/L synthetic factory datasets and combined artifacts."
     )
-    parser.add_argument("--config", type=str, default="config.json", help="Path to the base simulation config.")
+    parser.add_argument("--config", type=str, default="config/config.json", help="Path to the base simulation config.")
     parser.add_argument(
         "--profile-config",
         type=str,

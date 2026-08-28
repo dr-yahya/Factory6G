@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 
-from main import _FilteredTeeStream
+from factory6g.cli.run import _FilteredTeeStream
 
 
 def test_filtered_tee_writes_normal_lines_to_both_streams():

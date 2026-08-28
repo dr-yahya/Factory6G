@@ -18,15 +18,15 @@ COPY requirements.txt .
 RUN printf "mitsuba==3.8.0\ndrjit==1.3.1\n" > /tmp/overrides.txt && \
     uv pip install --system --no-cache -r requirements.txt --override /tmp/overrides.txt
 
+COPY pyproject.toml .
 COPY src/       src/
 COPY models/    models/
 COPY config/    config/
 COPY data/      data/
-COPY ["dr_athirah_simulation/", "dr_athirah_simulation/"]
-COPY main.py       .
-COPY train.py      .
-COPY visualize.py  .
-COPY config.json   .
+COPY ["reference/dr_athirah_simulation/", "reference/dr_athirah_simulation/"]
 
-ENTRYPOINT ["python", "main.py"]
-CMD ["--config", "config.json"]
+# Editable install wires up the `factory6g` package + console entrypoints.
+RUN uv pip install --system --no-cache -e .
+
+ENTRYPOINT ["python", "-m", "factory6g.cli.run"]
+CMD ["--config", "config/config.json"]

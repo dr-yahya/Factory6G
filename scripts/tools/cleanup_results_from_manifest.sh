@@ -7,6 +7,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 docker compose -f "${ROOT}/docker-compose.yml" run --rm \
   -v "${ROOT}:/app" \
   -w /app \
-  --entrypoint python \
+  --entrypoint bash \
   simulation \
-  scripts/tools/cleanup_results_from_manifest.py "$@"
+  -lc 'pip install -e . -q && exec python scripts/tools/cleanup_results_from_manifest.py "$@"' bash "$@"

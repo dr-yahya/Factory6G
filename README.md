@@ -16,24 +16,36 @@ plotting environment stays consistent.
 
 | Path | Purpose |
 |---|---|
-| `main.py` | CLI entrypoint for simulation runs. It loads `config.json`, creates a timestamped run directory, configures the environment, and dispatches the simulation flow. |
-| `config.json` | Main simulation configuration: Monte Carlo policy, enabled estimators/resource managers, system numerology, factory geometry, and output settings. |
-| `ARCHITECTURE.md` | Main architecture reference for runtime flow, stage data flow, interfaces, and output schema. Start there when reading the implementation deeply. |
-| `src/sim/` | Simulation orchestration, config loading, run context creation, stage execution, checkpointing, output writing, and plotting. |
-| `src/models/` | PHY model composition plus resource-manager implementations, learned CNN/DRL policy wrappers, and scheduling directives. |
-| `src/components/` | Signal-processing building blocks: antenna arrays, channel model, transmitter, receiver, and custom channel estimators. |
+| `pyproject.toml` | Packaging metadata. `pip install -e .` exposes the `factory6g` package plus the `factory6g-run` / `factory6g-train` / `factory6g-visualize` console entrypoints. |
+| `src/factory6g/cli/run.py` | CLI entrypoint for simulation runs (`python -m factory6g.cli.run`). Loads `config/config.json`, creates a timestamped run directory, configures the environment, and dispatches the simulation flow. |
+| `src/factory6g/cli/train.py` | NeuralChannelEstimator training entrypoint (`python -m factory6g.cli.train`). |
+| `src/factory6g/cli/visualize.py` | Factory ray-tracing visualization entrypoint (`python -m factory6g.cli.visualize`). |
+| `config/config.json` | Main simulation configuration: Monte Carlo policy, enabled estimators/resource managers, system numerology, factory geometry, and output settings. |
+| `config/factory_size_profiles.json` | Factory size profile definitions (S/M/L) for dataset generation. |
+| `docs/ARCHITECTURE.md` | Main architecture reference for runtime flow, stage data flow, interfaces, and output schema. Start there when reading the implementation deeply. |
+| `docs/CONTEXT.md` | Repo-wide working context and lean-git zone policy. |
+| `docs/assets/system_design/` | Static system-design images. |
+| `src/factory6g/sim/` | Simulation orchestration, config loading, run context creation, stage execution, checkpointing, output writing, and plotting. |
+| `src/factory6g/models/` | PHY model composition plus resource-manager implementations, learned CNN/DRL policy wrappers, and scheduling directives. |
+| `src/factory6g/components/` | Signal-processing building blocks: antenna arrays, channel model, transmitter, receiver, and custom channel estimators. |
+| `src/factory6g/athirah/` | Python port of the MATLAB polar-coded SCMA-OFDM (JIDD-SCMA) reference. |
 | `scripts/` | Dataset generation, model training, reporting, visualization, and maintenance utilities. Use Docker with a repo bind mount for these scripts. |
-| `config/` | Auxiliary configuration files, including factory size profiles. |
 | `data/` | Generated training datasets and dataset documentation. See `data/README.md`. |
 | `models/` | Trained channel-estimator and resource-manager artifacts. |
 | `results/` | Local full simulation runs (gitignored). See `results/README.md`. |
 | `reports/` | Progress reports and curated evidence summaries. |
 | `reports/evidence/` | Cross-cutting promoted plots, tables, and stage summaries. |
 | `tests/` | Unit and integration tests for config, CLI flow, estimators, resource managers, plotting, datasets, and DRL policy loading. |
-| `system_design/` | Static system-design images. |
-| `dr_athirah_simulation/` | Reference MATLAB-origin PHY/MAC/APP layer material and JIDD-SCMA assets. |
+| `reference/dr_athirah_simulation/` | Reference MATLAB-origin PHY/MAC/APP layer material and JIDD-SCMA assets. |
+| `thesis/` | LaTeX thesis sources, figures, and notes (gitignored; local only). |
+| `archive/` | Superseded drafting workflows kept for reference (gitignored). |
 
 ## Docker Setup
+
+The code is a proper Python package (`factory6g`, see `pyproject.toml`). The
+Docker image runs `pip install -e .` during build, so image-based runs work out
+of the box. For bind-mounted runs against a live checkout, run `pip install -e .`
+inside the container first (shown in the examples below).
 
 Build the CPU simulation image:
 
@@ -44,21 +56,21 @@ docker compose build simulation
 Run CPU simulations with the `simulation` service:
 
 ```bash
-docker compose run --rm simulation --config config.json
+docker compose run --rm simulation --config config/config.json
 ```
 
 Run GPU simulations with the `simulation-gpu` service when the host has NVIDIA
-Docker support and `config.json` is set for GPU execution:
+Docker support and `config/config.json` is set for GPU execution:
 
 ```bash
-docker compose run --rm simulation-gpu --config config.json
+docker compose run --rm simulation-gpu --config config/config.json
 ```
 
 Use `--build` when source code, config defaults, model files, or dependencies
 may have changed and you want Docker Compose to rebuild before the run:
 
 ```bash
-docker compose run --rm --build simulation --config config.json
+docker compose run --rm --build simulation --config config/config.json
 ```
 
 Use a repo bind mount when running tests or scripts that are not copied into the
@@ -66,18 +78,20 @@ image, or when you need the container to see the exact checkout without a
 rebuild:
 
 ```bash
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation main.py --help
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation -m factory6g.cli.run --help
 ```
 
 ## CLI Behavior
 
-The CLI is implemented in `main.py`.
+The CLI is implemented in `src/factory6g/cli/run.py` (run it with
+`python -m factory6g.cli.run` or the installed `factory6g-run` console script;
+the `simulation` Docker service uses it as its entrypoint).
 
 - `--estimators ls,dft,adaptive` runs only the estimator stage unless
   `--resource-managers` is also passed.
 - `--resource-managers static,pf,drl` runs only the resource-manager stage
   unless `--estimators` is also passed.
-- With no method override flags, the run uses estimators from `config.json` and
+- With no method override flags, the run uses estimators from `config/config.json` and
   defaults the resource-manager stage to `max_throughput`.
 - `--channel` accepts `rayleigh`, `rician`, `tr38901`, or `awgn`.
 - `--modulation` accepts `low` for QPSK, `mid` for 16-QAM, and `high` for
@@ -95,25 +109,25 @@ checks unless you intentionally want to regenerate research results.
 ### Baseline Resource Managers - Rayleigh
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel rayleigh --modulation low --factory-size s
+docker compose run --rm --build simulation --config config/config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel rayleigh --modulation low --factory-size s
 ```
 
 ### Baseline Resource Managers - TR 38.901 UMi
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel tr38901 --modulation low --factory-size s
+docker compose run --rm --build simulation --config config/config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel tr38901 --modulation low --factory-size s
 ```
 
 ### BER-First Learned Resource Manager - TR 38.901 UMi
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers reliability_drl --channel tr38901 --modulation low --factory-size s
+docker compose run --rm --build simulation --config config/config.json --resource-managers reliability_drl --channel tr38901 --modulation low --factory-size s
 ```
 
 ### BER-First Learned Resource Manager - Rayleigh
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers reliability_drl --channel rayleigh --modulation low --factory-size s
+docker compose run --rm --build simulation --config config/config.json --resource-managers reliability_drl --channel rayleigh --modulation low --factory-size s
 ```
 
 ### Resume An Interrupted Resource-Manager Run
@@ -122,7 +136,7 @@ Use the channel that matches the original run directory. For UMi runs, pass
 `--channel tr38901`; the scenario label in output names is usually `umi`.
 
 ```bash
-docker compose run -d --rm simulation --config config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel <rayleigh|tr38901> --modulation low --factory-size s --resume /app/results/<run_dir>
+docker compose run -d --rm simulation --config config/config.json --resource-managers static,round_robin,max_throughput,pf,wmmse,queue_aware,drl --channel <rayleigh|tr38901> --modulation low --factory-size s --resume /app/results/<run_dir>
 ```
 
 The resume path must be the in-container path under `/app/results/`. A resumed
@@ -173,10 +187,11 @@ plot and inspect `ber_upper_confidence` alongside raw `ber`.
 
 Dataset and training workflows are documented in `data/README.md`. Keep those
 commands Dockerized. Use a repo bind mount for script-based workflows because
-the `scripts/` tree is intended to be executed from the checkout:
+the `scripts/` tree is intended to be executed from the checkout; run an
+editable install first so the bind-mounted `factory6g` package resolves:
 
 ```bash
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/generate_rm_ber_report.py
+docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc "pip install -e . -q && python scripts/tools/generate_rm_ber_report.py"
 ```
 
 Generated summaries and research-facing tables live under `reports/`. Some
@@ -208,22 +223,23 @@ Microsoft Teams supervisory meetings on 10 Feb, 26 Feb, 16 Mar, and 2 Apr 2026).
 
 ## Quick Validation
 
-Validate the CLI syntax inside Docker:
+Validate the CLI syntax inside Docker (the bind-mounted checkout needs an
+editable install so the `factory6g` package resolves):
 
 ```bash
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation main.py --help
+docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc "pip install -e . -q && python -m factory6g.cli.run --help"
 ```
 
 Run a lightweight test subset inside Docker:
 
 ```bash
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation -m pytest tests/test_config_loader.py tests/test_main_cli.py -q
+docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc "pip install -e . -q && python -m pytest tests/test_config_loader.py tests/test_main_cli.py -q"
 ```
 
 Run the DRL policy loader regression inside Docker:
 
 ```bash
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation -m pytest tests/test_drl_policy_pipeline.py -q
+docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc "pip install -e . -q && python -m pytest tests/test_drl_policy_pipeline.py -q"
 ```
 
 Do not run full reproduction simulations as routine validation. They are meant
@@ -232,12 +248,13 @@ channel model, enabled methods, hardware, and Monte Carlo stopping behavior.
 
 ## Reading Path For New Contributors
 
-1. Read `ARCHITECTURE.md` for the fixed simulation flow and data contracts.
-2. Inspect `main.py` to understand CLI overrides and run-directory creation.
-3. Follow `src/sim/flow.py` into `src/sim/stages/estimators.py` and
-   `src/sim/stages/resource_managers.py`.
-4. Read `src/models/model.py` for the PHY model composition.
-5. Read `src/models/resource_manager.py` for the scheduling and power-control
-   interface used by all resource managers.
+1. Read `docs/ARCHITECTURE.md` for the fixed simulation flow and data contracts.
+2. Inspect `src/factory6g/cli/run.py` to understand CLI overrides and
+   run-directory creation.
+3. Follow `src/factory6g/sim/flow.py` into `src/factory6g/sim/stages/estimators.py`
+   and `src/factory6g/sim/stages/resource_managers.py`.
+4. Read `src/factory6g/models/model.py` for the PHY model composition.
+5. Read `src/factory6g/models/resource_manager.py` for the scheduling and
+   power-control interface used by all resource managers.
 6. Use `data/README.md` only when you need dataset generation or model training
    workflows.

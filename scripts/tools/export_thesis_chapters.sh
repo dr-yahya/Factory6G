@@ -21,11 +21,11 @@ run_latex() {
 
 echo "==> Building full thesis (main.tex)"
 run_latex main.tex
-cp -f "${THESIS}/main.pdf" "${OUT}/thesis_full.pdf"
+cp -f "${THESIS}/build/main.pdf" "${OUT}/thesis_full.pdf"
 echo "    -> ${OUT}/thesis_full.pdf"
 
-# Standalone chapter wrappers live under thesis/exports_src/
-WRAPPER_DIR="${THESIS}/exports_src"
+# Standalone chapter wrappers are auto-generated under thesis/build/exports_src/
+WRAPPER_DIR="${THESIS}/build/exports_src"
 mkdir -p "${WRAPPER_DIR}"
 
 chapters=(
@@ -106,13 +106,16 @@ ${body}
 EOF
 
   echo "==> Building ${stem}.pdf"
-  # Compile from thesis root so relative paths resolve; wrapper is under exports_src/
+  # Compile from thesis root so relative paths resolve; wrapper is under build/exports_src/.
+  # -f: standalone chapters have unresolvable cross-chapter \ref's, so latexmk would
+  # otherwise loop until "too many passes" and never emit the PDF. -f forces it to
+  # finish and produce the PDF with '??' for the external refs (expected).
   docker run --rm \
     -v "${THESIS}:/work" \
     -w /work \
     "${IMAGE}" \
-    latexmk -g -synctex=1 -interaction=nonstopmode -file-line-error -xelatex \
-      -outdir=exports_src "exports_src/${stem}.tex"
+    latexmk -f -g -synctex=1 -interaction=nonstopmode -file-line-error -xelatex \
+      -outdir=build/exports_src "build/exports_src/${stem}.tex"
   cp -f "${WRAPPER_DIR}/${stem}.pdf" "${OUT}/${stem}.pdf"
   echo "    -> ${OUT}/${stem}.pdf"
 done

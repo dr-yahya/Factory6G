@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge thesis/zotero_import/bucket_*.bib into thesis/references.bib (dedupe by cite key)."""
+"""Merge thesis/bib/bucket_*.bib into thesis/references.bib (dedupe by cite key)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 THESIS_DIR = Path(__file__).resolve().parents[2] / "thesis"
-IMPORT_DIR = THESIS_DIR / "zotero_import"
+IMPORT_DIR = THESIS_DIR / "bib"
 OUTPUT = THESIS_DIR / "references.bib"
 
 
@@ -34,7 +34,7 @@ def main() -> None:
 
     header = (
         "% Merged bibliography for Factory6G thesis.\n"
-        "% Zotero: import bucket_*.bib into collections A–E, then auto-export here via Better BibTeX.\n"
+        "% Zotero: import bucket_*.bib (thesis/bib/) into collections A–E, then auto-export here via Better BibTeX.\n"
         "% Regenerate: python scripts/tools/merge_thesis_bibliography.py\n\n"
     )
     body = "\n\n".join(merged.values()) + "\n"

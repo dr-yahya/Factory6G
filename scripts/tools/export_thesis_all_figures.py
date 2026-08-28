@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export all thesis figures and appendix tables from thesis/figure_manifest.json."""
+"""Export all thesis figures and appendix tables from thesis/figures/manifest.json."""
 
 from __future__ import annotations
 
@@ -9,13 +9,12 @@ import sys
 from pathlib import Path
 
 project_root = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(project_root))
 
 import matplotlib
 
 matplotlib.use("Agg")
 
-from src.visualization.thesis_extension_figures import (
+from factory6g.visualization.thesis_extension_figures import (
     export_single_json_ber,
     export_single_json_sweeps,
     plot_ch04_ber_heatmap,
@@ -27,7 +26,7 @@ from src.visualization.thesis_extension_figures import (
     write_exploratory_anchor_table,
     write_run_inventory_tables,
 )
-from src.visualization.thesis_summary_figures import load_stage_json
+from factory6g.visualization.thesis_summary_figures import load_stage_json
 
 
 def _resolve(path: str | Path, root: Path) -> Path:
@@ -155,7 +154,7 @@ def main() -> None:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=project_root / "thesis" / "figure_manifest.json",
+        default=project_root / "thesis" / "figures" / "manifest.json",
         help="Path to figure manifest",
     )
     parser.add_argument("--skip-tables", action="store_true", help="Only export PNG figures")

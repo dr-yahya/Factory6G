@@ -13,10 +13,10 @@ from typing import Any
 
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-FIGDIR = Path(__file__).resolve().parents[2] / "thesis" / "figures"
+FIGDIR = Path(__file__).resolve().parents[2] / "thesis" / "figures" / "src"
 SUNWAY_NAVY = "#233369"
 
-# Canonical figure style (thesis/CONTEXT.md → Table typography anchor, Figure typographic tiers)
+# Canonical figure style (thesis/notes/CONTEXT.md → Table typography anchor, Figure typographic tiers)
 FONT_FAMILY = "Times New Roman"
 # XML pts are calibrated for printed legibility at \linewidth (~145 mm), not raw documentclass pts.
 # Aug 2026: larger box text per supervisor feedback; wrap earlier so labels stay inside shapes.
@@ -31,7 +31,7 @@ FONT_BADGE = 22
 CANVAS_LANDSCAPE = (1100, 980)
 CANVAS_PORTRAIT = (900, 1250)
 
-# Per-line character caps (Figure label line breaking). See thesis/CONTEXT.md.
+# Per-line character caps (Figure label line breaking). See thesis/notes/CONTEXT.md.
 # Tighter caps force earlier wraps so larger fonts stay inside boxes.
 LABEL_MAX_CHARS_BOX = 16
 LABEL_MAX_CHARS_NARROW = 12

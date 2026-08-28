@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.sim.config import load_config
-from src.sim.stages import estimators as estimator_stage
+from factory6g.sim.config import load_config
+from factory6g.sim.stages import estimators as estimator_stage
 
 from .conftest import make_tiny_config, write_config
 

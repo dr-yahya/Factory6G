@@ -5,12 +5,11 @@ import os
 import sys
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(project_root)
 
 import numpy as np
 import tensorflow as tf
 
-from src.models.drl_policy import (
+from factory6g.models.drl_policy import (
     build_policy_training_inputs,
     compile_policy_model,
     create_policy_model,
@@ -18,7 +17,7 @@ from src.models.drl_policy import (
     load_rm_policy_dataset,
     save_policy_checkpoint,
 )
-from src.sim.config import load_config
+from factory6g.sim.config import load_config
 
 
 def _validate_shapes(
@@ -220,7 +219,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Train the Factory6G DRL-style resource-manager policy checkpoint."
     )
-    parser.add_argument("--config", type=str, default="config.json", help="Path to the config JSON file")
+    parser.add_argument("--config", type=str, default="config/config.json", help="Path to the config JSON file")
     parser.add_argument(
         "--data",
         type=str,

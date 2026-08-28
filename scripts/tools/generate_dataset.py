@@ -7,9 +7,8 @@ import sys
 from typing import Any
 
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(project_root)
 
-from src.sim.env import configure_env
+from factory6g.sim.env import configure_env
 
 configure_env(force_cpu=True, gpu_num=0)
 
@@ -17,10 +16,10 @@ import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
 
-from src.models.model import Model
-from src.models.resource_manager import ResourceDirectives, create_resource_manager
-from src.sim.config import load_config
-from src.sim.stages.common import ber_upper_confidence_bound, extract_error_stats
+from factory6g.models.model import Model
+from factory6g.models.resource_manager import ResourceDirectives, create_resource_manager
+from factory6g.sim.config import load_config
+from factory6g.sim.stages.common import ber_upper_confidence_bound, extract_error_stats
 
 
 def _preprocess_channel_for_cnn(h_hat: tf.Tensor) -> np.ndarray:
@@ -260,7 +259,7 @@ def generate_dataset(
     seed: int,
     tries: int = 16,
     latency_weight: float = 0.002,
-    config_path: str = "config.json",
+    config_path: str = "config/config.json",
     channel: str | None = None,
     ebno_grid: list[float] | None = None,
     ebno_jitter: float = 0.0,
@@ -438,7 +437,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate Sionna-aligned dataset for 6G resource management CNN"
     )
-    parser.add_argument("--config", type=str, default="config.json", help="Path to the config JSON file")
+    parser.add_argument("--config", type=str, default="config/config.json", help="Path to the config JSON file")
     parser.add_argument("--output", type=str, default="data/dataset.parquet", help="Output Parquet file path")
     parser.add_argument("--samples", type=int, default=100, help="Number of samples to generate")
     parser.add_argument("--batch-size", type=int, default=1, help="Must be 1 for per-sample supervised dataset")

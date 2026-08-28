@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.sim.stages.common import (
+from factory6g.sim.stages.common import (
     POINT_STATUS_RESOLVED,
     POINT_STATUS_UPPER_BOUND_ONLY,
     append_point_metrics,

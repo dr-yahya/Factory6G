@@ -19,7 +19,7 @@ def test_main_cli_runs_fixed_flow_without_plots(tmp_path):
     config_path = write_config(tmp_path, config_data)
 
     result = subprocess.run(
-        [sys.executable, "main.py", "--config", str(config_path)],
+        [sys.executable, "-m", "factory6g.cli.run", "--config", str(config_path)],
         cwd=Path(__file__).resolve().parents[1],
         capture_output=True,
         text=True,
@@ -73,7 +73,7 @@ def test_main_cli_generates_required_stage_plots(tmp_path):
     config_path = write_config(tmp_path, config_data)
 
     result = subprocess.run(
-        [sys.executable, "main.py", "--config", str(config_path)],
+        [sys.executable, "-m", "factory6g.cli.run", "--config", str(config_path)],
         cwd=Path(__file__).resolve().parents[1],
         capture_output=True,
         text=True,

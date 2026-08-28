@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Export all Ch4 + Appendix B figures from thesis/figure_manifest.json (Docker).
+# Export all Ch4 + Appendix B figures from thesis/figures/manifest.json (Docker).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -7,6 +7,6 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 docker compose -f "${ROOT}/docker-compose.yml" run --rm \
   -v "${ROOT}:/app" \
   -w /app \
-  --entrypoint python \
+  --entrypoint bash \
   simulation \
-  scripts/tools/export_thesis_all_figures.py "$@"
+  -lc 'pip install -e . -q && exec python scripts/tools/export_thesis_all_figures.py "$@"' bash "$@"

@@ -35,7 +35,7 @@ def main() -> None:
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=project_root / "thesis" / "figure_manifest.json",
+        default=project_root / "thesis" / "figures" / "manifest.json",
     )
     parser.add_argument("--dry-run", action="store_true", help="Print paths only")
     parser.add_argument("--force", action="store_true", help="Skip reference safety check")

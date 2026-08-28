@@ -7,12 +7,12 @@ import pytest
 import tensorflow as tf
 from sionna.phy.ofdm import ResourceGrid
 
-from src.components.estimators import (
+from factory6g.components.estimators import (
     AdaptiveHybridChannelEstimator,
     LMMSEChannelEstimator,
     select_quality_branch,
 )
-from src.models.model import Model
+from factory6g.models.model import Model
 
 from .conftest import make_tiny_config, set_all_seeds
 

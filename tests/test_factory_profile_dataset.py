@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import pytest
 
-import scripts.generate_factory_dataset as dataset_module
+import scripts.tools.generate_factory_dataset as dataset_module
 
 
 def _fake_generate_profile_samples(
@@ -74,7 +74,7 @@ def _fake_generate_profile_samples(
 
 def _args_for(tmp_path: Path, *, seed: int, generate_visuals: bool) -> argparse.Namespace:
     return argparse.Namespace(
-        config="config.json",
+        config="config/config.json",
         profile_config="config/factory_size_profiles.json",
         profiles="S,M,L",
         samples_per_profile=2,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.models.model import Model
+from factory6g.models.model import Model
 
 from .conftest import make_tiny_config, set_all_seeds
 

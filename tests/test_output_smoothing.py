@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from matplotlib.axes import Axes
 
-from src.sim.output import _plot_ber_publication, _plot_ber_raw
+from factory6g.sim.output import _plot_ber_publication, _plot_ber_raw
 
 
 def test_publication_plot_uses_upper_bound_for_low_evidence_points(tmp_path, monkeypatch):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.sim.config import ConfigError, load_config
+from factory6g.sim.config import ConfigError, load_config
 
 from .conftest import make_tiny_config, write_config
 

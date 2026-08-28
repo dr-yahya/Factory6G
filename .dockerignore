@@ -15,5 +15,14 @@ Thumbs.db
 .git/
 tests/
 scripts/
-ARCHITECTURE.md
+docs/
+thesis/
+thesis_writing/
+archive/
+research/
+reports/
+outputs/
+system_design/
 CITATION.cff
+CLAUDE.md
+AGENTS.md

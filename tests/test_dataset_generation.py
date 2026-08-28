@@ -5,7 +5,7 @@ import pytest
 
 pd = pytest.importorskip("pandas")
 import scripts.generate_dataset as dataset_module
-from src.models.resource_manager import ResourceDirectives
+from factory6g.models.resource_manager import ResourceDirectives
 
 from .conftest import make_tiny_config, write_config
 

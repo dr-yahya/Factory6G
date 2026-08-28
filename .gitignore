@@ -60,6 +60,8 @@ results/*
 outputs/*
 !outputs/README.md
 
-# Thesis and thesis writing (local; keep out of the software repo)
+# Thesis, drafting history, and reference library (local; keep out of the software repo)
 thesis/
 thesis_writing/
+archive/
+research/literature/

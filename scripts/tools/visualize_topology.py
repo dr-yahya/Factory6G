@@ -16,7 +16,6 @@ from mpl_toolkits.mplot3d import Axes3D
 
 # Add src to path
 project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
 
 from sionna.phy.channel import gen_single_sector_topology as gen_topology
 

@@ -11,9 +11,8 @@ import tensorflow as tf
 from tensorflow.keras import layers, models, optimizers
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_root)
 
-from src.sim.config import load_config
+from factory6g.sim.config import load_config
 
 
 def load_data(data_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -120,7 +119,7 @@ def train_resource_manager(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the Factory6G resource-manager CNN.")
-    parser.add_argument("--config", type=str, default="config.json", help="Path to the config JSON file")
+    parser.add_argument("--config", type=str, default="config/config.json", help="Path to the config JSON file")
     parser.add_argument("--data", type=str, default="data/rm_training_data.parquet", help="Path to the training parquet file")
     parser.add_argument("--output", type=str, default="models/cnn_resource_manager.h5", help="Output model path")
     parser.add_argument("--epochs", type=int, default=10)

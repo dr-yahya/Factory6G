@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.models.resource_manager import ResourceDirectives
-from src.sim.stages.common import extract_error_stats, transmitted_ut_mask
+from factory6g.models.resource_manager import ResourceDirectives
+from factory6g.sim.stages.common import extract_error_stats, transmitted_ut_mask
 
 
 def test_extract_error_stats_filters_muted_users():

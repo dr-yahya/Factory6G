@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factory6g"
+version = "1.0.0"
+description = "6G / Beyond-5G smart-factory PHY-layer reliability and AI/ML resource-management simulation"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Yahya Khamayseh" },
+    { name = "Rosdiadee Nordin" },
+]
+# Runtime dependencies are pinned in requirements.txt (installed separately in
+# the Docker image). `pip install -e .` here only wires up the importable
+# `factory6g` package and the console entrypoints below.
+dependencies = []
+
+[project.scripts]
+factory6g-run = "factory6g.cli.run:main"
+factory6g-train = "factory6g.cli.train:main"
+factory6g-visualize = "factory6g.cli.visualize:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks end-to-end regression tests that exercise the CLI or full simulation loop",
+]

@@ -1,18 +1,18 @@
 services:
 
-  simulation:          # CPU-only (set force_cpu: true in config.json)
+  simulation:          # CPU-only (set force_cpu: true in config/config.json)
     build: .
     image: factory6g:latest
     volumes:
       - ./results:/app/results
-      - ./config.json:/app/config.json:ro
+      - ./config/config.json:/app/config/config.json:ro
 
-  simulation-gpu:      # GPU-accelerated (set force_cpu: false in config.json)
+  simulation-gpu:      # GPU-accelerated (set force_cpu: false in config/config.json)
     build: .
     image: factory6g:latest
     volumes:
       - ./results:/app/results
-      - ./config.json:/app/config.json:ro
+      - ./config/config.json:/app/config/config.json:ro
     deploy:
       resources:
         reservations:
@@ -26,8 +26,8 @@ services:
     image: factory6g:latest
     volumes:
       - ./results:/app/results
-      - ./config.json:/app/config.json:ro
-    entrypoint: ["python", "visualize.py"]
+      - ./config/config.json:/app/config/config.json:ro
+    entrypoint: ["python", "-m", "factory6g.cli.visualize"]
     command: ["--factory-size", "s,m,l,apple"]
 
   train-estimator:     # Train the NeuralChannelEstimator inside Docker
@@ -36,11 +36,11 @@ services:
     volumes:
       - ./models:/app/models          # trained weights persist on host
       - ./data:/app/data              # generated dataset persists on host
-      - ./config.json:/app/config.json:ro
-    entrypoint: ["python", "train.py"]
+      - ./config/config.json:/app/config/config.json:ro
+    entrypoint: ["python", "-m", "factory6g.cli.train"]
     command: ["--data", "data/channel_train.npz", "--output", "models/neural_estimator.keras"]
 
-  thesis:              # Build thesis/main.pdf (XeLaTeX + biber via latexmk)
+  thesis:              # Build thesis/main.pdf (XeLaTeX + biber via latexmk); output under thesis/build/
     image: texlive/texlive:latest
     volumes:
       - ./thesis:/work
@@ -54,5 +54,5 @@ services:
       - main.tex
 
   # To resume an interrupted run, override the command on the existing service:
-  #   CPU: docker compose run simulation --config config.json --resume /app/results/20260315_092517_simulation
-  #   GPU: docker compose run simulation-gpu --config config.json --resume /app/results/20260315_092517_simulation
+  #   CPU: docker compose run simulation --config config/config.json --resume /app/results/20260315_092517_simulation
+  #   GPU: docker compose run simulation-gpu --config config/config.json --resume /app/results/20260315_092517_simulation

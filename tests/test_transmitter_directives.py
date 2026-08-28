@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 from sionna.phy.ofdm import ResourceGrid
 
-from src.components.transmitter import Transmitter
-from src.models.resource_manager import ResourceDirectives
+from factory6g.components.transmitter import Transmitter
+from factory6g.models.resource_manager import ResourceDirectives
 
 from .conftest import make_tiny_config
 

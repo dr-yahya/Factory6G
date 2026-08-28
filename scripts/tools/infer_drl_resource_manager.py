@@ -6,11 +6,10 @@ import os
 import sys
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(project_root)
 
 import numpy as np
 
-from src.models.drl_policy import (
+from factory6g.models.drl_policy import (
     build_policy_state,
     load_policy_checkpoint,
     load_rm_policy_dataset,

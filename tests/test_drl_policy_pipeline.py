@@ -6,7 +6,7 @@ import zipfile
 import numpy as np
 import tensorflow as tf
 
-from src.models.drl_policy import (
+from factory6g.models.drl_policy import (
     POLICY_HISTORY_FILENAME,
     POLICY_METADATA_FILENAME,
     POLICY_MODEL_FILENAME,
@@ -21,8 +21,8 @@ from src.models.drl_policy import (
     save_policy_checkpoint,
 )
 from scripts.tools.train_drl_resource_manager import _ber_log_reliability_target
-from src.models.resource_manager import create_resource_manager
-from src.sim.types import ResourceManagerFeedback
+from factory6g.models.resource_manager import create_resource_manager
+from factory6g.sim.types import ResourceManagerFeedback
 
 
 def _synthetic_training_data() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
