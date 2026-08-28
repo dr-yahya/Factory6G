@@ -73,8 +73,9 @@ _Avoid_: results/, temp
 
 **Lean git policy**:
 Version control holds the codebase, documentation, curated evidence, and
-lightweight thesis/report sources; large or regenerable artifacts stay local or
-use Git LFS only when sharing binaries is required.
+lightweight report sources; the thesis workspace, large binaries, and
+regenerable artifacts stay local (gitignored) or use Git LFS only when sharing
+binaries is required.
 _Avoid_: Thin repo, minimal git
 
 ## Repository zones
@@ -93,14 +94,20 @@ Cross-cutting curated evidence (plots, tables, manifests) cited in multiple
 reports or the thesis, promoted from full runs.
 _Avoid_: results/, plots dump
 
-**`thesis_writing/`**:
-Thesis source and writing workspace; version-controlled text sources and cited
-figures, local-only build outputs and bulk rendered assets.
-_Avoid_: reports/, notes
+**`thesis/`**:
+The LaTeX thesis workspace (sources, figures, notes, build output). Entirely
+gitignored — local-only. See `thesis/README.md` for its layout. Built with the
+Dockerized TeX Live toolchain via `scripts/tools/*thesis*`.
+_Avoid_: committing to git, reports/
+
+**`archive/`**:
+Superseded workspaces kept for reference, e.g. `archive/thesis_writing/` (the old
+`.docx`-based drafting flow, replaced by `thesis/`). Gitignored.
+_Avoid_: active work, git
 
 **Thesis source**:
-Editable thesis inputs kept in git: markdown/LaTeX, bibliography, and helper
-scripts under `thesis_writing/tools/`.
+Thesis inputs are **not** in git (untracked in c3d2ada). Editable sources live in
+`thesis/` on disk; helper build scripts are the tracked `scripts/tools/*thesis*`.
 _Avoid_: Draft, export
 
 **Cited thesis figure**:
