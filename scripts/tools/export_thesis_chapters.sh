@@ -72,6 +72,10 @@ for entry in "${chapters[@]}"; do
 \\usepackage{algorithm}
 \\usepackage{algpseudocode}
 \\usepackage{microtype}
+% Resolve cross-chapter \\ref/\\cref (Chapter, Figure, Appendix numbers) against
+% the full-thesis main.aux so standalone exports don't show "??".
+\\usepackage{xr-hyper}
+\\externaldocument{main}
 \\usepackage[hidelinks]{hyperref}
 \\usepackage{xurl}
 \\urlstyle{tt}

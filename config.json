@@ -62,7 +62,7 @@
       "wmmse",
       "queue_aware",
       "drl",
-      "ber_drl"
+      "reliability_drl"
     ],
     "cnn_model_path": "models/cnn_resource_manager_1k.h5",
     "drl_model_path": "models/drl_resource_manager_policy",
@@ -80,8 +80,8 @@
         "temperature": 0.75,
         "fairness_weight": 0.35
       },
-      "ber_drl": {
-        "model_path": "models/ber_drl_resource_manager_policy",
+      "reliability_drl": {
+        "model_path": "models/reliability_drl_resource_manager_policy",
         "temperature": 0.65,
         "fairness_weight": 0.1,
         "channel_gain_weight": 2.0,

@@ -26,7 +26,7 @@ def test_rm_ber_report_ranks_by_ber_and_writes_outputs(tmp_path):
                 },
                 "methods": {
                     "max_throughput": {"ber": [0.01], "ber_upper_confidence": [0.02]},
-                    "ber_drl": {"ber": [0.005], "ber_upper_confidence": [0.01]},
+                    "reliability_drl": {"ber": [0.005], "ber_upper_confidence": [0.01]},
                 },
             }
         ),
@@ -47,7 +47,7 @@ def test_rm_ber_report_ranks_by_ber_and_writes_outputs(tmp_path):
                             "bit_errors": 1.0,
                             "total_bits": 100.0,
                         },
-                        "ber_drl": {
+                        "reliability_drl": {
                             "ber": 0.005,
                             "ber_upper_confidence": 0.01,
                             "throughput_bits_per_batch": 120.0,
@@ -62,7 +62,7 @@ def test_rm_ber_report_ranks_by_ber_and_writes_outputs(tmp_path):
                 "runtime_totals_sec": {
                     "resource_managers": {
                         "max_throughput": 10.0,
-                        "ber_drl": 11.0,
+                        "reliability_drl": 11.0,
                     }
                 },
             }
@@ -74,13 +74,13 @@ def test_rm_ber_report_ranks_by_ber_and_writes_outputs(tmp_path):
     output_csv = tmp_path / "report.csv"
     rows = report_module.generate_report([stage_json], output_md, output_csv)
 
-    ber_drl = next(row for row in rows if row.method == "ber_drl")
+    reliability_drl = next(row for row in rows if row.method == "reliability_drl")
     max_throughput = next(row for row in rows if row.method == "max_throughput")
-    assert ber_drl.rank_by_ber == 1
+    assert reliability_drl.rank_by_ber == 1
     assert max_throughput.rank_by_ber == 2
     assert output_csv.read_text(encoding="utf-8").splitlines()[0].startswith("run_id,channel_label")
     report_text = output_md.read_text(encoding="utf-8")
-    assert "`ber_drl` beats best baseline `max_throughput`" in report_text
+    assert "`reliability_drl` beats best baseline `max_throughput`" in report_text
     assert "https://arxiv.org/abs/1705.09412" in report_text
 
 
@@ -123,7 +123,7 @@ def test_rm_ber_report_reranks_same_channel_across_stage_files(tmp_path):
                 "ebno_db_range": [0.0],
                 "config_snapshot": common_config,
                 "methods": {
-                    "ber_drl": {"ber": [0.015], "ber_upper_confidence": [0.025]},
+                    "reliability_drl": {"ber": [0.015], "ber_upper_confidence": [0.025]},
                 },
             }
         ),
@@ -135,7 +135,7 @@ def test_rm_ber_report_reranks_same_channel_across_stage_files(tmp_path):
 
     assert ranks == {
         "max_throughput": 1,
-        "ber_drl": 2,
+        "reliability_drl": 2,
         "drl": 3,
     }
 
@@ -160,7 +160,7 @@ def test_rm_ber_report_uses_top_level_summary_for_nested_channel_stage(tmp_path)
                     }
                 },
                 "methods": {
-                    "ber_drl": {
+                    "reliability_drl": {
                         "ber": [0.4],
                         "ber_upper_confidence": [0.5],
                         "runtime_sec": [1.0],
@@ -175,7 +175,7 @@ def test_rm_ber_report_uses_top_level_summary_for_nested_channel_stage(tmp_path)
             {
                 "aggregate_means": {
                     "rician/resource_managers": {
-                        "ber_drl": {
+                        "reliability_drl": {
                             "ber": 0.03,
                             "ber_upper_confidence": 0.04,
                             "throughput_bits_per_batch": 200.0,
@@ -189,7 +189,7 @@ def test_rm_ber_report_uses_top_level_summary_for_nested_channel_stage(tmp_path)
                 },
                 "runtime_totals_sec": {
                     "rician/resource_managers": {
-                        "ber_drl": 12.0,
+                        "reliability_drl": 12.0,
                     }
                 },
             }

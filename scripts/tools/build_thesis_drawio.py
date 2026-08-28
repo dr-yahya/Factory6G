@@ -75,13 +75,15 @@ def _wrap_paragraph(paragraph: str, *, max_chars: int) -> list[str]:
         lines: list[str] = []
         current = parts[0].strip()
         sep_stripped = sep.strip()
+        # Keep list punctuation on the line it belongs to when a wrap falls on it.
+        trailing = sep_stripped if sep_stripped in {",", ";"} else ""
         for part in parts[1:]:
             candidate = f"{current}{sep}{part}" if current else part.strip()
             if len(candidate) <= max_chars:
                 current = candidate
             else:
                 if current:
-                    lines.append(current)
+                    lines.append(f"{current}{trailing}")
                 current = part.strip()
         if current:
             lines.append(current)
@@ -1115,7 +1117,7 @@ def build_rm_comparison() -> str:
         ("WMMSE", "primary"),
         ("Q-aware", "secondary"),
         ("DRL", "secondary"),
-        ("BER-DRL", "secondary"),
+        ("Reliability-DRL", "secondary"),
     ]
 
     header_ids = [d.box(mx, y, label_w, 52, "Dimension", "neutral", fixed_width=True)]
@@ -1225,7 +1227,7 @@ def build_rm_comparison() -> str:
 
 
 def build_drl_rm_architecture() -> str:
-    """Landscape canvas; dual-column DRL/BER-DRL inference loop with shared offline callout."""
+    """Landscape canvas; dual-column DRL/Reliability-DRL inference loop with shared offline callout."""
     pw, ph = CANVAS_LANDSCAPE
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 48
@@ -1235,7 +1237,7 @@ def build_drl_rm_architecture() -> str:
     group_pad = 8
 
     d.title(mx, 16, cw, "Learned RM inference loop")
-    d.subtitle(mx, 52, cw, "DRL and BER-DRL actors — shared state, distinct checkpoints")
+    d.subtitle(mx, 52, cw, "DRL and Reliability-DRL actors — shared state, distinct checkpoints")
 
     # Left column + actor/output row share top band; actors equal size (fixed_width)
     lw = 210
@@ -1287,7 +1289,7 @@ def build_drl_rm_architecture() -> str:
         actor_y,
         actor_w,
         actor_h,
-        "BER-DRL actor (inference)<br>pretrained policy network<br>BER-aware reward",
+        "Reliability-DRL actor (inference)<br>pretrained policy network<br>reliability-aware reward",
         "secondary",
         fixed_width=True,
     )
@@ -1322,7 +1324,7 @@ def build_drl_rm_architecture() -> str:
         cw,
         48,
         "Offline (dashed): actor trained on link-level RM dataset · shared inference loop · "
-        "distinct throughput vs BER-aware reward objectives",
+        "distinct throughput vs reliability-aware reward objectives",
         "neutral",
     )
     return d.to_xml()
@@ -1540,45 +1542,44 @@ def build_decoupled_vs_integrated() -> str:
 
 
 def build_research_framework() -> str:
-    """Full-page portrait research framework that fits above the footer.
+    """Full-page portrait research framework.
 
-    Keeps the detailed roadmap wording and nested methodology. Canvas aspect is
-    tuned so ``width=\\linewidth, height=0.80\\textheight`` fills the figure
-    page without colliding with the page number or caption.
+    Three colour-coded vertical tracks (RQ1 estimator / RQ2 scheduler / RQ3
+    joint reading) run through five phase rows: problem, research question,
+    approach, finding, contribution. Box text is condensed to phrases so the
+    structure -- not the prose -- carries the figure. Canvas aspect is tuned so
+    ``width=\\linewidth, height=0.80\\textheight`` fills the figure page without
+    colliding with the page number or caption.
     """
-    # Slot budget: ~145 mm wide × ~0.80\textheight tall (~198 mm) for the graphic;
-    # remaining text-block height holds the caption above the footer.
-    pw, ph = 1200, 1640
+    pw, ph = 1230, 1180
     d = DrawioBuilder(page_w=pw, page_h=ph)
     mx = 18
-    label_w = 118
+    label_w = 128
     gap = 10
     content_x = mx + label_w + gap
     content_w = pw - content_x - mx
-    col_gap = 12
+    col_gap = 16
     col_w = (content_w - 2 * col_gap) // 3
-    arrow_color = "#c62828"
-    mc = 26
+    mc = 18
 
-    top_margin = 14
-    bottom_margin = 14
-    n_gaps = 5
-    gap_budget = 55
-    row_gap = gap_budget / n_gaps
+    # RQ1 = estimator/PHY (blue), RQ2 = scheduler/MAC (green), RQ3 = joint (orange).
+    track_role = ("primary", "success", "accent")
+    track_arrow = ("#1565c0", "#2e7d32", "#e65100")
+
+    top_margin = 12
+    bottom_margin = 12
+    gap_budget = 70
+    row_gap = gap_budget / 5
     usable = ph - top_margin - bottom_margin - gap_budget
-    # Stretch rows to consume the canvas (methodology keeps nested detail).
-    h_title = usable * 0.08
-    h_problems = usable * 0.145
-    h_objectives = usable * 0.155
-    h_methodology = usable * 0.36
-    h_outcome = usable * 0.15
-    h_significance = usable * 0.11
+    h_title = usable * 0.085
+    h_problem = usable * 0.135
+    h_question = usable * 0.145
+    h_approach = usable * 0.40
+    h_finding = usable * 0.13
+    h_contrib = usable * 0.105
 
     def col_x(i: int) -> float:
         return content_x + i * (col_w + col_gap)
-
-    def down_arrow(src: str, dst: str) -> None:
-        d.edge(src, dst, color=arrow_color)
 
     def force_height(node_ids: list[str], height: float) -> None:
         id_set = set(node_ids)
@@ -1594,92 +1595,78 @@ def build_research_framework() -> str:
     def cell(x: float, y: float, w: float, text: str, role: str, *, min_h: float) -> str:
         return d.box(x, y, w, min_h, text, role, fixed_width=True, max_chars=mc)
 
-    # --- Row 1: Title ---
+    # --- Header band: thesis title (plain navy text, no box) ---
     y = top_margin
-    title = cell(
-        content_x,
-        y,
-        content_w,
-        "Integrated Machine Learning for Channel Estimation and "
-        "Resource Management in 6G Smart-Factory Wireless Systems",
-        "primary",
-        min_h=h_title,
+    d.title(
+        content_x, y, content_w,
+        "Integrated Machine Learning for Channel Estimation and Resource "
+        "Management in 6G Smart-Factory Wireless",
     )
-    force_height([title], h_title)
-    label_row(y, h_title, "Title")
+    y += h_title
 
-    # --- Row 2: Problems (restored wording) ---
-    y = d.bottom(title) + row_gap
+    # --- Row 1: Problem (one per track) ---
+    y += row_gap
     problem_labels = [
-        "Industrial halls impose multipath, metallic scattering, and mobility "
-        "(AGVs, cobots) that stress classical channel models.",
-        "Literature often optimises PHY channel estimation and MAC scheduling "
-        "in isolation—without propagating estimation error.",
-        "Decoupled benchmarking cannot establish whether learned PHY and MAC "
-        "policies compose into URLLC-grade factory reliability.",
+        "Harsh factory channels stress classical estimators",
+        "PHY and MAC evaluated in isolation; estimation error not propagated",
+        "Decoupled evidence cannot confirm end-to-end URLLC reliability",
     ]
     probs = [
-        cell(col_x(i), y, col_w, text, "primary", min_h=h_problems)
-        for i, text in enumerate(problem_labels)
+        cell(col_x(i), y, col_w, t, track_role[i], min_h=h_problem)
+        for i, t in enumerate(problem_labels)
     ]
-    force_height(probs, h_problems)
-    label_row(y, h_problems, "Problems")
-    for p in probs:
-        down_arrow(title, p)
+    force_height(probs, h_problem)
+    label_row(y, h_problem, "Problem")
 
-    # --- Row 3: Objectives (restored wording) ---
-    y = max(d.bottom(p) for p in probs) + row_gap
-    objective_labels = [
-        "RQ1: Compare a neural and an LS estimator on BER, stopping "
-        "confidence, and runtime under a factory channel model.",
-        "RQ2: Compare classical and learned schedulers on throughput, latency, "
-        "power, and fairness under identical estimated CSI.",
-        "RQ3: Test whether joint PHY/MAC reading changes trade-offs relative to "
-        "PHY-only or MAC-only views of the same runs.",
+    # --- Row 2: Research question ---
+    y = d.bottom(probs[0]) + row_gap
+    question_labels = [
+        "RQ1: Neural vs LS estimator: BER, stopping confidence, runtime",
+        "RQ2: Eight schedulers on shared estimated CSI: throughput, latency, "
+        "power, fairness",
+        "RQ3: Does a joint reading change rankings or trade-offs?",
     ]
-    objs = [
-        cell(col_x(i), y, col_w, text, "secondary", min_h=h_objectives)
-        for i, text in enumerate(objective_labels)
+    quest = [
+        cell(col_x(i), y, col_w, t, track_role[i], min_h=h_question)
+        for i, t in enumerate(question_labels)
     ]
-    force_height(objs, h_objectives)
-    label_row(y, h_objectives, "Objectives")
-    for p, o in zip(probs, objs):
-        down_arrow(p, o)
+    force_height(quest, h_question)
+    label_row(y, h_question, "Research<br>question")
+    for i, (p, q) in enumerate(zip(probs, quest)):
+        d.edge(p, q, color=track_arrow[i])
 
-    # --- Row 4: Methodology (restored nested steps) ---
-    y = max(d.bottom(o) for o in objs) + row_gap
+    # --- Row 3: Approach (three condensed steps per track, in a dashed group) ---
+    y = d.bottom(quest[0]) + row_gap
     inner_pad = 12
-    sub_gap = 10
+    sub_gap = 9
     inner_w = col_w - 2 * inner_pad
-    meth_steps = [
+    approach_steps = [
         [
-            "Review separate CE/RM evaluation practice in factory wireless.",
-            "Neural vs LS estimator on Rayleigh QPSK; transceiver chain fixed.",
-            "Report BER, stopping confidence, and runtime.",
+            "Neural vs LS, Rayleigh QPSK",
+            "Transceiver chain held fixed",
+            "Report BER, confidence, runtime",
         ],
         [
-            "Staged joint evaluation: same samples, estimated CSI at scheduler.",
-            "Eight schedulers: six classical plus two DRL on estimated CSI.",
-            "Sweep Rayleigh, Rician, and TR 38.901 UMi; report throughput, "
-            "latency, power, fairness.",
+            "Eight schedulers, estimated CSI at MAC",
+            "Rayleigh / Rician / TR 38.901 UMi",
+            "Report throughput, latency, power, fairness",
         ],
         [
-            "Monte Carlo OFDM link simulation with Eb/N0 sweeps.",
-            "Read the same runs jointly, then as PHY-only and MAC-only views.",
-            "Test whether ranking, trade-off, or gain attribution changes.",
+            "Same runs read jointly",
+            "vs PHY-only and MAC-only views",
+            "Check ranking, trade-off, attribution shifts",
         ],
     ]
-    sub_h = (h_methodology - 2 * inner_pad - 2 * sub_gap) / 3
-    meth_tops: list[str] = []
-    meth_bottoms: list[str] = []
-
-    for i, steps in enumerate(meth_steps):
+    sub_h = (h_approach - 2 * inner_pad - 2 * sub_gap) / 3
+    appr_tops: list[str] = []
+    appr_bottoms: list[str] = []
+    for i, steps in enumerate(approach_steps):
         gx = col_x(i)
         sub_ids: list[str] = []
         for j, step in enumerate(steps):
             sy = y + inner_pad + j * (sub_h + sub_gap)
-            sub_id = cell(gx + inner_pad, sy, inner_w, step, "neutral", min_h=sub_h)
-            sub_ids.append(sub_id)
+            sid = cell(gx + inner_pad, sy, inner_w, step, track_role[i], min_h=sub_h)
+            sub_ids.append(sid)
         force_height(sub_ids, sub_h)
         for j, sid in enumerate(sub_ids):
             x0, _, w0, _ = d._geom[sid]
@@ -1689,48 +1676,45 @@ def build_research_framework() -> str:
                 if cid == sid:
                     data["y"] = yj
                     data["h"] = sub_h
-        d.group_rect(gx, y, col_w, h_methodology)
-        meth_tops.append(sub_ids[0])
-        meth_bottoms.append(sub_ids[-1])
+        d.group_rect(gx, y, col_w, h_approach)
+        appr_tops.append(sub_ids[0])
+        appr_bottoms.append(sub_ids[-1])
+    label_row(y, h_approach, "Approach")
+    for i, (q, top_id) in enumerate(zip(quest, appr_tops)):
+        d.edge(q, top_id, color=track_arrow[i])
 
-    label_row(y, h_methodology, "Methodology")
-    for o, top_id in zip(objs, meth_tops):
-        down_arrow(o, top_id)
-
-    # --- Row 5: Outcome (restored wording; no Chapter 4 numbers) ---
-    y = y + h_methodology + row_gap
-    outcome_labels = [
-        "Estimator comparison under shared samples: relative BER, confidence, "
-        "and runtime for neural versus LS (RQ1).",
-        "Scheduler comparison under estimated CSI: throughput, latency, power, "
-        "fairness, and BER across classical and learned policies (RQ2).",
-        "Joint PHY/MAC interpretation of the same runs versus "
-        "PHY-only or MAC-only readings (RQ3).",
+    # --- Row 4: Finding ---
+    y = y + h_approach + row_gap
+    finding_labels = [
+        "Relative BER, confidence, and runtime: neural vs LS",
+        "Scheduler trade-offs under estimated CSI",
+        "Joint reading vs PHY-only / MAC-only readings",
     ]
-    results = [
-        cell(col_x(i), y, col_w, text, "success", min_h=h_outcome)
-        for i, text in enumerate(outcome_labels)
+    finds = [
+        cell(col_x(i), y, col_w, t, track_role[i], min_h=h_finding)
+        for i, t in enumerate(finding_labels)
     ]
-    force_height(results, h_outcome)
-    label_row(y, h_outcome, "Outcome")
-    for mb, r in zip(meth_bottoms, results):
-        down_arrow(mb, r)
+    force_height(finds, h_finding)
+    label_row(y, h_finding, "Finding")
+    for i, (mb, f) in enumerate(zip(appr_bottoms, finds)):
+        d.edge(mb, f, color=track_arrow[i])
+    # Convergence: RQ3 reads the RQ1 and RQ2 runs.
+    d.edge(finds[0], finds[2], dashed=True, color=track_arrow[2])
+    d.edge(finds[1], finds[2], dashed=True, color=track_arrow[2])
 
-    # --- Row 6: Significance (restored wording) ---
-    y = max(d.bottom(r) for r in results) + row_gap
-    sig = cell(
-        content_x,
-        y,
-        content_w,
-        "A joint PHY/MAC evaluation methodology for machine-learning channel "
-        "estimation and resource management in 6G smart-factory wireless.",
-        "accent",
-        min_h=h_significance,
+    # --- Row 5: Contribution (full width) ---
+    y = d.bottom(finds[0]) + row_gap
+    contrib = cell(
+        content_x, y, content_w,
+        "Joint PHY/MAC evaluation methodology for machine-learning channel "
+        "estimation and resource management in 6G smart-factory wireless",
+        "secondary",
+        min_h=h_contrib,
     )
-    force_height([sig], h_significance)
-    label_row(y, h_significance, "Significance<br>Impact")
-    for r in results:
-        down_arrow(r, sig)
+    force_height([contrib], h_contrib)
+    label_row(y, h_contrib, "Contribution")
+    for i, f in enumerate(finds):
+        d.edge(f, contrib, color=track_arrow[i])
 
     d.page_h = ph
     return d.to_xml()

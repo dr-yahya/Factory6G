@@ -87,7 +87,7 @@ RESOURCE_MANAGER_ORDER: tuple[str, ...] = (
     "wmmse",
     "queue_aware_drl",
     "drl",
-    "ber_drl",
+    "reliability_drl",
     "cnn",
 )
 

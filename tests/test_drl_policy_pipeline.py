@@ -194,10 +194,10 @@ def test_drl_resource_manager_loads_policy_checkpoint(tmp_path):
     assert all(0.0 <= value <= 1.0 for value in directives.per_ut_power)
 
 
-def test_ber_drl_resource_manager_uses_independent_checkpoint_path(tmp_path):
+def test_reliability_drl_resource_manager_uses_independent_checkpoint_path(tmp_path):
     checkpoint_dir, _, _ = _train_and_save_checkpoint(tmp_path)
     manager = create_resource_manager(
-        "ber_drl",
+        "reliability_drl",
         num_ut=4,
         num_active=2,
         cnn_model_path=None,
@@ -216,7 +216,7 @@ def test_ber_drl_resource_manager_uses_independent_checkpoint_path(tmp_path):
 def test_drl_policy_channel_gain_guard_biases_projection_to_stronger_users(tmp_path):
     checkpoint_dir, _, _ = _train_and_save_checkpoint(tmp_path)
     manager = create_resource_manager(
-        "ber_drl",
+        "reliability_drl",
         num_ut=4,
         num_active=2,
         cnn_model_path=None,

@@ -516,8 +516,12 @@ def create_resource_manager(
 ) -> ResourceManager:
     name_lower = name.lower()
     kwargs = dict(manager_kwargs or {})
-    if "ber_drl" in name_lower or "ber-drl" in name_lower or "berdrl" in name_lower:
-        kwargs.setdefault("model_path", "models/ber_drl_resource_manager_policy")
+    if (
+        "reliability_drl" in name_lower
+        or "reliability-drl" in name_lower
+        or "reliabilitydrl" in name_lower
+    ):
+        kwargs.setdefault("model_path", "models/reliability_drl_resource_manager_policy")
         return DRLResourceManager(num_active=num_active, **kwargs)
     if "static" in name_lower:
         return StaticResourceManager(active_ut_mask=[1] * num_ut, per_ut_power=[1.0] * num_ut)

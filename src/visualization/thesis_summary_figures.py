@@ -26,7 +26,7 @@ CANONICAL_SCHEDULERS: tuple[str, ...] = (
     "wmmse",
     "queue_aware",
     "drl",
-    "ber_drl",
+    "reliability_drl",
 )
 
 RM_LABELS: dict[str, str] = {
@@ -37,7 +37,7 @@ RM_LABELS: dict[str, str] = {
     "wmmse": "WMMSE",
     "queue_aware": "Queue-aware",
     "drl": "DRL",
-    "ber_drl": "BER-DRL",
+    "reliability_drl": "Reliability-DRL",
 }
 
 CHANNEL_LABELS: dict[str, str] = {

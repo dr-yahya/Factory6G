@@ -23,7 +23,7 @@ DEFAULT_METHOD_ORDER = [
     "wmmse",
     "queue_aware",
     "drl",
-    "ber_drl",
+    "reliability_drl",
 ]
 
 METHOD_STYLES = {
@@ -34,7 +34,7 @@ METHOD_STYLES = {
     "wmmse": {"color": "#9467bd", "marker": "v", "alpha": 0.66, "linewidth": 1.7},
     "queue_aware": {"color": "#17becf", "marker": "P", "alpha": 0.70, "linewidth": 1.8},
     "drl": {"color": "#bcbd22", "marker": "X", "alpha": 0.78, "linewidth": 1.9},
-    "ber_drl": {"color": "#d62728", "marker": "*", "alpha": 0.98, "linewidth": 2.9},
+    "reliability_drl": {"color": "#d62728", "marker": "*", "alpha": 0.98, "linewidth": 2.9},
 }
 
 CHANNEL_STYLES = {
@@ -92,7 +92,7 @@ def _as_numeric_array(values: Any, size: int, default: float = 0.0) -> np.ndarra
 
 
 def _source_type(method: str) -> str:
-    return "trained" if method == "ber_drl" else "baseline"
+    return "trained" if method == "reliability_drl" else "baseline"
 
 
 def _channel_label(stage_payload: dict[str, Any], stage_json: Path) -> str:
@@ -264,7 +264,7 @@ def _fit_smoothed_curve(
     elif method.name == "drl":
         slope *= 1.08
         start *= 0.92
-    elif method.name == "ber_drl":
+    elif method.name == "reliability_drl":
         slope *= 1.16
         start *= 0.74
         floor *= 0.45
@@ -321,26 +321,26 @@ def build_synthetic_curves(
                 anchor_stage_json=channel.stage_json,
             )
 
-        if trained_policy_target and "ber_drl" in channel_curves:
+        if trained_policy_target and "reliability_drl" in channel_curves:
             baseline_curves = [
                 curve.ber
                 for method_name, curve in channel_curves.items()
-                if method_name != "ber_drl"
+                if method_name != "reliability_drl"
             ]
             if baseline_curves:
                 best_baseline_curve = np.min(np.vstack(baseline_curves), axis=0)
-                ber_drl = channel_curves["ber_drl"]
+                reliability_drl = channel_curves["reliability_drl"]
                 target_ber = np.maximum.accumulate((best_baseline_curve * 0.72)[::-1])[::-1]
-                channel_curves["ber_drl"] = SyntheticCurve(
-                    channel=ber_drl.channel,
-                    method=ber_drl.method,
-                    source_type=ber_drl.source_type,
-                    ebno_db=ber_drl.ebno_db,
-                    ber=np.minimum(ber_drl.ber, target_ber),
-                    ber_upper=np.minimum(ber_drl.ber_upper, target_ber * 1.08),
-                    throughput=ber_drl.throughput,
-                    fit_basis=f"{ber_drl.fit_basis}; trained-policy-target-projection",
-                    anchor_stage_json=ber_drl.anchor_stage_json,
+                channel_curves["reliability_drl"] = SyntheticCurve(
+                    channel=reliability_drl.channel,
+                    method=reliability_drl.method,
+                    source_type=reliability_drl.source_type,
+                    ebno_db=reliability_drl.ebno_db,
+                    ber=np.minimum(reliability_drl.ber, target_ber),
+                    ber_upper=np.minimum(reliability_drl.ber_upper, target_ber * 1.08),
+                    throughput=reliability_drl.throughput,
+                    fit_basis=f"{reliability_drl.fit_basis}; trained-policy-target-projection",
+                    anchor_stage_json=reliability_drl.anchor_stage_json,
                 )
 
         curves_by_channel[channel.label] = channel_curves
@@ -420,7 +420,7 @@ def write_plot(
         for method_name in channel_curves
     }
     if method is None:
-        method = "ber_drl" if "ber_drl" in available_methods else sorted(available_methods, key=_method_sort_key)[0]
+        method = "reliability_drl" if "reliability_drl" in available_methods else sorted(available_methods, key=_method_sort_key)[0]
     if method not in available_methods:
         raise ValueError(f"Method '{method}' is not available in the synthetic curves.")
 
@@ -531,9 +531,9 @@ def write_markdown(
         "",
         f"CSV data: `{output_csv.as_posix()}`",
         "",
-        f"![Simulation-anchored synthetic BER-DRL channel comparison]({output_png.name})",
+        f"![Simulation-anchored synthetic Reliability-DRL channel comparison]({output_png.name})",
         "",
-        "The main figure uses the trained `ber_drl` resource manager across the same three channel labels used by the real estimator comparison run.",
+        "The main figure uses the trained `reliability_drl` resource manager across the same three channel labels used by the real estimator comparison run.",
         "",
         "## Anchor Stage Files",
         "",
@@ -549,11 +549,11 @@ def write_markdown(
             "- Positive BER points are fitted in log space where enough observations exist.",
             "- Single-positive and zero-error methods borrow the channel-level slope learned from other methods.",
             "- Zero-error methods are estimated below the measured confidence bound instead of plotted as hard zero.",
-            "- When enabled, the trained `ber_drl` line is constrained as a target projection below the best baseline curve; this is a presentation projection, not a measured improvement claim.",
+            "- When enabled, the trained `reliability_drl` line is constrained as a target projection below the best baseline curve; this is a presentation projection, not a measured improvement claim.",
             "",
             "## Final Synthetic BER at Highest Eb/N0",
             "",
-            "| channel | best baseline | best baseline BER | ber_drl BER |",
+            "| channel | best baseline | best baseline BER | reliability_drl BER |",
             "|---|---|---:|---:|",
         ]
     )
@@ -565,11 +565,11 @@ def write_markdown(
             for method, curve in channel_curves.items()
         ]
         best_baseline = min((row for row in final_rows if row[1] == "baseline"), key=lambda row: row[2])
-        ber_drl = next(row for row in final_rows if row[0] == "ber_drl")
+        reliability_drl = next(row for row in final_rows if row[0] == "reliability_drl")
         lines.append(
             "| "
             f"{channel} | {best_baseline[0]} | {_format_scientific(best_baseline[2])} | "
-            f"{_format_scientific(ber_drl[2])} |"
+            f"{_format_scientific(reliability_drl[2])} |"
         )
 
     if method_plot_paths:
@@ -610,7 +610,7 @@ def main() -> int:
     parser.add_argument(
         "--no-trained-policy-target",
         action="store_true",
-        help="Do not constrain ber_drl as a synthetic trained target projection.",
+        help="Do not constrain reliability_drl as a synthetic trained target projection.",
     )
     args = parser.parse_args()
 
@@ -638,8 +638,8 @@ def main() -> int:
         output_png,
         channels,
         curves_by_channel,
-        method="ber_drl",
-        title="Resource Managers (ber_drl): BER vs Eb/No",
+        method="reliability_drl",
+        title="Resource Managers (reliability_drl): BER vs Eb/No",
     )
     method_plot_paths = write_method_plots(
         output_dir / "resource_manager_channel_comparison_synthetic_methods",

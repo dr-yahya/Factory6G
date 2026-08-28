@@ -157,7 +157,7 @@ Train the BER-first DRL-style policy checkpoint:
 
 ```bash
 docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/generate_dataset.py --config config.json --output data/rm_training_data_ber_first_tr38901.parquet --samples 1000 --batch-size 1 --scenario umi --channel tr38901 --min-ebno 0 --max-ebno 20 --ebno-grid 0,2,4,6,8,10,12,14,16,18,20 --seed 42 --tries 32 --objective ber_first --random-active-count 2 --random-power-min 0.85 --label-active-count 2
-docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/train_drl_resource_manager.py --config config.json --data data/rm_training_data_ber_first_tr38901.parquet --output-dir models/ber_drl_resource_manager_policy --initial-checkpoint models/ber_drl_resource_manager_policy --value-target ber_log_reliability --ber-clip 0.01 --ber-floor 1e-7 --sample-weight-mode ber_confidence --sample-weight-strength 1.5 --schedule-loss-weight 1.5 --power-loss-weight 0.75
+docker compose run --rm --entrypoint python -v "$PWD:/app" simulation scripts/tools/train_drl_resource_manager.py --config config.json --data data/rm_training_data_ber_first_tr38901.parquet --output-dir models/reliability_drl_resource_manager_policy --initial-checkpoint models/reliability_drl_resource_manager_policy --value-target ber_log_reliability --ber-clip 0.01 --ber-floor 1e-7 --sample-weight-mode ber_confidence --sample-weight-strength 1.5 --schedule-loss-weight 1.5 --power-loss-weight 0.75
 ```
 
 Generate the BER comparison report:

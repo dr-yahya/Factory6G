@@ -188,7 +188,7 @@ def load_report_rows(stage_json_paths: list[Path]) -> list[ReportRow]:
                     channel_label=channel_label,
                     method=method,
                     rank_by_ber=0,
-                    source_type="trained" if method == "ber_drl" else "baseline",
+                    source_type="trained" if method == "reliability_drl" else "baseline",
                     stage_json=str(stage_json),
                     **metrics,
                 )
@@ -237,25 +237,25 @@ def _acceptance_lines(rows: list[ReportRow]) -> list[str]:
         by_channel.setdefault(row.channel_label, []).append(row)
 
     for channel_label, channel_rows in sorted(by_channel.items()):
-        ber_drl = next((row for row in channel_rows if row.method == "ber_drl"), None)
-        baselines = [row for row in channel_rows if row.method != "ber_drl"]
+        reliability_drl = next((row for row in channel_rows if row.method == "reliability_drl"), None)
+        baselines = [row for row in channel_rows if row.method != "reliability_drl"]
         if not baselines:
             continue
         best_baseline = min(baselines, key=lambda row: (row.ber, row.ber_upper_confidence))
-        if ber_drl is None:
+        if reliability_drl is None:
             lines.append(
-                f"- {channel_label}: no `ber_drl` benchmark row found yet; no trained-model improvement claim is made."
+                f"- {channel_label}: no `reliability_drl` benchmark row found yet; no trained-model improvement claim is made."
             )
             continue
-        if ber_drl.ber < best_baseline.ber:
+        if reliability_drl.ber < best_baseline.ber:
             verdict = "beats"
-        elif ber_drl.ber == best_baseline.ber and ber_drl.ber_upper_confidence <= best_baseline.ber_upper_confidence:
+        elif reliability_drl.ber == best_baseline.ber and reliability_drl.ber_upper_confidence <= best_baseline.ber_upper_confidence:
             verdict = "matches"
         else:
             verdict = "does not beat"
         lines.append(
-            f"- {channel_label}: `ber_drl` {verdict} best baseline `{best_baseline.method}` "
-            f"(ber_drl BER={_format_float(ber_drl.ber)}, baseline BER={_format_float(best_baseline.ber)})."
+            f"- {channel_label}: `reliability_drl` {verdict} best baseline `{best_baseline.method}` "
+            f"(reliability_drl BER={_format_float(reliability_drl.ber)}, baseline BER={_format_float(best_baseline.ber)})."
         )
     return lines
 

@@ -107,13 +107,13 @@ docker compose run --rm --build simulation --config config.json --resource-manag
 ### BER-First Learned Resource Manager - TR 38.901 UMi
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers ber_drl --channel tr38901 --modulation low --factory-size s
+docker compose run --rm --build simulation --config config.json --resource-managers reliability_drl --channel tr38901 --modulation low --factory-size s
 ```
 
 ### BER-First Learned Resource Manager - Rayleigh
 
 ```bash
-docker compose run --rm --build simulation --config config.json --resource-managers ber_drl --channel rayleigh --modulation low --factory-size s
+docker compose run --rm --build simulation --config config.json --resource-managers reliability_drl --channel rayleigh --modulation low --factory-size s
 ```
 
 ### Resume An Interrupted Resource-Manager Run
