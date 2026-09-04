@@ -653,9 +653,19 @@ class DRLResourceManager(ResourceManager):
         if self.policy_checkpoint is None:
             raise RuntimeError("No DRL policy model loaded.")
 
-        from factory6g.models.drl_policy import build_policy_state, predict_policy_outputs
+        from factory6g.models.drl_policy import (
+            build_policy_state,
+            fairness_input_for_inference,
+            predict_policy_outputs,
+        )
 
-        state = build_policy_state(channel_energy, ebno_db, fairness_debt=fairness_debt)
+        # Feed the fairness input the checkpoint was actually trained with; a
+        # policy trained under the constant regime must not be driven by a live
+        # signal its weights never saw.
+        fairness_input = fairness_input_for_inference(
+            fairness_debt, self.policy_checkpoint.metadata
+        )
+        state = build_policy_state(channel_energy, ebno_db, fairness_debt=fairness_input)
         outputs = predict_policy_outputs(self.policy_checkpoint, state)
         sched_np = np.asarray(outputs["schedule_output"], dtype=np.float64).reshape(-1)
         power_np = np.asarray(outputs["power_output"], dtype=np.float64).reshape(-1)

@@ -118,7 +118,13 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
         config_path=args.config,
     )
 
-    x_state, normalization = build_policy_training_inputs(channel_energy, ebno_db)
+    # If the dataset carries a fairness-debt column, train with it. Otherwise
+    # train with the constant regime and record that, so inference feeds the
+    # policy the same thing its weights were fitted against.
+    fairness_debt = dataset.get("fairness_debt")
+    x_state, normalization, fairness_regime = build_policy_training_inputs(
+        channel_energy, ebno_db, fairness_debt=fairness_debt
+    )
     if args.initial_checkpoint:
         checkpoint = load_policy_checkpoint(args.initial_checkpoint)
         model = checkpoint.model
@@ -134,6 +140,7 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
             output_dim=int(y_mask.shape[1]),
             hidden_dim=args.hidden_dim,
             dropout_rate=args.dropout,
+            encoder=args.encoder,
         )
     compile_policy_model(
         model,
@@ -184,7 +191,13 @@ def train_drl_resource_manager(args: argparse.Namespace) -> None:
         "num_ut": int(y_mask.shape[1]),
         "fft_size": int(channel_energy.shape[2]),
         "state_dim": int(x_state.shape[2]),
-        "checkpoint_type": "offline_actor_pretraining",
+        # Naming honesty: this trainer is supervised imitation of an oracle's
+        # labels, not reinforcement learning. See scripts/tools/train_rl_resource_manager.py
+        # for the actual RL loop.
+        "checkpoint_type": "offline_behaviour_cloning",
+        "training_method": "supervised_imitation",
+        "fairness_feature": fairness_regime,
+        "encoder": args.encoder,
         "policy_outputs": ["schedule_output", "power_output", "value_output"],
         "training_args": {
             "epochs": args.epochs,
@@ -276,6 +289,16 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Existing policy checkpoint to fine-tune instead of training a new model from scratch.",
+    )
+    parser.add_argument(
+        "--encoder",
+        choices=["deepsets", "conv1d"],
+        default="deepsets",
+        help=(
+            "Per-user feature extractor. 'deepsets' is permutation-equivariant, "
+            "which is the right prior for scheduling an unordered set of users. "
+            "'conv1d' is the legacy encoder and imposes a spurious ordering."
+        ),
     )
     parser.add_argument("--early-stop-patience", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)

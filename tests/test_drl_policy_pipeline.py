@@ -86,7 +86,7 @@ def _train_and_save_checkpoint(tmp_path):
     np.random.seed(7)
 
     channel_energy, ebno_db, active_mask, per_ut_power, utility = _synthetic_training_data()
-    x_state, normalization = build_policy_training_inputs(channel_energy, ebno_db)
+    x_state, normalization, _fairness_regime = build_policy_training_inputs(channel_energy, ebno_db)
 
     model = create_policy_model(tuple(x_state.shape[1:]), output_dim=4, hidden_dim=16, dropout_rate=0.0)
     compile_policy_model(model, learning_rate=0.005, value_loss_weight=0.05)
