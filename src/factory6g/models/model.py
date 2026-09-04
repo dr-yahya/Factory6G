@@ -57,6 +57,9 @@ class Model:
 
         self._sm = StreamManagement(rx_tx_association, num_streams_per_tx)
 
+        self.graph_mode = bool(self.config.get("graph_mode", False))
+        self._decode_fn = None
+
         self._antenna_config = AntennaConfig(self.config)
         self._transmitter = Transmitter(self.config, self._rg)
         self._channel = ChannelModel(self.config, self._antenna_config, self._rg)
@@ -223,6 +226,25 @@ class Model:
             active &= np.asarray(directives.per_ut_power, dtype=np.float64)[:num_tx] > 0.0
         return np.broadcast_to(active.reshape(1, num_tx, 1), block_shape).copy()
 
+    def _compiled_decode(self):
+        """tf.function-compiled decode pipeline, built lazily and cached.
+
+        Nothing in the simulation path used to be graph-compiled, and the
+        adaptive estimator called `.numpy()` mid-forward-pass, which forces the
+        whole run into eager mode. With the estimator made traceable, the tensor
+        part of the decode path can be compiled -- which matters because the
+        Monte Carlo depth the URLLC reliability targets require is out of reach
+        at eager speed.
+
+        Off by default: enable with `system.graph_mode: true` once a given
+        estimator has been verified to trace.
+        """
+        if self._decode_fn is None:
+            self._decode_fn = tf.function(
+                self._decode_once_impl, reduce_retracing=True
+            )
+        return self._decode_fn
+
     def _decode_once(
         self,
         x_rg,
@@ -232,6 +254,47 @@ class Model:
         active_ut_mask,
     ) -> dict:
         """One transmission attempt: apply channel, estimate, equalize, decode."""
+        if self.graph_mode:
+            h_hat, x_hat, no_eff, bits_hat, decoder_iter = self._compiled_decode()(
+                x_rg, h_freq, noise, noise_variance, active_ut_mask
+            )
+            return {
+                "h_hat": h_hat,
+                "x_hat": x_hat,
+                "no_eff": no_eff,
+                "bits_hat": bits_hat,
+                "decoder_iterations": decoder_iter,
+            }
+        return self._decode_once_impl_dict(x_rg, h_freq, noise, noise_variance, active_ut_mask)
+
+    def _decode_once_impl(
+        self,
+        x_rg,
+        h_freq,
+        noise,
+        noise_variance,
+        active_ut_mask,
+    ):
+        """Traceable core, returning a flat tuple so it can be tf.function'd."""
+        result = self._decode_once_impl_dict(
+            x_rg, h_freq, noise, noise_variance, active_ut_mask
+        )
+        return (
+            result["h_hat"],
+            result["x_hat"],
+            result["no_eff"],
+            result["bits_hat"],
+            result["decoder_iterations"],
+        )
+
+    def _decode_once_impl_dict(
+        self,
+        x_rg,
+        h_freq,
+        noise,
+        noise_variance,
+        active_ut_mask,
+    ) -> dict:
         y = self._channel.apply_frequency_response(x_rg, h_freq) + noise
 
         if self.perfect_csi:

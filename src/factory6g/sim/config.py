@@ -402,6 +402,7 @@ class SystemConfig:
     inf_clutter_height_m: float
     inf_hall_volume_m3: float
     inf_hall_surface_m2: float
+    graph_mode: bool
 
     # Radio profiles.
     #
@@ -471,6 +472,7 @@ class SystemConfig:
             "inf_clutter_height_m",
             "inf_hall_volume_m3",
             "inf_hall_surface_m2",
+            "graph_mode",
         }
         required = {
             "carrier_frequency",
@@ -558,6 +560,7 @@ class SystemConfig:
                 raw.get("inf_hall_surface_m2", 2 * (15 * 15 + 15 * 5 + 15 * 5)),
                 "system.inf_hall_surface_m2",
             ),
+            graph_mode=_ensure_bool(raw.get("graph_mode", False), "system.graph_mode"),
         )
         channel_model_type = str(raw["channel_model_type"]).lower()
         if channel_model_type not in cls._VALID_CHANNEL_MODELS:
