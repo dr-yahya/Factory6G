@@ -24,6 +24,7 @@ plotting environment stays consistent.
 | `config/factory_size_profiles.json` | Factory size profile definitions (S/M/L) for dataset generation. |
 | `docs/ARCHITECTURE.md` | Main architecture reference for runtime flow, stage data flow, interfaces, and output schema. Start there when reading the implementation deeply. |
 | `docs/CONTEXT.md` | Repo-wide working context and lean-git zone policy. |
+| `docs/SIMULATION_REVIEW.md` | Standing review of the simulation code against the research objectives: correctness issues that affect reported results, AI/ML and factory-realism gaps, and a prioritized work order. |
 | `docs/assets/system_design/` | Static system-design images. |
 | `src/factory6g/sim/` | Simulation orchestration, config loading, run context creation, stage execution, checkpointing, output writing, and plotting. |
 | `src/factory6g/models/` | PHY model composition plus resource-manager implementations, learned CNN/DRL policy wrappers, and scheduling directives. |
