@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from factory6g.sim.factory_profiles import (
+    FACTORY_SIZE_DISPLAY,
+    FACTORY_SIZE_PRESETS,
+)
+
 import argparse
 import dataclasses
 import logging
@@ -87,37 +92,8 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
 
 _MODULATION_MAP = {"low": 2, "mid": 4, "high": 6}
 _MODULATION_LABEL_MAP = {2: "qpsk", 4: "16qam", 6: "64qam", 1: "bpsk"}
-_VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn"}
-_FACTORY_SIZE_PRESETS = {
-    "s": {
-        "room_dimensions": [15.0, 15.0, 5.0],
-        "num_machines": 5,
-        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
-        "num_ut": 4,
-    },
-    "m": {
-        "room_dimensions": [25.0, 25.0, 6.0],
-        "num_machines": 10,
-        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-    "l": {
-        "room_dimensions": [40.0, 40.0, 8.0],
-        "num_machines": 20,
-        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
-        "num_ut": 16,
-    },
-    "apple": {
-        # Consumer electronics precision assembly hall (iPhone-style)
-        # 60×35m floor, 8m ceiling — rectangular assembly line layout
-        # Dense compact workstations: SMT placers, robotic arms, test stations
-        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
-        "room_dimensions": [60.0, 35.0, 8.0],
-        "num_machines": 22,
-        "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-}
+_VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn", "inf"}
+_FACTORY_SIZE_PRESETS = FACTORY_SIZE_PRESETS
 
 
 def _parse_modulation_list(raw: str) -> list[tuple[str, int]]:

@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from factory6g.sim.factory_profiles import (
+    FACTORY_SIZE_DISPLAY,
+    FACTORY_SIZE_PRESETS,
+)
+
 import dataclasses
 import json
 import time
@@ -15,37 +20,8 @@ from factory6g.sim.stages.jidd_scma import run_jidd_scma_stage
 from factory6g.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
-_FACTORY_SIZE_DISPLAY = {"s": "Small", "m": "Medium", "l": "Large", "apple": "Apple Factory"}
-_FACTORY_SIZE_PRESETS = {
-    "s": {
-        "room_dimensions": [15.0, 15.0, 5.0],
-        "num_machines": 5,
-        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
-        "num_ut": 4,
-    },
-    "m": {
-        "room_dimensions": [25.0, 25.0, 6.0],
-        "num_machines": 10,
-        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-    "l": {
-        "room_dimensions": [40.0, 40.0, 8.0],
-        "num_machines": 20,
-        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
-        "num_ut": 16,
-    },
-    "apple": {
-        # Consumer electronics precision assembly hall (iPhone-style)
-        # 60×35m floor, 8m ceiling — rectangular assembly line layout
-        # Dense compact workstations: SMT placers, robotic arms, test stations
-        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
-        "room_dimensions": [60.0, 35.0, 8.0],
-        "num_machines": 22,
-        "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-}
+_FACTORY_SIZE_DISPLAY = FACTORY_SIZE_DISPLAY
+_FACTORY_SIZE_PRESETS = FACTORY_SIZE_PRESETS
 
 
 def _load_completed_stage(stage_dir: Path) -> dict[str, Any] | None:

@@ -10,7 +10,15 @@ from sionna.phy.channel import (
 from sionna.phy.channel.tr38901 import RMa, UMa, UMi
 from sionna.phy.ofdm import ResourceGrid
 
+import numpy as np
+
 from .antenna import AntennaConfig
+from .inf_channel import (
+    INF_SCENARIOS,
+    clutter_density_from_layout,
+    mean_clutter_size_m,
+    sample_inf_large_scale_gain,
+)
 
 
 class ChannelModel:
@@ -26,17 +34,26 @@ class ChannelModel:
             self._channel_model = self._create_rayleigh_channel()
             self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
         elif channel_model_type == "rician":
-            # Rician = deterministic LoS + Rayleigh NLoS, blended by K-factor
+            # Rician = structured LOS + Rayleigh NLOS, blended by the K-factor.
             self._channel_model = self._create_rayleigh_channel()
             self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
-            self._rician_k_factor = float(self.config.get("rician_k_factor", 1.0))
         elif channel_model_type == "awgn":
             self._channel_model = None
             self._generator = None
+        elif channel_model_type == "inf":
+            # TR 38.901 Indoor Factory: small-scale fading from the block-fading
+            # generator, large-scale statistics from the InF model.
+            self._channel_model = self._create_rayleigh_channel()
+            self._generator = GenerateOFDMChannel(
+                self._channel_model, resource_grid, normalize_channel=True
+            )
         else:  # tr38901
             self._channel_model = self._create_tr38901_channel()
             self._generator = GenerateOFDMChannel(self._channel_model, resource_grid, normalize_channel=True)
+        self._rician_k_factor = float(self.config.get("rician_k_factor", 1.0))
         self._applier = ApplyOFDMChannel()
+        self._rng = np.random.default_rng(int(self.config.get("seed", 0)) or None)
+        self._last_large_scale: dict[str, object] | None = None
 
     def _create_tr38901_channel(self):
         channel_params = {
@@ -76,7 +93,12 @@ class ChannelModel:
         )
 
     def set_topology(self, batch_size: int) -> None:
-        if self.config.get("channel_model_type", "tr38901") in ("rayleigh", "rician", "awgn"):
+        if self.config.get("channel_model_type", "tr38901") in (
+            "rayleigh",
+            "rician",
+            "awgn",
+            "inf",
+        ):
             return
         topology = gen_topology(
             batch_size,
@@ -107,11 +129,96 @@ class ChannelModel:
         with tf.device("/CPU:0"):
             h = self._generator(batch_size)
         if cmt == "rician":
-            k = tf.cast(self._rician_k_factor, tf.float32)
-            los = tf.cast(tf.sqrt(k / (k + 1.0)), tf.complex64)
-            nlos_scale = tf.cast(tf.sqrt(1.0 / (k + 1.0)), tf.complex64)
-            h = los + nlos_scale * h
+            h = self._apply_rician_los(h)
+        elif cmt == "inf":
+            h = self._apply_inf_large_scale(h)
         return h
+
+    def _apply_rician_los(self, h: tf.Tensor) -> tf.Tensor:
+        """Blend in a spatially structured LOS component.
+
+        An earlier revision added a *scalar* sqrt(K/(K+1)) to every antenna pair,
+        subcarrier and symbol -- and to every user. Total power was right, but the
+        LOS part was then the same rank-one all-ones vector for all users, which
+        makes the multi-user channel matrix artificially ill-conditioned and has
+        nothing to do with Rician fading.
+
+        The LOS component of a link is a rank-one outer product of the receive and
+        transmit array responses with a per-link phase:
+
+            h_LOS = a_rx(theta_rx) a_tx(theta_tx)^H e^{j*phi}
+
+        so each user gets its own angle of arrival and its own phase, and users
+        remain spatially separable.
+        """
+        shape = h.shape.as_list()
+        batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc = shape
+        k = float(self._rician_k_factor)
+        los_scale = np.sqrt(k / (k + 1.0))
+        nlos_scale = np.sqrt(1.0 / (k + 1.0))
+
+        antenna_spacing = float(self.config.get("antenna_spacing", 0.5))
+        # Independent AoA/AoD and phase per (batch, rx, tx) link.
+        aoa = self._rng.uniform(-np.pi / 2, np.pi / 2, size=(batch, num_rx, num_tx))
+        aod = self._rng.uniform(-np.pi / 2, np.pi / 2, size=(batch, num_rx, num_tx))
+        phase = self._rng.uniform(-np.pi, np.pi, size=(batch, num_rx, num_tx))
+
+        rx_index = np.arange(num_rx_ant).reshape(1, 1, 1, num_rx_ant)
+        tx_index = np.arange(num_tx_ant).reshape(1, 1, 1, num_tx_ant)
+        # Uniform linear array steering vectors. Entries are unit modulus so each
+        # channel coefficient carries unit LOS power, matching the unit-power
+        # convention of the normalised NLOS component; the K-factor blend then
+        # preserves total power exactly.
+        a_rx = np.exp(2j * np.pi * antenna_spacing * rx_index * np.sin(aoa)[..., None])
+        a_tx = np.exp(2j * np.pi * antenna_spacing * tx_index * np.sin(aod)[..., None])
+
+        # [batch, num_rx, num_tx, num_rx_ant, num_tx_ant] -> channel axis order.
+        outer = a_rx[..., :, None] * np.conj(a_tx)[..., None, :]
+        outer = outer * np.exp(1j * phase)[..., None, None]
+        los = np.transpose(outer, (0, 1, 3, 2, 4))[:, :, :, :, :, None, None]
+        los = np.broadcast_to(los, (batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc))
+
+        los_tf = tf.constant(los.astype(np.complex64))
+        return tf.cast(los_scale, tf.complex64) * los_tf + tf.cast(nlos_scale, tf.complex64) * h
+
+    def _apply_inf_large_scale(self, h: tf.Tensor) -> tf.Tensor:
+        """Scale each link by its TR 38.901 Indoor Factory large-scale gain."""
+        shape = h.shape.as_list()
+        batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc = shape
+
+        room_dimensions = list(self.config.get("room_dimensions", [15.0, 15.0, 5.0]))
+        machine_size_range = list(
+            self.config.get("machine_size_range", [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]])
+        )
+        num_machines = int(self.config.get("num_machines", 5))
+        clutter_density = float(
+            self.config.get(
+                "inf_clutter_density",
+                clutter_density_from_layout(num_machines, machine_size_range, room_dimensions),
+            )
+        )
+        large_scale = sample_inf_large_scale_gain(
+            num_links=batch * num_rx * num_tx,
+            scenario=str(self.config.get("scenario", "inf_dl")).lower(),
+            carrier_frequency_hz=float(self.config.get("carrier_frequency", 3.5e9)),
+            room_dimensions=room_dimensions,
+            bs_height_m=float(room_dimensions[2]) - float(self.config.get("tx_height_offset", 1.0)),
+            ut_height_m=float(self.config.get("rx_height", 1.0)),
+            clutter_density=clutter_density,
+            clutter_size_m=mean_clutter_size_m(machine_size_range),
+            clutter_height_m=float(self.config.get("inf_clutter_height_m", 2.0)),
+            enable_pathloss=bool(self.config.get("enable_pathloss", True)),
+            enable_shadow_fading=bool(self.config.get("enable_shadow_fading", True)),
+            rng=self._rng,
+        )
+        self._last_large_scale = large_scale
+
+        gain = large_scale["amplitude_gain"].reshape(batch, num_rx, 1, num_tx, 1, 1, 1)
+        return h * tf.constant(gain.astype(np.complex64))
+
+    def last_large_scale_diagnostics(self) -> dict[str, object] | None:
+        """LOS flags, distances and path loss from the most recent InF draw."""
+        return self._last_large_scale
 
     def apply_frequency_response(self, x_rg: tf.Tensor, h_freq: tf.Tensor) -> tf.Tensor:
         with tf.device("/CPU:0"):

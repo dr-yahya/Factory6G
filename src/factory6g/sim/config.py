@@ -432,7 +432,7 @@ class SystemConfig:
 
     _VALID_MODULATIONS = {1, 2, 4, 6}
 
-    _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn"}
+    _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn", "inf"}
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SystemConfig":
@@ -841,6 +841,15 @@ class Factory6GConfig:
     def system_runtime_config(self) -> dict[str, Any]:
         runtime = asdict(self.system)
         runtime.update(asdict(self.transceiver))
+        # Factory geometry has to reach the channel model, otherwise the hall
+        # dimensions and machine count in `factory_scenario` never influence
+        # propagation and a "factory size" sweep is only a user-count sweep.
+        runtime["room_dimensions"] = list(self.factory_scenario.room_dimensions)
+        runtime["num_machines"] = int(self.factory_scenario.num_machines)
+        runtime["machine_size_range"] = [
+            list(row) for row in self.factory_scenario.machine_size_range
+        ]
+        runtime["seed"] = int(self.simulation.seed)
         return runtime
 
     def to_dict(self) -> dict[str, Any]:

@@ -137,12 +137,18 @@ class Model:
         feedback = None
         if include_feedback:
             probe_directives = self.default_directives()
+            # CSI is measured on an earlier slot than the one it schedules. With
+            # static users and zero delay the two coincide and an instantaneous
+            # max-SNR rule is near optimal -- which is precisely why a learned
+            # scheduler has nothing to add. Ageing the feedback restores the
+            # problem that a policy exploiting temporal statistics can solve.
+            h_feedback = self._age_channel(h_freq)
             x_probe, _, _ = self._transmitter.call(batch_size, directives=probe_directives)
-            y_probe = self._channel.apply_frequency_response(x_probe, h_freq) + probe_noise
+            y_probe = self._channel.apply_frequency_response(x_probe, h_feedback) + probe_noise
             if self.perfect_csi:
                 feedback = ResourceManagerFeedback(
-                    h_hat=h_freq,
-                    err_var=tf.zeros(tf.shape(h_freq), dtype=noise_variance.dtype),
+                    h_hat=h_feedback,
+                    err_var=tf.zeros(tf.shape(h_feedback), dtype=noise_variance.dtype),
                 )
             else:
                 h_hat, err_var = self._receiver.estimate_channel(y_probe, noise_variance)
@@ -158,6 +164,46 @@ class Model:
             source_bits=source_bits,
             feedback=feedback,
         )
+
+    def csi_correlation(self) -> float:
+        """Jakes correlation between the CSI feedback and the scheduled slot.
+
+        rho = J0(2*pi*f_d*tau) with f_d = v*f_c/c the maximum Doppler shift and
+        tau the feedback delay. rho = 1 means perfectly fresh CSI.
+        """
+        delay_slots = int(self.config.get("csi_feedback_delay_slots", 0))
+        if delay_slots <= 0:
+            return 1.0
+        max_velocity = float(self.config.get("max_ut_velocity", 0.0))
+        if max_velocity <= 0.0:
+            return 1.0
+        carrier_frequency = float(self.config.get("carrier_frequency", 3.5e9))
+        doppler_hz = max_velocity * carrier_frequency / 299_792_458.0
+        delay_sec = delay_slots * self._estimate_air_interface_latency()
+        from scipy.special import j0
+
+        return float(np.clip(j0(2.0 * np.pi * doppler_hz * delay_sec), -1.0, 1.0))
+
+    def _age_channel(self, h_freq: tf.Tensor) -> tf.Tensor:
+        """Return the channel as it was `csi_feedback_delay_slots` earlier.
+
+        Uses the standard first-order Jakes ageing model:
+
+            h_old = rho * h + sqrt(1 - rho^2) * h_independent
+
+        which reproduces the correct autocorrelation without having to simulate
+        the intervening slots.
+        """
+        rho = self.csi_correlation()
+        if rho >= 1.0 - 1e-9:
+            return h_freq
+        shape = tf.shape(h_freq)
+        real = tf.random.normal(shape, stddev=np.sqrt(0.5), dtype=tf.float32)
+        imag = tf.random.normal(shape, stddev=np.sqrt(0.5), dtype=tf.float32)
+        independent = tf.complex(real, imag)
+        return tf.cast(rho, tf.complex64) * h_freq + tf.cast(
+            np.sqrt(max(1.0 - rho**2, 0.0)), tf.complex64
+        ) * independent
 
     def _scheduled_block_mask(
         self,
