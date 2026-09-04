@@ -49,8 +49,89 @@ def test_simulation_targets_are_rejected(tmp_path):
 
 
 def test_non_5g_radio_preset_values_are_rejected(tmp_path):
+    # The 5G lock guards the numerology, not the fading model: `rayleigh` is a
+    # supported and documented channel choice (`--channel rayleigh`).
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["carrier_frequency"] = 28.0e9
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_rayleigh_channel_model_is_accepted_under_the_5g_profile(tmp_path):
     config_data = make_tiny_config(str(tmp_path / "results"))
     config_data["system"]["channel_model_type"] = "rayleigh"
+    config_path = write_config(tmp_path, config_data)
+    assert load_config(config_path).system.channel_model_type == "rayleigh"
+
+
+def test_unknown_channel_model_is_rejected(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["channel_model_type"] = "not_a_model"
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_default_profile_still_locks_the_5g_numerology(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["num_ofdm_symbols"] = 7
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_6g_profile_allows_fr3_carrier_and_mini_slots(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update(
+        {
+            "radio_profile": "6g_fr3",
+            "carrier_frequency": 13.0e9,
+            "subcarrier_spacing": 120000.0,
+            "num_ofdm_symbols": 4,
+            "pilot_ofdm_symbol_indices": [0, 2],
+        }
+    )
+    config_path = write_config(tmp_path, config_data)
+    system = load_config(config_path).system
+    assert system.radio_profile == "6g_fr3"
+    assert system.num_ofdm_symbols == 4
+
+
+def test_6g_profile_rejects_out_of_band_carrier(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update({"radio_profile": "6g_fr3", "carrier_frequency": 3.5e9})
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_6g_profile_rejects_pilots_outside_the_mini_slot(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update(
+        {
+            "radio_profile": "6g_fr3",
+            "carrier_frequency": 13.0e9,
+            "subcarrier_spacing": 120000.0,
+            "num_ofdm_symbols": 4,
+            "pilot_ofdm_symbol_indices": [2, 11],
+        }
+    )
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_indoor_factory_scenarios_are_accepted(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update({"radio_profile": "custom", "scenario": "inf_dh"})
+    config_path = write_config(tmp_path, config_data)
+    assert load_config(config_path).system.scenario == "inf_dh"
+
+
+def test_harq_rounds_must_be_at_least_one(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["harq_max_rounds"] = 0
     config_path = write_config(tmp_path, config_data)
     with pytest.raises(ConfigError):
         load_config(config_path)

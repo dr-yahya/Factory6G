@@ -67,6 +67,76 @@ from sionna.phy.fec.ldpc import LDPC5GDecoder
 
 
 
+# Default LLR magnitude limit. Large enough that genuine high-SNR LLRs pass
+# through untouched, small enough to keep belief propagation numerically sane.
+DEFAULT_LLR_CLIP = 200.0
+
+
+def _resolve_llr_clip(config: dict) -> float | None:
+    """Resolve the LLR magnitude limit from config.
+
+    Returns None when clipping is disabled (`llr_clip` set to null, 0 or a
+    negative value).
+    """
+    if "llr_clip" not in config:
+        return DEFAULT_LLR_CLIP
+    raw = config.get("llr_clip")
+    if raw is None:
+        return None
+    value = float(raw)
+    return value if value > 0.0 else None
+
+
+def apply_stream_mask(
+    h_hat: tf.Tensor,
+    err_var,
+    active_ut_mask,
+    *,
+    num_tx_axis: int = 3,
+):
+    """Zero the channel estimate of transmitters that were not scheduled.
+
+    The scheduler mutes users at the transmitter, but without this the receiver
+    still believes every user transmitted: LS returns pure noise as the muted
+    users' channel estimate, and the LMMSE equalizer then spends spatial degrees
+    of freedom nulling interference that does not exist, noise-enhancing the
+    users that *were* scheduled.
+
+    Zeroing the muted columns of ``h_hat`` (and their estimation-error variance,
+    which is then known exactly) makes the effective channel matrix seen by the
+    equalizer match what was actually transmitted.
+
+    Args:
+        h_hat: Channel estimate, transmitter axis at ``num_tx_axis``.
+            Shape: [batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc]
+        err_var: Estimation error variance, broadcastable to ``h_hat``, or a scalar.
+        active_ut_mask: Per-transmitter 0/1 mask, length num_tx.
+        num_tx_axis: Axis of ``h_hat`` holding the transmitter index.
+
+    Returns:
+        Tuple of masked ``(h_hat, err_var)``.
+    """
+    if active_ut_mask is None:
+        return h_hat, err_var
+
+    rank = len(h_hat.shape)
+    num_tx = int(h_hat.shape[num_tx_axis])
+    flags = tf.convert_to_tensor(active_ut_mask)[:num_tx] > 0
+    broadcast_shape = [num_tx if axis == num_tx_axis else 1 for axis in range(rank)]
+    h_masked = h_hat * tf.reshape(tf.cast(flags, h_hat.dtype), broadcast_shape)
+
+    if err_var is None or isinstance(err_var, (int, float)):
+        # A scalar error variance is uniform across streams and cannot express
+        # "zero error on the muted ones"; leave it untouched.
+        return h_masked, err_var
+
+    err_tensor = tf.convert_to_tensor(err_var)
+    if len(err_tensor.shape) != rank:
+        return h_masked, err_var
+    err_masked = err_tensor * tf.reshape(tf.cast(flags, err_tensor.dtype), broadcast_shape)
+    return h_masked, err_masked
+
+
 class Receiver:
     """
     Receiver chain: Channel Estimation -> Equalization -> Demapping -> LDPC Decoding.
@@ -177,6 +247,9 @@ class Receiver:
         # APP demapper: converts symbols to log-likelihood ratios
         self._demapper = Demapper("app", "qam", self.config.get("num_bits_per_symbol", 2))
         
+        # LLR magnitude limit used by demap(). None disables clipping.
+        self._llr_clip = _resolve_llr_clip(self.config)
+
         # LDPC decoder: use Sionna's 5G decoder
         self._decoder = LDPC5GDecoder(encoder, 
                                       num_iter=self.config.get("num_decoding_iter", 20),
@@ -325,11 +398,18 @@ class Receiver:
             Higher values indicate higher confidence in bit = 1
         """
         llr = self._demapper(x_hat, no_eff)
-        # Clip extreme LLRs to prevent numerical issues and improve decoder performance
-        # Diagnostic showed 27.5% of LLRs have |LLR| > 50, which can cause decoder issues
-        # Clip to reasonable range: ±20 is typical for LDPC decoders
-        llr_clipped = tf.clip_by_value(llr, -20.0, 20.0)
-        return llr_clipped
+        # LLR magnitude limiting.
+        #
+        # An earlier revision clipped hard at +/-20. That is far too tight: at high
+        # Eb/No a large share of LLRs are legitimately large, and saturating them
+        # discards exactly the reliability information belief propagation needs to
+        # correct the few weak bits. The result is an artificial high-SNR error
+        # floor. The limit is now a config knob (`llr_clip`) that defaults to a
+        # value chosen only to keep the decoder numerically well behaved, and can
+        # be disabled entirely with `llr_clip: null` or a non-positive value.
+        if self._llr_clip is None:
+            return llr
+        return tf.clip_by_value(llr, -self._llr_clip, self._llr_clip)
     
     def decode(self, llr: tf.Tensor) -> tuple:
         """

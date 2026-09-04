@@ -369,6 +369,35 @@ class SystemConfig:
     enable_shadow_fading: bool
     min_ut_velocity: float
     max_ut_velocity: float
+    radio_profile: str
+    llr_clip: float | None
+    harq_max_rounds: int
+    csi_feedback_delay_slots: int
+    ut_max_tx_power_w: float
+    pa_efficiency: float
+    circuit_power_ut_w: float
+    circuit_power_bs_w: float
+    decode_energy_per_iter_j: float
+    inf_clutter_density: float
+    inf_clutter_height_m: float
+    inf_hall_volume_m3: float
+    inf_hall_surface_m2: float
+
+    # Radio profiles.
+    #
+    # `nr_5g_fr1` keeps the original hard lock on the 5G numerology so existing
+    # result families stay reproducible and cannot drift by accident. The other
+    # profiles exist because the research objective is 6G in a factory, which the
+    # 5G lock made unreachable: it forbade FR3 carriers, mini-slot TTIs and the
+    # TR 38.901 Indoor Factory scenarios.
+    _PROFILE_NR_5G_FR1 = "nr_5g_fr1"
+    _PROFILE_6G_FR3 = "6g_fr3"
+    _PROFILE_CUSTOM = "custom"
+    _VALID_PROFILES = {_PROFILE_NR_5G_FR1, _PROFILE_6G_FR3, _PROFILE_CUSTOM}
+
+    # TR 38.901 Indoor Factory scenarios (Rel-16, Table 7.2-4).
+    _INF_SCENARIOS = {"inf_sl", "inf_dl", "inf_sh", "inf_dh", "inf_hh"}
+    _VALID_SCENARIOS = {"umi", "uma", "rma"} | _INF_SCENARIOS
 
     _LOCKED_5G_VALUES = {
         "carrier_frequency": 3.5e9,
@@ -409,6 +438,19 @@ class SystemConfig:
             "enable_shadow_fading",
             "min_ut_velocity",
             "max_ut_velocity",
+            "radio_profile",
+            "llr_clip",
+            "harq_max_rounds",
+            "csi_feedback_delay_slots",
+            "ut_max_tx_power_w",
+            "pa_efficiency",
+            "circuit_power_ut_w",
+            "circuit_power_bs_w",
+            "decode_energy_per_iter_j",
+            "inf_clutter_density",
+            "inf_clutter_height_m",
+            "inf_hall_volume_m3",
+            "inf_hall_surface_m2",
         }
         required = {
             "carrier_frequency",
@@ -463,6 +505,39 @@ class SystemConfig:
             ),
             min_ut_velocity=_ensure_float(raw["min_ut_velocity"], "system.min_ut_velocity"),
             max_ut_velocity=_ensure_float(raw["max_ut_velocity"], "system.max_ut_velocity"),
+            radio_profile=str(raw.get("radio_profile", cls._PROFILE_NR_5G_FR1)).lower(),
+            llr_clip=_ensure_optional_float(raw.get("llr_clip", 200.0), "system.llr_clip"),
+            harq_max_rounds=_ensure_int(raw.get("harq_max_rounds", 1), "system.harq_max_rounds"),
+            csi_feedback_delay_slots=_ensure_int(
+                raw.get("csi_feedback_delay_slots", 0),
+                "system.csi_feedback_delay_slots",
+            ),
+            ut_max_tx_power_w=_ensure_float(
+                raw.get("ut_max_tx_power_w", 0.2), "system.ut_max_tx_power_w"
+            ),
+            pa_efficiency=_ensure_float(raw.get("pa_efficiency", 0.35), "system.pa_efficiency"),
+            circuit_power_ut_w=_ensure_float(
+                raw.get("circuit_power_ut_w", 0.1), "system.circuit_power_ut_w"
+            ),
+            circuit_power_bs_w=_ensure_float(
+                raw.get("circuit_power_bs_w", 1.0), "system.circuit_power_bs_w"
+            ),
+            decode_energy_per_iter_j=_ensure_float(
+                raw.get("decode_energy_per_iter_j", 1e-6), "system.decode_energy_per_iter_j"
+            ),
+            inf_clutter_density=_ensure_float(
+                raw.get("inf_clutter_density", 0.6), "system.inf_clutter_density"
+            ),
+            inf_clutter_height_m=_ensure_float(
+                raw.get("inf_clutter_height_m", 2.0), "system.inf_clutter_height_m"
+            ),
+            inf_hall_volume_m3=_ensure_float(
+                raw.get("inf_hall_volume_m3", 15.0 * 15.0 * 5.0), "system.inf_hall_volume_m3"
+            ),
+            inf_hall_surface_m2=_ensure_float(
+                raw.get("inf_hall_surface_m2", 2 * (15 * 15 + 15 * 5 + 15 * 5)),
+                "system.inf_hall_surface_m2",
+            ),
         )
         channel_model_type = str(raw["channel_model_type"]).lower()
         if channel_model_type not in cls._VALID_CHANNEL_MODELS:
@@ -475,8 +550,65 @@ class SystemConfig:
                 f"'system.num_bits_per_symbol' must be one of {sorted(cls._VALID_MODULATIONS)} "
                 f"(got {parsed.num_bits_per_symbol})."
             )
-        parsed._validate_locked_5g_profile()
+        if parsed.radio_profile not in cls._VALID_PROFILES:
+            raise ConfigError(
+                f"'system.radio_profile' must be one of {sorted(cls._VALID_PROFILES)} "
+                f"(got '{parsed.radio_profile}')."
+            )
+        if parsed.scenario not in cls._VALID_SCENARIOS:
+            raise ConfigError(
+                f"'system.scenario' must be one of {sorted(cls._VALID_SCENARIOS)} "
+                f"(got '{parsed.scenario}')."
+            )
+        if parsed.harq_max_rounds < 1:
+            raise ConfigError("'system.harq_max_rounds' must be >= 1.")
+        if parsed.csi_feedback_delay_slots < 0:
+            raise ConfigError("'system.csi_feedback_delay_slots' must be >= 0.")
+        if not 0.0 < parsed.pa_efficiency <= 1.0:
+            raise ConfigError("'system.pa_efficiency' must lie in (0, 1].")
+        parsed._validate_radio_profile()
         return parsed
+
+    def _validate_radio_profile(self) -> None:
+        """Apply the constraints of the selected radio profile."""
+        if self.radio_profile == self._PROFILE_CUSTOM:
+            return
+        if self.radio_profile == self._PROFILE_6G_FR3:
+            self._validate_6g_fr3_profile()
+            return
+        self._validate_locked_5g_profile()
+
+    def _validate_6g_fr3_profile(self) -> None:
+        """Guard rails for the 6G profile: FR3 carrier, NR-compatible numerology.
+
+        Deliberately looser than the 5G lock -- it permits the FR3 band, the
+        60/120 kHz subcarrier spacings and the mini-slot TTIs that sub-millisecond
+        factory URLLC needs, while still rejecting values that are not physically
+        coherent.
+        """
+        if not 7.0e9 <= self.carrier_frequency <= 24.0e9:
+            raise ConfigError(
+                "'system.carrier_frequency' must lie in the FR3 range 7-24 GHz for "
+                f"the 6g_fr3 profile (got {self.carrier_frequency})."
+            )
+        valid_scs = {15e3, 30e3, 60e3, 120e3, 480e3, 960e3}
+        if not any(np.isclose(self.subcarrier_spacing, scs) for scs in valid_scs):
+            raise ConfigError(
+                f"'system.subcarrier_spacing' must be one of {sorted(valid_scs)} "
+                f"for the 6g_fr3 profile (got {self.subcarrier_spacing})."
+            )
+        # Mini-slots: 2-7 symbols; 14 is a full slot.
+        if not 2 <= self.num_ofdm_symbols <= 14:
+            raise ConfigError(
+                "'system.num_ofdm_symbols' must lie in 2..14 for the 6g_fr3 profile "
+                f"(got {self.num_ofdm_symbols})."
+            )
+        for index in self.pilot_ofdm_symbol_indices:
+            if not 0 <= index < self.num_ofdm_symbols:
+                raise ConfigError(
+                    f"'system.pilot_ofdm_symbol_indices' entry {index} is outside the "
+                    f"{self.num_ofdm_symbols}-symbol TTI."
+                )
 
     def _validate_locked_5g_profile(self) -> None:
         self._assert_locked_float("system.carrier_frequency", self.carrier_frequency)
