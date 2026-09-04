@@ -319,11 +319,23 @@ class ResourceManagersConfig:
     cnn_model_path: str | None
     drl_model_path: str | None
     num_active_users: int
+    strict_policy_loading: bool
+    paired_reference: str
+    model_root: str | None
     kwargs: dict[str, dict[str, Any]]
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "ResourceManagersConfig":
-        allowed = {"enabled", "cnn_model_path", "drl_model_path", "num_active_users", "kwargs"}
+        allowed = {
+            "enabled",
+            "cnn_model_path",
+            "drl_model_path",
+            "num_active_users",
+            "kwargs",
+            "strict_policy_loading",
+            "paired_reference",
+            "model_root",
+        }
         required = {"enabled", "num_active_users"}
         _validate_keys("resource_managers", raw, allowed)
         _require_keys("resource_managers", raw, required)
@@ -342,6 +354,14 @@ class ResourceManagersConfig:
             cnn_model_path=model_path,
             drl_model_path=drl_model_path,
             num_active_users=num_active_users,
+            strict_policy_loading=_ensure_bool(
+                raw.get("strict_policy_loading", True),
+                "resource_managers.strict_policy_loading",
+            ),
+            paired_reference=str(raw.get("paired_reference", "static")),
+            model_root=(
+                None if raw.get("model_root") is None else str(raw.get("model_root"))
+            ),
             kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "resource_managers.kwargs"),
         )
 

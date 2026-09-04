@@ -26,6 +26,43 @@ from factory6g.visualization.thesis_plot_style import (
 SCHEMA_VERSION = "2.0"
 
 
+def run_provenance() -> dict[str, Any]:
+    """Environment fingerprint for the run.
+
+    A thesis result needs to be traceable to the exact code and library versions
+    that produced it; a config snapshot alone is not enough.
+    """
+    import platform
+    import subprocess
+
+    def _git(*args: str) -> str | None:
+        try:
+            return subprocess.run(
+                ["git", *args],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                cwd=Path(__file__).resolve().parent,
+            ).stdout.strip() or None
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+    versions: dict[str, str] = {"python": platform.python_version()}
+    for module_name in ("tensorflow", "sionna", "numpy", "scipy"):
+        try:
+            versions[module_name] = __import__(module_name).__version__
+        except Exception:  # pragma: no cover - a missing optional dep is fine
+            pass
+
+    dirty = _git("status", "--porcelain")
+    return {
+        "git_commit": _git("rev-parse", "HEAD"),
+        "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+        "git_dirty": bool(dirty),
+        "versions": versions,
+    }
+
+
 def write_stage_outputs(
     *,
     run_id: str,
@@ -46,6 +83,15 @@ def write_stage_outputs(
         "config_snapshot": config_snapshot,
         "methods": stage_result["methods"],
         "runtime_totals_sec": stage_result["runtime_totals_sec"],
+        # Provenance: which actor actually ran for each learned method, so a
+        # curve can never be attributed to a policy that failed to load.
+        "manager_provenance": stage_result.get("manager_provenance", {}),
+        # Paired per-batch comparison against the reference baseline. The shared
+        # batch contexts make this a common-random-numbers comparison, so these
+        # intervals are far tighter than the marginal per-method ones.
+        "paired_reference": stage_result.get("paired_reference"),
+        "paired_comparisons": stage_result.get("paired_comparisons", {}),
+        "run_provenance": run_provenance(),
     }
 
     json_path = stage_dir / "stage_results_v2.json"
@@ -290,12 +336,47 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
     methods = payload["methods"]
     runtime_totals = payload.get("runtime_totals_sec", {})
 
+    # BLER is the headline reliability metric for URLLC, and the one whose
+    # confidence bound is statistically defensible (codewords are close to
+    # independent; bits within a codeword are not).
+    _plot_bler(
+        plt=plt,
+        methods=methods,
+        ebno_range=ebno_range,
+        title=f"{stage_name}: BLER vs Eb/No",
+        output_path=stage_dir / "bler_vs_ebno.png",
+        stage_hint=stage_key,
+    )
     _plot_ber_publication(
         plt=plt,
         methods=methods,
         ebno_range=ebno_range,
         title=f"{stage_name}: BER vs Eb/No",
         output_path=stage_dir / "ber_vs_ebno.png",
+        stage_hint=stage_key,
+    )
+    if any(
+        np.any(np.isfinite(_coerce_float_array(metrics.get("nmse_db", []))))
+        for metrics in methods.values()
+    ):
+        _plot_metric_vs_ebno(
+            plt=plt,
+            methods=methods,
+            ebno_range=ebno_range,
+            metric="nmse_db",
+            ylabel="Channel estimate NMSE (dB)",
+            title=f"{stage_name}: NMSE vs Eb/No",
+            output_path=stage_dir / "nmse_vs_ebno.png",
+            stage_hint=stage_key,
+        )
+    _plot_metric_vs_ebno(
+        plt=plt,
+        methods=methods,
+        ebno_range=ebno_range,
+        metric="latency_p999_ms",
+        ylabel="99.9th percentile latency (ms)",
+        title=f"{stage_name}: Tail latency vs Eb/No",
+        output_path=stage_dir / "latency_p999_vs_ebno.png",
         stage_hint=stage_key,
     )
     _plot_ber_raw(
@@ -411,6 +492,62 @@ def _plot_ber_publication(
         alpha=0.85,
     )
     fig.tight_layout(rect=(0.0, 0.04, 1.0, 1.0))
+    fig.savefig(output_path, dpi=THESIS_DPI)
+    plt.close(fig)
+
+
+def _plot_bler(
+    *,
+    plt,
+    methods: dict[str, dict[str, list[Any]]],
+    ebno_range: list[float],
+    title: str,
+    output_path: Path,
+    stage_hint: str = "",
+) -> None:
+    """Confidence-aware BLER curve.
+
+    Points with too few observed block errors are drawn from the Clopper-Pearson
+    upper bound rather than from a point estimate that would pretend to a
+    precision the evidence does not support.
+    """
+    apply_thesis_rcparams(plt)
+    fig, ax = plt.subplots(figsize=THESIS_FIGSIZE)
+    ordered = order_methods_dict(methods)
+    plotted = False
+    for method, metrics in ordered.items():
+        bler = _coerce_float_array(metrics.get("bler", []))
+        upper = _coerce_float_array(metrics.get("bler_upper_confidence", []))
+        if bler.size == 0:
+            continue
+        block_errors = _coerce_float_array(metrics.get("block_errors", []))
+        # Below ~30 observed block errors the point estimate is not trustworthy.
+        resolved = block_errors >= MIN_RESOLVED_BIT_ERRORS
+        values = np.where(resolved & (bler > 0.0), bler, upper)
+        values = np.where(values > 0.0, values, np.nan)
+        ax.semilogy(
+            ebno_range[: values.size],
+            values,
+            marker=method_marker(method),
+            color=method_color(method),
+            label=method,
+        )
+        # Mark the points that are bounds rather than measurements.
+        bound_only = ~resolved
+        if np.any(bound_only):
+            ax.scatter(
+                np.asarray(ebno_range[: values.size])[bound_only],
+                values[bound_only],
+                facecolors="none",
+                edgecolors=method_color(method),
+                s=90,
+                zorder=5,
+            )
+        plotted = True
+    if plotted:
+        ax.legend()
+    style_ebno_axis(ax, ylabel="BLER", title=title)
+    fig.tight_layout()
     fig.savefig(output_path, dpi=THESIS_DPI)
     plt.close(fig)
 

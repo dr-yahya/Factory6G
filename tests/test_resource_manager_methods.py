@@ -5,9 +5,13 @@ import tempfile
 from pathlib import Path
 
 import numpy as np
+import pytest
 import tensorflow as tf
 
-from factory6g.models.resource_manager import create_resource_manager
+from factory6g.models.resource_manager import (
+    create_resource_manager,
+    resolve_resource_manager_name,
+)
 from factory6g.sim.config import load_config
 from factory6g.sim.types import ResourceManagerFeedback
 
@@ -169,6 +173,7 @@ def test_drl_manager_heuristic_fallback_returns_valid_directives():
         cnn_model_path=None,
         drl_model_path=None,
         manager_kwargs={"temperature": 0.5, "fairness_weight": 0.4},
+        strict_policy_loading=False,
     )
     directives = manager.get_runtime_directives({"num_ut": 4}, ebno_db=5.0, feedback=_make_feedback())
 
@@ -178,3 +183,124 @@ def test_drl_manager_heuristic_fallback_returns_valid_directives():
     assert directives.active_ut_mask[0] == 1
     assert len(directives.per_ut_power) == 4
     assert all(0.0 <= value <= 1.0 for value in directives.per_ut_power)
+
+
+def test_strict_loading_refuses_to_run_the_heuristic_under_a_learned_name():
+    """A `drl` curve must never be a hand-written rule in disguise."""
+    with pytest.raises((RuntimeError, ValueError)):
+        create_resource_manager(
+            "drl",
+            num_ut=4,
+            num_active=2,
+            cnn_model_path=None,
+            drl_model_path=None,
+        )
+
+
+def test_drl_provenance_records_the_heuristic_fallback():
+    manager = create_resource_manager(
+        "drl",
+        num_ut=4,
+        num_active=2,
+        cnn_model_path=None,
+        drl_model_path=None,
+        strict_policy_loading=False,
+    )
+    provenance = manager.provenance()
+    assert provenance["policy_loaded"] is False
+    assert provenance["actor"] == "heuristic_fallback"
+
+
+def test_unknown_resource_manager_name_is_rejected_with_the_valid_list():
+    with pytest.raises(ValueError, match="Valid names"):
+        create_resource_manager(
+            "totally_made_up",
+            num_ut=4,
+            num_active=2,
+            cnn_model_path=None,
+            drl_model_path=None,
+        )
+
+
+def test_registry_does_not_substring_match():
+    """`static_drl` used to resolve to the static manager via substring matching."""
+    with pytest.raises(ValueError):
+        resolve_resource_manager_name("static_drl")
+    assert resolve_resource_manager_name("max_throughput") == "max_throughput"
+    assert resolve_resource_manager_name("PF") == "proportional_fair"
+
+
+def test_static_manager_honours_manager_kwargs():
+    """Static used to silently discard its configured kwargs."""
+    manager = create_resource_manager(
+        "static",
+        num_ut=4,
+        num_active=2,
+        cnn_model_path=None,
+        drl_model_path=None,
+        manager_kwargs={"active_ut_mask": [1, 0, 1, 0], "per_ut_power": [0.5, 0.0, 0.5, 0.0]},
+    )
+    directives = manager.get_runtime_directives({"num_ut": 4}, ebno_db=5.0)
+    assert directives.active_ut_mask == [1, 0, 1, 0]
+    assert directives.per_ut_power == [0.5, 0.0, 0.5, 0.0]
+
+
+def test_static_subset_matches_the_scheduler_load():
+    """Equal-load control: `static` full-load is not comparable to a k-user scheduler."""
+    full = create_resource_manager(
+        "static", num_ut=4, num_active=2, cnn_model_path=None, drl_model_path=None
+    ).get_runtime_directives({"num_ut": 4}, ebno_db=5.0)
+    subset = create_resource_manager(
+        "static_subset", num_ut=4, num_active=2, cnn_model_path=None, drl_model_path=None
+    ).get_runtime_directives({"num_ut": 4}, ebno_db=5.0)
+
+    assert sum(full.active_ut_mask) == 4
+    assert sum(subset.active_ut_mask) == 2
+
+
+class TestPerPointSchedulerState:
+    """State must not leak between Eb/No points (review 1.4)."""
+
+    def test_round_robin_rotates_independently_per_point(self):
+        manager = create_resource_manager(
+            "round_robin", num_ut=4, num_active=1, cnn_model_path=None, drl_model_path=None
+        )
+        config = {"num_ut": 4}
+        first_at_0 = manager.get_runtime_directives(config, ebno_db=0.0).active_ut_mask
+        # Visiting another point must not advance the 0 dB rotation.
+        manager.get_runtime_directives(config, ebno_db=10.0)
+        manager.get_runtime_directives(config, ebno_db=20.0)
+        second_at_0 = manager.get_runtime_directives(config, ebno_db=0.0).active_ut_mask
+
+        assert first_at_0.index(1) == 0
+        assert second_at_0.index(1) == 1
+
+    def test_proportional_fair_memory_is_isolated_per_point(self):
+        manager = create_resource_manager(
+            "pf", num_ut=4, num_active=1, cnn_model_path=None, drl_model_path=None
+        )
+        config = {"num_ut": 4, "coderate": 0.5, "num_bits_per_symbol": 2}
+        feedback = _make_feedback()
+        for _ in range(5):
+            manager.get_runtime_directives(config, ebno_db=0.0, feedback=feedback)
+
+        state = manager.export_state()["avg_rates"]
+        assert set(state) == {"0.0"}
+
+    def test_scheduler_state_round_trips_through_export_and_load(self):
+        original = create_resource_manager(
+            "round_robin", num_ut=4, num_active=1, cnn_model_path=None, drl_model_path=None
+        )
+        config = {"num_ut": 4}
+        for _ in range(3):
+            original.get_runtime_directives(config, ebno_db=0.0)
+
+        restored = create_resource_manager(
+            "round_robin", num_ut=4, num_active=1, cnn_model_path=None, drl_model_path=None
+        )
+        restored.load_state(original.export_state())
+
+        assert (
+            restored.get_runtime_directives(config, ebno_db=0.0).active_ut_mask
+            == original.get_runtime_directives(config, ebno_db=0.0).active_ut_mask
+        )

@@ -39,8 +39,8 @@ class _FakeEstimatorModel:
             "include_feedback": include_feedback,
         }
 
-    def run_batch(self, context, directives=None, include_details: bool = True):
-        del directives, include_details
+    def run_batch(self, context, directives=None, include_details: bool = True, harq_max_rounds=None):
+        del directives, include_details, harq_max_rounds
         assert self.instance_index > 0
         _FakeEstimatorModel.run_tokens[self.estimator_type].append(context["token"])
         total_bits = 64

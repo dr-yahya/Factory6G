@@ -333,13 +333,10 @@ class Model:
         }
 
     def _estimate_air_interface_latency(self) -> float:
-        subcarrier_spacing = float(self.config.get("subcarrier_spacing", 30e3))
-        fft_size = float(self.config.get("fft_size", 512))
-        cyclic_prefix_length = float(self.config.get("cyclic_prefix_length", 20))
-        num_ofdm_symbols = float(self.config.get("num_ofdm_symbols", 14))
-        symbol_duration = 1.0 / subcarrier_spacing
-        cyclic_prefix_ratio = cyclic_prefix_length / max(fft_size, 1.0)
-        return symbol_duration * (1.0 + cyclic_prefix_ratio) * num_ofdm_symbols
+        """Duration of one transmission time interval, in seconds."""
+        from factory6g.sim.stages.common import slot_duration_seconds
+
+        return slot_duration_seconds(self.config)
 
     def _radiated_power(self, directives: ResourceDirectives) -> float:
         """Total radiated power in watts implied by the scheduling directives.
