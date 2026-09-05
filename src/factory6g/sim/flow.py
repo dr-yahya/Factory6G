@@ -118,6 +118,42 @@ def run_jidd_scma_flow(
     }
 
 
+def _report_evidence_ceiling(config) -> None:
+    """Print what this Monte Carlo budget can actually resolve.
+
+    Points that never accumulate enough errors come back labelled
+    `upper_bound_only`, which is easy to read as a detail of one point rather
+    than as a hard limit of the whole run. Stating the ceiling up front makes it
+    explicit before hours of compute are spent.
+    """
+    from factory6g.sim.evidence import check_reliability_target, evidence_ceiling
+
+    system = config.system
+    monte_carlo = config.monte_carlo
+    ceiling = evidence_ceiling(
+        batch_size=monte_carlo.batch_size,
+        max_batches=monte_carlo.max_batches,
+        num_ut=system.num_ut,
+        num_streams_per_ut=system.num_ut_ant,
+        fft_size=system.fft_size,
+        num_ofdm_symbols=system.num_ofdm_symbols,
+        num_pilot_symbols=len(system.pilot_ofdm_symbol_indices),
+        num_bits_per_symbol=system.num_bits_per_symbol,
+        coderate=system.coderate,
+        confidence_level=monte_carlo.confidence_level,
+    )
+    print(ceiling.describe())
+
+    if monte_carlo.target_ber is not None:
+        report = check_reliability_target(
+            monte_carlo.target_ber,
+            ceiling,
+            blocks_per_batch=monte_carlo.batch_size * system.num_ut * system.num_ut_ant,
+        )
+        if not report["reachable"]:
+            print(f"[evidence] {report['message']}")
+
+
 def run_simulation_flow(
     config: Factory6GConfig,
     *,
@@ -172,6 +208,8 @@ def run_simulation_flow(
     print("=" * 70)
     print("  6G Smart Factory Simulation Flow")
     print("=" * 70)
+    _report_evidence_ceiling(config)
+
     stage_order_text = " -> ".join(active_stages) if active_stages else "(none)"
     print(f"Stages: {stage_order_text}")
     # The flow is fixed and not user-selectable; state it in the log so a run
