@@ -172,7 +172,12 @@ def run_simulation_flow(
     print("=" * 70)
     print("  6G Smart Factory Simulation Flow")
     print("=" * 70)
-    print(f"Stages: {' -> '.join(active_stages) if active_stages else '(none)'}")
+    stage_order_text = " -> ".join(active_stages) if active_stages else "(none)"
+    print(f"Stages: {stage_order_text}")
+    # The flow is fixed and not user-selectable; state it in the log so a run
+    # artifact records the execution order it was produced under.
+    print(f"Stage order: {stage_order_text}")
+    print(f"Starting execution for fixed flow: {stage_order_text}")
     if run_estimators:
         print(f"Estimators: {config.estimators.enabled}")
     if run_rms:

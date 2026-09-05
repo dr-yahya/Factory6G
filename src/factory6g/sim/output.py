@@ -431,6 +431,22 @@ def _write_stage_plots(*, stage_dir: Path, payload: dict[str, Any]) -> None:
     plt.close(fig_runtime)
 
 
+def is_flat_curve(values: np.ndarray, *, min_decades: float = 0.3) -> bool:
+    """True when a BER curve shows no meaningful slope across the sweep.
+
+    A working link's BER falls by orders of magnitude as Eb/No rises. A curve
+    that stays within a fraction of a decade over the entire sweep is telling us
+    the method did not respond to SNR at all -- an experimental outlier rather
+    than a measurement. `min_decades` is how much variation counts as a real
+    trend.
+    """
+    finite = values[np.isfinite(values) & (values > 0.0)]
+    if finite.size < 3:
+        return False
+    decades = np.log10(finite.max()) - np.log10(finite.min())
+    return bool(decades < min_decades)
+
+
 def _plot_ber_publication(
     *,
     plt,
@@ -446,6 +462,12 @@ def _plot_ber_publication(
     ordered = order_methods_dict(methods, stage_hint=stage_hint)
     for name, metric_map in ordered.items():
         if "ber" not in metric_map:
+            continue
+        if is_flat_curve(_coerce_float_array(metric_map["ber"])):
+            # A BER that does not move across the whole Eb/No sweep is an
+            # experimental artifact, not a waterfall. Keeping it on the headline
+            # plot invites it to be read as a result; it stays in the raw plot
+            # and in the stage tables.
             continue
 
         ber = _coerce_float_array(metric_map["ber"])
@@ -570,6 +592,11 @@ def _plot_ber_raw(
         if "ber" not in metric_map:
             continue
         values = _coerce_float_array(metric_map["ber"])
+        # A measured BER of zero is "no errors observed", not "BER = 0". On a log
+        # axis it cannot be drawn honestly, so the point is omitted (NaN breaks
+        # the line) rather than clipped to a fabricated floor. The confidence-aware
+        # plot is where those points belong, as upper bounds.
+        values = np.where(values > 0.0, values, np.nan)
         ax.semilogy(
             x,
             values,
