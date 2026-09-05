@@ -222,6 +222,15 @@ def normalize_policy_state(state: np.ndarray, normalization: PolicyNormalization
     if state_np.ndim != 3:
         raise ValueError(f"Expected policy state rank 2 or 3, got shape {state_np.shape}.")
 
+    channel_width = state_np.shape[-1] - 2
+    expected_width = int(np.asarray(normalization.channel_mean).shape[-1])
+    if channel_width != expected_width:
+        raise ValueError(
+            f"Policy checkpoint expects {expected_width} channel-energy features "
+            f"(fft_size={expected_width}) but the run supplies {channel_width} "
+            f"(fft_size={channel_width}). The checkpoint was trained for a different "
+            "numerology: retrain it, or run with the fft_size it was trained on."
+        )
     channel_part = (state_np[..., :-2] - normalization.channel_mean) / normalization.channel_std
     fairness_part = (state_np[..., -2:-1] - normalization.fairness_mean) / normalization.fairness_std
     ebno_part = (state_np[..., -1:] - normalization.ebno_mean) / normalization.ebno_std
@@ -364,10 +373,20 @@ def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
             super().__init__(*args, **kwargs)
 
     def _is_keras_module_mismatch_error(exc: Exception) -> bool:
+        """Detect a checkpoint saved by a Keras whose module layout has moved.
+
+        The guard used to require the literal "keras.src.models.", which only
+        covers one vintage. Checkpoints saved by Keras 2.x report
+        "keras.src.engine.functional" instead, so they missed this branch, never
+        reached the weights-archive fallback, and failed to load -- which, before
+        strict loading, meant they silently became heuristic results published
+        under a learned method's name. Matching the "keras.src." prefix covers
+        both layouts.
+        """
         message = str(exc)
         return (
             "Could not deserialize class" in message
-            and "keras.src.models." in message
+            and "keras.src." in message
             and "cannot be imported" in message
         )
 

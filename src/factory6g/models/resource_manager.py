@@ -615,10 +615,15 @@ class DRLResourceManager(ResourceManager):
                 self.policy_checkpoint_digest = _checkpoint_digest(resolved)
                 print(f"Loaded DRL Resource Manager checkpoint from {resolved}")
             except Exception as exc:
-                self.policy_load_error = f"{type(exc).__name__}: {exc}"
+                # Keras deserialisation errors embed the entire model config;
+                # keep the record readable.
+                detail = str(exc)
+                if len(detail) > 400:
+                    detail = detail[:400] + " ... [truncated]"
+                self.policy_load_error = f"{type(exc).__name__}: {detail}"
                 if self.strict:
                     raise RuntimeError(
-                        f"Failed to load DRL resource-manager policy from '{resolved}': {exc}. "
+                        f"Failed to load DRL resource-manager policy from '{resolved}': {detail}. "
                         "Refusing to silently fall back to the heuristic actor, which would "
                         "publish a hand-written rule under a learned method's name. Pass "
                         "strict=False (or set resource_managers.strict_policy_loading to false) "
