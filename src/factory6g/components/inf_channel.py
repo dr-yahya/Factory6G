@@ -154,6 +154,74 @@ def inf_shadow_sigma_db(scenario: str, is_los: np.ndarray) -> np.ndarray:
     )
 
 
+def inf_delay_spread_seconds(
+    hall_volume_m3: float,
+    hall_surface_m2: float,
+    *,
+    rng: np.random.Generator | None = None,
+    num_links: int = 1,
+) -> np.ndarray:
+    """RMS delay spread for an InF hall (TR 38.901 Table 7.5-6, Part 3).
+
+        mu_lgDS    = log10(26 * (V / S) + 14) - 9.35
+        sigma_lgDS = 0.15
+
+    V is the hall volume and S its total interior surface area, so the delay
+    spread is set by the room's geometry -- a bigger hall reverberates longer.
+    This is the mechanism that makes a "factory size" sweep physically
+    meaningful rather than a relabelled user-count sweep.
+    """
+    volume = max(float(hall_volume_m3), 1.0)
+    surface = max(float(hall_surface_m2), 1.0)
+    mu = math.log10(26.0 * (volume / surface) + 14.0) - 9.35
+    if rng is None:
+        return np.full(num_links, 10.0**mu)
+    return np.power(10.0, rng.normal(mu, 0.15, num_links))
+
+
+def hall_volume_and_surface(room_dimensions: list[float]) -> tuple[float, float]:
+    """Interior volume and total surface area of a rectangular hall."""
+    length, width, height = (float(v) for v in room_dimensions[:3])
+    volume = length * width * height
+    surface = 2.0 * length * width + 2.0 * height * (length + width)
+    return volume, surface
+
+
+def exponential_pdp(
+    delay_spread_sec: float,
+    num_taps: int,
+    sample_duration_sec: float,
+) -> np.ndarray:
+    """Sampled exponential power delay profile with the requested RMS spread.
+
+    An exponential PDP is the standard indoor model. The decay constant is set
+    so the *sampled* profile has the target RMS delay spread, and the result is
+    normalised to unit total power.
+    """
+    if delay_spread_sec <= 0.0 or sample_duration_sec <= 0.0:
+        profile = np.zeros(max(num_taps, 1))
+        profile[0] = 1.0
+        return profile
+
+    taps = np.arange(max(num_taps, 1)) * sample_duration_sec
+    # For a continuous exponential profile the RMS spread equals the decay
+    # constant, which is the right starting point for the sampled version.
+    profile = np.exp(-taps / delay_spread_sec)
+    total = profile.sum()
+    if total <= 0.0:
+        profile = np.zeros_like(profile)
+        profile[0] = 1.0
+        return profile
+    return profile / total
+
+
+def coherence_bandwidth_hz(delay_spread_sec: float) -> float:
+    """Coherence bandwidth at 0.5 correlation, the usual 1 / (5 * DS) rule."""
+    if delay_spread_sec <= 0.0:
+        return float("inf")
+    return 1.0 / (5.0 * delay_spread_sec)
+
+
 def clutter_density_from_layout(
     num_machines: int,
     machine_size_range: list[list[float]],

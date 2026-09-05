@@ -16,6 +16,10 @@ from .antenna import AntennaConfig
 from .inf_channel import (
     INF_SCENARIOS,
     clutter_density_from_layout,
+    coherence_bandwidth_hz,
+    exponential_pdp,
+    hall_volume_and_surface,
+    inf_delay_spread_seconds,
     mean_clutter_size_m,
     sample_inf_large_scale_gain,
 )
@@ -181,8 +185,78 @@ class ChannelModel:
         los_tf = tf.constant(los.astype(np.complex64))
         return tf.cast(los_scale, tf.complex64) * los_tf + tf.cast(nlos_scale, tf.complex64) * h
 
+    def _inf_frequency_selectivity(
+        self,
+        shape: list[int],
+        delay_spread_sec: np.ndarray,
+    ) -> np.ndarray:
+        """Frequency response of an InF tapped-delay-line channel.
+
+        The large-scale model alone leaves the channel frequency-flat, because it
+        only scales a single-tap block-fading realisation. A factory hall does
+        have a delay profile -- TR 38.901 ties its RMS spread to the hall's
+        volume-to-surface ratio -- so the small-scale channel is built here as an
+        exponential PDP sampled at the signal bandwidth, with independent Rayleigh
+        taps per link.
+
+        Whether that produces *usable* frequency selectivity depends on the
+        bandwidth: an indoor hall's 24-40 ns spread has a coherence bandwidth of
+        5-8 MHz, so a narrow carrier sees a flat channel no matter how correct
+        this model is. `frequency_selectivity_report()` quantifies that for the
+        configured numerology.
+        """
+        batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc = shape
+        bandwidth = float(num_sc) * float(self.config.get("subcarrier_spacing", 30e3))
+        sample_duration = 1.0 / max(bandwidth, 1.0)
+        num_taps = max(int(self.config.get("cyclic_prefix_length", 20)), 1)
+
+        link_shape = (batch, num_rx, num_rx_ant, num_tx, num_tx_ant)
+        num_links = int(np.prod(link_shape))
+        spreads = np.asarray(delay_spread_sec, dtype=np.float64).reshape(-1)
+        if spreads.size == 1:
+            spreads = np.repeat(spreads, num_links)
+        elif spreads.size != num_links:
+            # One spread per (batch, rx, tx) link; broadcast over the antennas.
+            spreads = np.repeat(spreads, max(num_links // spreads.size, 1))[:num_links]
+
+        # Independent Rayleigh taps, shaped by each link's power delay profile.
+        taps = (
+            self._rng.normal(size=(num_links, num_taps))
+            + 1j * self._rng.normal(size=(num_links, num_taps))
+        ) / np.sqrt(2.0)
+        profiles = np.stack(
+            [exponential_pdp(float(ds), num_taps, sample_duration) for ds in spreads]
+        )
+        taps = taps * np.sqrt(profiles)
+
+        # Frequency response: zero-padded DFT over the delay axis.
+        response = np.fft.fft(taps, n=num_sc, axis=-1)
+        response = response.reshape(*link_shape, 1, num_sc)
+        return np.broadcast_to(response, (*link_shape, num_sym, num_sc))
+
+    def frequency_selectivity_report(self) -> dict[str, float]:
+        """Is the configured carrier wide enough to see the hall's delay spread?"""
+        room_dimensions = list(self.config.get("room_dimensions", [15.0, 15.0, 5.0]))
+        volume, surface = hall_volume_and_surface(room_dimensions)
+        delay_spread = float(inf_delay_spread_seconds(volume, surface)[0])
+        bandwidth = float(self.resource_grid.fft_size) * float(
+            self.config.get("subcarrier_spacing", 30e3)
+        )
+        coherence = coherence_bandwidth_hz(delay_spread)
+        return {
+            "hall_volume_m3": volume,
+            "hall_surface_m2": surface,
+            "rms_delay_spread_sec": delay_spread,
+            "signal_bandwidth_hz": bandwidth,
+            "coherence_bandwidth_hz": coherence,
+            "delay_spread_samples": delay_spread * bandwidth,
+            # Below ~1 the carrier cannot resolve the delay profile and every
+            # frequency-domain estimator converges to the same answer.
+            "selectivity_ratio": bandwidth / max(coherence, 1e-9),
+        }
+
     def _apply_inf_large_scale(self, h: tf.Tensor) -> tf.Tensor:
-        """Scale each link by its TR 38.901 Indoor Factory large-scale gain."""
+        """Apply the TR 38.901 Indoor Factory channel: delay profile plus pathloss."""
         shape = h.shape.as_list()
         batch, num_rx, num_rx_ant, num_tx, num_tx_ant, num_sym, num_sc = shape
 
@@ -211,10 +285,19 @@ class ChannelModel:
             enable_shadow_fading=bool(self.config.get("enable_shadow_fading", True)),
             rng=self._rng,
         )
+        volume, surface = hall_volume_and_surface(room_dimensions)
+        delay_spread = inf_delay_spread_seconds(
+            float(self.config.get("inf_hall_volume_m3", volume)),
+            float(self.config.get("inf_hall_surface_m2", surface)),
+            rng=self._rng,
+            num_links=batch * num_rx * num_tx,
+        )
+        large_scale["rms_delay_spread_sec"] = delay_spread
         self._last_large_scale = large_scale
 
+        selective = self._inf_frequency_selectivity(shape, delay_spread)
         gain = large_scale["amplitude_gain"].reshape(batch, num_rx, 1, num_tx, 1, 1, 1)
-        return h * tf.constant(gain.astype(np.complex64))
+        return tf.constant((selective * gain).astype(np.complex64))
 
     def last_large_scale_diagnostics(self) -> dict[str, object] | None:
         """LOS flags, distances and path loss from the most recent InF draw."""

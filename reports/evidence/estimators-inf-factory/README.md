@@ -1,5 +1,24 @@
 # Channel Estimation In A TR 38.901 Indoor Factory Hall
 
+> ## SUPERSEDED — regenerate before use
+>
+> These numbers were produced with an InF channel that was **frequency-flat**.
+> The TR 38.901 large-scale model (path loss, LOS probability, shadow fading) was
+> layered onto single-tap block fading, and the hall volume/surface parameters
+> that set the delay spread were never used. Every estimator therefore faced a
+> channel with no frequency selectivity, which is why the waterfalls are clean
+> and NMSE and BLER agree so neatly.
+>
+> The channel now implements the InF delay profile (TR 38.901 Table 7.5-6:
+> `mu_lgDS = log10(26*(V/S) + 14) - 9.35`), giving 23.7 ns in the small hall and
+> 39.4 ns in the large one.
+>
+> **However**, that measurement also shows a 3.84 MHz carrier cannot resolve
+> those spreads — the coherence bandwidth is 5-8 MHz, so the channel really is
+> flat at this numerology. The conclusions below are not wrong for *this*
+> bandwidth; they are simply uninformative about frequency-domain estimation.
+> See the bandwidth analysis in `docs/THESIS_RESULTS.md`.
+
 **Date:** 2026-09-05
 **Channel:** TR 38.901 InF-DH (dense clutter, high BS), 15x15x5 m hall, 5 machines
 **System:** 3.5 GHz FR1, QPSK, rate 1/2, 4 users, 8 BS antennas, fft 128
