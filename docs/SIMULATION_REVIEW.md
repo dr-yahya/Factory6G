@@ -1,9 +1,24 @@
 # Factory6G Simulation Review — Gaps Against the Research Objectives
 
-Status: static code review (2026-09-04). No Docker daemon was available in the
-review environment, so nothing here was re-executed; every claim is traced to a
-file and line, and the items marked **[verify]** need one short run to confirm
-magnitude.
+Status: **resolved on branch `claude/simulation-review-fixes`** (2026-09-05).
+
+Originally a static review (2026-09-04). Every item below has since been
+addressed; each section carries a `Fixed:` note naming the change and, where the
+fix was measured, the number. The findings are kept in full rather than deleted,
+because they are the rationale for the changes and are worth citing in the
+thesis' methodology chapter.
+
+Two caveats on the verification:
+
+* Validation ran in a local virtualenv with TensorFlow 2.21 / Sionna 1.2.1, not
+  the project's Docker image (which pins TensorFlow 2.15) -- no Docker daemon
+  was available. The code paths are the same, but the reproduction runs should
+  be repeated in the container before results are published.
+* The one item that still needs a real experiment rather than a code change is
+  **1.1**: the LLR clip is fixed, but only a full Eb/No sweep will show how much
+  of the reported high-SNR floor it was responsible for.
+
+One correction to the original review is recorded in section 4.6.
 
 Research objectives assumed, from `CLAUDE.md` and `README.md`:
 6G / B5G networks in **smart factory** environments, with **AI/ML** applied to
@@ -22,6 +37,9 @@ These change published curves. Fix and re-run before any of the current
 evidence is defended.
 
 ### 1.1 LLR clipping at ±20 manufactures a high-SNR error floor
+
+> **Fixed.** `system.llr_clip` now defaults to 200 (`receiver.py`), and `null` or a non-positive value disables clipping entirely. The magnitude of the floor it was creating still needs one full Eb/No sweep to quantify -- that is the one open experimental item on this document.
+
 
 `src/factory6g/components/receiver.py:331`
 
@@ -45,6 +63,9 @@ external clip this tight is a debugging workaround, not a model.
 
 ### 1.2 The receiver is never told which users were scheduled
 
+> **Fixed.** `apply_stream_mask()` zeroes the channel estimate and error variance of muted transmitters before equalization, so the LMMSE equalizer no longer nulls interference from users that never transmitted.
+
+
 `src/factory6g/models/model.py:185`
 
 Directives are applied at the transmitter (`transmitter.py:273-285`) and then
@@ -67,6 +88,9 @@ Fix: thread `active_ut_mask` into `Receiver`, and restrict `StreamManagement` /
 equalization / decoding to the scheduled streams.
 
 ### 1.3 `latency_ms` and `avg_power_w` measure the host CPU, not the system
+
+> **Fixed.** Latency is now the physical slot time times the HARQ rounds actually used, reported as a distribution (mean, p99, p99.9) built from a per-codeword delivery-round histogram. Host wall-clock stays in `processing_latency_sec` and never enters a KPI. The energy model is rebuilt around the directives (radiated power / PA efficiency + circuit power + decode energy), so power allocation and scheduled-user count now move the reported energy; `avg_power_w` is energy over slot time. Type-I HARQ is available via `system.harq_max_rounds`.
+
 
 `src/factory6g/models/model.py:189-242`, consumed at
 `sim/stages/resource_managers.py:184`.
@@ -102,6 +126,9 @@ Fix: separate the three quantities that are currently fused.
 
 ### 1.4 Stateful schedulers keep state inconsistently, and lose it on resume
 
+> **Fixed.** All scheduler state moved behind a shared `_PerPointState` keyed by Eb/No, so round-robin and proportional-fair are no longer driven by the sweep order. Managers gained `export_state`/`load_state` and the stage checkpoints them, so a resumed run continues rather than restarting cold.
+
+
 | Manager | State | Keyed by Eb/No? | Line |
 |---|---|---|---|
 | Round robin | `_current_index` | **no** | `resource_manager.py:62` |
@@ -131,6 +158,9 @@ instance per point), and serialise RM state + RNG state in the checkpoint.
 
 ### 1.5 `static` is not a comparable baseline
 
+> **Fixed.** `static` keeps its full-load meaning and is documented as the "no scheduler at all" reference; a new `static_subset` schedules `num_active` users as the equal-load control, and both ship enabled. Every point also reports `num_scheduled_users`, so the load difference is visible in the output rather than hidden. `static` no longer discards its `manager_kwargs`.
+
+
 `config/config.json` sets `num_active_users: 2` with `num_ut: 4`, but
 `create_resource_manager()` builds `StaticResourceManager` with
 `active_ut_mask=[1]*num_ut` (`resource_manager.py:527`) — all four users, full
@@ -146,6 +176,9 @@ Fix: either give `static` the same `num_active`, or (better) report BER against
 than a single point. And stop dropping `manager_kwargs` for `static`.
 
 ### 1.6 The Rician channel is not Rician
+
+> **Fixed.** The LOS component is now a rank-one outer product of receive and transmit array responses with per-link angles and phase. Measured mean cross-user spatial correlation at K=5 falls from **0.88** (scalar LOS) to **0.24**, and the blend preserves unit average power. Rician results in the 2026-05-23 report should be regenerated.
+
 
 `src/factory6g/components/channel.py:110-114`
 
@@ -168,6 +201,11 @@ proper LOS geometry.
 
 ### 1.7 The DRL manager silently degrades to a hand-tuned heuristic
 
+> **Fixed, and it immediately caught a real case.** Loading is strict by default; the fallback requires `strict=False`. Stage output records `policy_loaded`, the resolved path and a checkpoint SHA-256. Paths resolve against a configured `model_root` rather than the working directory.
+>
+> Turning strict mode on exposed that `models/reliability_drl_resource_manager_policy` **did not load at all** here: the compatibility loader's guard matched only `keras.src.models.`, while that checkpoint reports `keras.src.engine.functional`, so it never reached the weights-archive fallback. Under the old silent fallback, every `reliability_drl` curve produced in such an environment was the heuristic actor under a learned name. The guard now matches the `keras.src.` prefix and all three checkpoints load.
+
+
 `src/factory6g/models/resource_manager.py:421-424`: if the checkpoint fails to
 load, it prints a message and falls back to a heuristic actor. Nothing in
 `stage_results_v2.json` records which one ran. A curve labelled `drl` in the
@@ -187,6 +225,13 @@ record `policy_loaded`, checkpoint path and checkpoint hash in the stage output.
 ## 2. The "AI/ML" contribution is thinner than the naming suggests
 
 ### 2.1 The DRL resource manager is not reinforcement learning
+
+> **Fixed.** New `factory6g/training/rl_resource_manager.py` and `scripts/tools/train_rl_resource_manager.py` implement REINFORCE with a learned value baseline over the real simulator: the policy acts, the physical layer reports what it delivered, and the reward drives the gradient. Scheduling is sampled with Gumbel top-k (exactly Plackett-Luce top-k), giving a closed-form log-probability and an unbiased score-function estimator; powers use a Gaussian policy. The problem is documented as a **contextual bandit**, which is what it honestly is.
+>
+> Verified to learn: over 120 iterations on a 6-user Rayleigh setup, mean BLER fell from **0.031 to 0.0014** while reward rose.
+>
+> The imitation trainer is renamed rather than dressed up: `checkpoint_type: "offline_behaviour_cloning"`, `training_method: "supervised_imitation"`. Warm-starting RL from a behaviour-cloning checkpoint is supported and is usually the strongest combination.
+
 
 `scripts/tools/train_drl_resource_manager.py` is `model.fit()` on a parquet of
 oracle labels, with binary cross-entropy on the schedule head and MSE on power
@@ -215,6 +260,9 @@ gives you the ablation an examiner will ask for: imitation vs. RL vs. heuristic.
 
 ### 2.2 Train/serve feature skew on the fairness input
 
+> **Fixed.** Checkpoints record which fairness regime they were trained under (`constant` or `live`) and inference feeds the matching input, so weights fitted against a dead channel are never driven by a live signal.
+
+
 `train_drl_resource_manager.py:121` calls
 `build_policy_training_inputs(channel_energy, ebno_db)` with no `fairness_debt`.
 Following that through `drl_policy.py:218-226`, `:150` and `:186`: the fairness
@@ -232,6 +280,9 @@ feature — but the two paths must match. Worth adding a test that asserts the
 training and inference state builders agree on a fixed input.
 
 ### 2.3 The oracle labels are selected on noise, and its utility is degenerate
+
+> **Fixed.** Utility now uses absolute delivered bits normalised by full-load capacity, so it genuinely trades throughput against reliability instead of collapsing to (1 - BER). Candidates are averaged over `--label-repeats` independent noise draws (default 4) before the oracle picks a winner, which removes most of the winner's-curse bias.
+
 
 `scripts/tools/generate_dataset.py:89-146` (`:105`):
 
@@ -261,6 +312,9 @@ ranking; (c) consider soft or ranking labels rather than a hard argmax.
 
 ### 2.4 The policy network's inductive bias fights the problem
 
+> **Fixed.** The default encoder is a permutation-equivariant DeepSets stack. `conv1d` remains selectable and the compatibility loader detects which encoder a checkpoint used, so existing checkpoints still load.
+
+
 `drl_policy.py:240-241` puts `Conv1D(kernel=3, padding="same")` over the **user**
 axis. Users have no meaningful ordering — a 1-D convolution imposes a locality
 prior between user 2 and user 3 that does not exist, and makes the policy
@@ -272,6 +326,9 @@ change, it is the standard answer for set-structured scheduling, and it is easy
 to defend in the thesis.
 
 ### 2.5 The adaptive estimator is SNR-switched, not channel-adaptive
+
+> **Fixed.** The default `per_user` mode decides the DFT/LMMSE blend per user from two statistics the channel actually varies -- per-user LS SNR and the fraction of delay-domain energy outside the cyclic prefix -- so different users can take different branches in the same slot. The legacy `scalar` mode is retained for reproducing earlier results.
+
 
 `components/estimators/adaptive_estimator.py:54-58`:
 
@@ -300,6 +357,11 @@ This is the gap most likely to be raised in the viva, because it goes to whether
 the whole evidence base is on-topic.
 
 ### 3.1 The factory scenario has no effect on any reported number
+
+> **Fixed (route 1 of the three below).** New `components/inf_channel.py` implements the TR 38.901 Rel-16 Indoor Factory large-scale model Sionna does not ship: LOS probability (Table 7.4.2-1), path loss and shadow fading (Table 7.4.1-1) for InF-SL/DL/SH/DH/HH with the NLOS floors the table requires. Select it with `channel_model_type: "inf"` and an `inf_*` scenario.
+>
+> Clutter density and clutter size are derived from the configured machine count and size range, and `factory_scenario` geometry now reaches `system_runtime_config`, so hall dimensions genuinely drive propagation. The ray-tracing route (2) remains the stronger long-term option and is untouched.
+
 
 `config.factory_scenario` (room dimensions, machines, metal/concrete materials)
 is consumed only by the ray-tracing visualiser. The channel used by both
@@ -337,6 +399,9 @@ This is the single highest-value thing to fix, and there are three routes:
 
 ### 3.2 No mobility — which removes the reason to learn a scheduler
 
+> **Fixed.** `system.csi_feedback_delay_slots` ages the feedback channel with the standard first-order Jakes model, rho = J0(2*pi*f_d*tau). At 3 m/s with a 4-slot delay rho = 0.89 -- meaningful ageing, and exactly the regime where a learned policy can beat an instantaneous-CSI heuristic. Set a non-zero `max_ut_velocity` to activate it.
+
+
 `min_ut_velocity: 0.0`, `max_ut_velocity: 0.0`. Every UT is static, so there is
 no Doppler and no channel aging between the feedback probe and the data
 transmission.
@@ -351,6 +416,11 @@ contribution is supposed to solve.
 
 ### 3.3 The numerology is 5G FR1, not 6G, and not URLLC
 
+> **Fixed (the blocker, at least).** The hard 5G numerology lock is now `system.radio_profile`. The default `nr_5g_fr1` preserves the existing lock so current result families stay reproducible; `6g_fr3` permits FR3 carriers (7-24 GHz), 60/120 kHz subcarrier spacing and mini-slot TTIs (2-14 symbols); `custom` opts out. HARQ is implemented (`harq_max_rounds`) and per-user BLER plus p99/p99.9 latency are reported.
+>
+> Choosing and defending the specific 6G operating point remains a research decision, not a code change -- the lock that made it impossible is gone.
+
+
 - `carrier_frequency: 3.5 GHz` — NR FR1. A 6G thesis should show at least FR3
   (7–15 GHz) or mmWave. The `jidd_scma` block already lists 28 GHz, so the
   intent exists somewhere.
@@ -364,6 +434,17 @@ contribution is supposed to solve.
   trade-off.
 
 ### 3.4 The Monte Carlo budget cannot reach the reliability regime being claimed
+
+> **Addressed on all three fronts.**
+>
+> *Speed*: `system.graph_mode` compiles the decode pipeline with `tf.function`. Measured on a shared batch context, output is **bit-identical** to eager for ls, dft, lmmse and adaptive at a **7.1-7.3x speedup**. This required removing the `.numpy()` calls in the adaptive quality proxy and LMMSE's shrinkage cache that forced the whole simulation into eager mode.
+>
+> *Metric*: BLER is now the headline, with exact Clopper-Pearson bounds.
+>
+> *Honesty about the tail*: new `sim/evidence.py` computes what a configuration can actually resolve and prints it at run start -- for the shipped config, 2,457,600 bits / 1,600 codewords per point, so BLER below ~1.9e-2 is unresolvable and reaching 1e-5 would need ~37,500 batches per point. An unreachable `target_ber` is flagged with that number. `extrapolate_bler` fits the log-linear tail with a prediction interval and marks predictions made outside the fitted range, so a deep-tail claim can be reported as an extrapolation instead of being passed off as a measurement.
+>
+> Importance sampling is still not implemented; the extrapolation path plus the 7x speedup is the honest interim.
+
 
 With the shipped config: 12 data symbols × 128 subcarriers × 2 bits × 0.5 rate
 ≈ 1536 info bits per codeword; `batch_size: 20` × `num_ut: 4` = 80 codewords per
@@ -394,6 +475,9 @@ Getting there needs all three of:
 
 ### 4.1 Nothing is graph-compiled — this is what makes the runs take hours
 
+> **Fixed.** See 3.4: 7.1-7.3x, bit-identical, opt-in via `system.graph_mode`. The estimator-stage duplication of full `Model` objects per method is unchanged.
+
+
 There is no `tf.function` and no `jit_compile` anywhere in `src/`. Every batch
 runs eager, and `adaptive_estimator.py:58` calls `.numpy()` on the quality proxy
 mid-forward-pass, which would break tracing even if a decorator were added.
@@ -410,6 +494,9 @@ Secondary: the estimator stage builds a full `Model` per method
 encoder, when only the estimator differs.
 
 ### 4.2 The BER confidence interval assumes independence that does not hold
+
+> **Fixed.** BLER with exact Clopper-Pearson bounds is the headline metric, and `paired_bootstrap_ci` resamples whole Monte Carlo batches so the correlation structure is respected. The bit-level Wilson interval is retained for BER but is no longer what the primary claims rest on.
+
 
 `ber_upper_confidence_bound()` (`stages/common.py:116`) treats `total_bits`
 Bernoulli trials as independent. LDPC errors are strongly bursty — a failed
@@ -430,6 +517,9 @@ as a *bit*-level rule of three but inherits the same independence problem.
 
 ### 4.3 You have common random numbers and are not using them
 
+> **Fixed.** `compare_methods_paired` differences per-batch BLER against a configurable reference (`resource_managers.paired_reference`, defaulting to `static_subset`) and reports a paired bootstrap CI plus a significance flag, so a result can be stated as "improves BLER by X (95% CI [a, b])". It uses only the batch prefix both methods actually ran, which handles the early-stopping mismatch noted in the original caveat.
+
+
 The shared `BatchContext` design means every method at a given (batch, Eb/No)
 sees the identical channel, noise and source bits. That is textbook common
 random numbers, and it is the single best variance-reduction property the
@@ -449,6 +539,9 @@ batch count for the paired analysis, or truncate to the shared prefix.
 
 ### 4.4 Reproducibility gaps
 
+> **Fixed.** Per-point seeds are derived from (base seed, stage, Eb/No, batch), so a point is reproducible in isolation and unaffected by which other methods are enabled. Checkpoints carry scheduler state. Stage output records a run fingerprint: git commit, branch, dirty flag and library versions.
+
+
 - One global seed (`cli/run.py:364-367`) drives one RNG stream shared by every
   method and point. Add or remove a method from `enabled` and **every channel
   realisation changes**, so runs with different method lists are not comparable.
@@ -460,6 +553,9 @@ batch count for the paired analysis, or truncate to the shared prefix.
   the loaded policy checkpoint. For a thesis these belong in `summary_v2.json`.
 
 ### 4.5 Missing metrics for the claims being made
+
+> **Fixed.** Added NMSE (with its own plot), analytic estimator complexity in `components/estimators/complexity.py`, Jain's fairness index, per-user and worst-user BLER, radiated power and scheduled-user count. `pilot_reuse_factor` is implemented rather than deleted: it shares pilot power within a reuse group, so the contamination penalty is real and measurable.
+
 
 - **No NMSE anywhere.** A channel-estimator benchmark with no estimation-accuracy
   metric is a strange artifact — `run_batch` already returns both `channel` and
@@ -483,6 +579,8 @@ batch count for the paired analysis, or truncate to the shared prefix.
 
 ### 4.6 Smaller items
 
+> **All fixed** -- with one correction to the original review, flagged inline below.
+
 - `create_resource_manager()` dispatches by substring, ordered
   (`resource_manager.py:508-546`). `"max"` catches anything containing "max";
   `"pf"` and `"prop"` are separate substrings for one manager. Replace with an
@@ -494,6 +592,20 @@ batch count for the paired analysis, or truncate to the shared prefix.
   Since power ∈ (0, 1] can only *reduce* SNR relative to full power, any manager
   that does power control is handicapped against one that does not. Impose a sum
   constraint (`Σ P_i = P_total`) so power allocation is a real trade-off.
+
+  > **Correction to this review.** Calling the missing sum-power constraint a
+  > defect was wrong for this simulator. `system.direction` is `uplink`, and in
+  > the uplink every device has its own power amplifier — a **per-UT** limit is
+  > the physically correct constraint, and there is no shared budget across
+  > devices to redistribute. What the original item got right is the rest: peak
+  > renormalisation discarded WMMSE's absolute solution, and with the old
+  > energy model (§1.3) ignoring power entirely, reducing power was pure
+  > downside with no measurable benefit — so no manager had a reason to use it.
+  >
+  > **Fixed accordingly**: WMMSE now uses `mode="absolute"` and keeps its solved
+  > levels; the energy model responds to power, making reduction a genuine
+  > trade-off; and an optional `sum_power_budget` is available for downlink or
+  > shared-budget studies rather than being imposed on the uplink.
 - `_instantaneous_rate_per_user()` (`resource_manager.py:92`) uses
   `10**(ebno_db/10)` as a linear SNR, skipping the Eb/N0 → SNR conversion
   (`num_bits_per_symbol`, coderate, RG occupancy). Harmless for ranking, wrong if
@@ -504,43 +616,53 @@ batch count for the paired analysis, or truncate to the shared prefix.
 - `_FACTORY_SIZE_PRESETS` is duplicated verbatim in `cli/run.py:91` and
   `flow.py:19`.
 - `sim/results.py` and `sim/simulation.py` are legacy shims reachable only via
-  lazy imports in `sim/__init__.py` and one test.
+  lazy imports in `sim/__init__.py` and one test. *(Both removed; the one test
+  now calls `run_simulation_flow` directly.)*
 
 ---
 
-## 5. Suggested order of work
+## 5. Status and what remains
 
-**Before defending any current result** — these invalidate published figures:
+Everything in sections 1-4 is implemented on `claude/simulation-review-fixes`.
+The test suite is green (191 tests), including five that were failing before the
+work started -- three of those turned out to be behaviours `ARCHITECTURE.md`
+documented but nobody had implemented.
 
-1. Remove or widen the ±20 LLR clip and re-run one sweep to quantify the floor (§1.1).
-2. Pass `active_ut_mask` to the receiver (§1.2).
-3. Give `static` the same active-user count, or plot against served load (§1.5).
-4. Key RM state per Eb/No point; checkpoint RM + RNG state (§1.4).
-5. Make the DRL loader strict and record `policy_loaded` in the outputs (§1.7).
-6. Stop reporting `latency_ms` and `avg_power_w` until they mean something (§1.3).
-7. Fix or withdraw the Rician results (§1.6).
+### What is code-complete but needs a real run
 
-**Then unblock the science:**
+These are finished in code and cannot be signed off from a unit test:
 
-8. Graph-compile the batch path (§4.1). Everything below depends on this.
-9. Add NMSE to the estimator stage (§4.5) — cheapest real gain in the repo.
-10. Switch the headline metric to BLER with Clopper–Pearson intervals, and add
-    paired bootstrap CIs between methods (§4.2, §4.3).
-11. Fix the train/serve fairness skew and add a regression test (§2.2).
+1. **Quantify the LLR-clip floor (§1.1).** One Eb/No sweep at clip 20 / 200 /
+   disabled. If the floor lifts, every BER figure in the thesis needs
+   regenerating -- and the thesis gains a clean methodological finding.
+2. **Regenerate the Rician family (§1.6).** The 2026-05-23 results were produced
+   with the scalar-LOS channel and are not trustworthy.
+3. **Re-run the RM comparison (§1.2, §1.4, §1.5).** Receiver masking, per-point
+   scheduler state and the `static_subset` equal-load control all move the
+   numbers. The paired CIs now make the comparison quantitative.
+4. **Validate `graph_mode` in the Docker image.** The 7.1-7.3x speedup and
+   bit-identical output were measured under TensorFlow 2.21; confirm under the
+   pinned 2.15 before relying on it for long runs.
+5. **Train an RL policy for real.** The loop is verified to learn on a small
+   setup (BLER 0.031 -> 0.0014 over 120 iterations). A thesis-grade policy needs
+   a proper run, ideally warm-started from the behaviour-cloning checkpoint, with
+   the max-SNR and PF baselines evaluated through the same path.
 
-**Then close the objective gaps** — these are the chapters, not the fixes:
+### Deliberately not done
 
-12. **InF channel** (§3.1). Without this the thesis is about UMi.
-13. **Mobility + CSI feedback delay** (§3.2). This is what creates the problem
-    the AI is meant to solve.
-14. **Real RL, or honest renaming** (§2.1). Pick one; the current situation is
-    neither.
-15. **URLLC KPIs**: mini-slot numerology, HARQ, per-user BLER and latency
-    percentiles (§3.3).
-16. **Rare-event simulation** for the 1e-5..1e-6 regime (§3.4).
-17. Fix the oracle utility and label averaging (§2.3), and swap the Conv1D user
-    encoder for a permutation-equivariant one (§2.4).
-
-Items 12, 13 and 14 are the ones that decide whether the work reads as
-*6G AI for smart factories* or as *a UMi link-level study with a learned
-scheduler*. Everything else is in service of them.
+* **Importance sampling for the deep tail (§3.4).** The evidence-ceiling report
+  and the interval-bearing extrapolation make the limit explicit and let a
+  1e-6 claim be stated honestly, which was the actual problem. A splitting or
+  importance-sampling estimator is a substantial piece of work with its own
+  validation burden, and the 7x speedup buys roughly an order of magnitude of
+  depth first.
+* **Ray-traced factory channels (§3.1, route 2).** The InF model makes hall
+  geometry matter and is standards-compliant, which resolves the finding. Using
+  the existing ray tracer for site-specific CIRs would be stronger still, and is
+  a research project rather than a fix.
+* **Choosing the 6G operating point (§3.3).** The `6g_fr3` profile removes the
+  lock that made FR3 carriers and mini-slots impossible. Which carrier,
+  bandwidth and TTI the thesis should actually defend is a research decision.
+* **Estimator-stage model duplication (§4.1).** Each method still builds a full
+  `Model` with its own channel and LDPC encoder when only the estimator differs.
+  Wasteful, but correctness-neutral and untouched by this work.
