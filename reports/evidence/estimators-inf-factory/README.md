@@ -1,6 +1,6 @@
 # Channel Estimation In A TR 38.901 Indoor Factory Hall
 
-> ## SUPERSEDED — regenerate before use
+> ## SUPERSEDED — see `reports/evidence/estimators-inf-minislot/`
 >
 > These numbers were produced with an InF channel that was **frequency-flat**.
 > The TR 38.901 large-scale model (path loss, LOS probability, shadow fading) was
