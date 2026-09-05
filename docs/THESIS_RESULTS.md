@@ -4,11 +4,16 @@ One config per result family in `config/thesis/`, one command each, and a
 statement of which thesis claim the family is evidence for. If a claim is not in
 this table, there is no run producing evidence for it.
 
-Structure assumed (agreed 2026-09-05): **estimator-led, resource management
-second**; **TR 38.901 Indoor Factory for all factory claims** with UMi retained
-as a comparison arm; **FR1 numerology in the body with an FR3 mini-slot
-section**; **reinforcement learning trained for real, with behaviour cloning
+Structure (agreed 2026-09-05): **estimator-led, resource management second**;
+**TR 38.901 Indoor Factory for all factory claims** with UMi retained as a
+comparison arm; **reinforcement learning trained for real, with behaviour cloning
 kept as an ablation**.
+
+The numerology decision was revised once the delay-spread model was measured.
+The factory families now run on a **4-symbol mini-slot at 120 kHz over 512
+subcarriers** — 61.4 MHz, the only configuration in this project where a factory
+hall's delay profile is actually resolvable (see the bandwidth section). FR1 is
+retained as a deliberate narrowband control rather than as the body numerology.
 
 ## Running a family
 
@@ -23,14 +28,18 @@ affordable.
 
 ## The families
 
-| Config | Claim it supports | Channel | Numerology | Notes |
-|---|---|---|---|---|
-| `estimators_inf_s.json` | Estimator comparison in a small factory hall | InF-DH, 15x15x5 m, 5 machines | FR1 | 4 users. Primary evidence for the lead contribution. |
-| `estimators_inf_m.json` | Scaling with hall size and device count | InF-DH, 25x25x6 m, 10 machines | FR1 | 8 users. |
-| `estimators_inf_l.json` | Scaling continued | InF-DH, 40x40x8 m, 20 machines | FR1 | 16 users. |
-| `estimators_umi.json` | Comparison arm against the prior UMi evidence | TR 38.901 UMi | FR1 | Keeps the existing weekly-report results interpretable. |
-| `estimators_fr3_minislot.json` | The 6G section: methods carry to FR3 and hit sub-ms latency | InF-DH | **FR3**, 13 GHz, 120 kHz, 4-symbol mini-slot | AGV mobility 3 m/s, CSI delay 4 slots, HARQ 3. Measured p99.9 latency 0.116 ms. |
-| `resource_managers_inf.json` | Resource-management chapter | InF-DH, 25x25x6 m | FR1 | 8 users, CSI ageing on, `static_subset` as the equal-load control, `drl` and `rl` both present for the ablation. |
+| Config | Claim it supports | Hall | Bandwidth | Selectivity | Notes |
+|---|---|---|---|---|---|
+| `estimators_inf_s.json` | **Lead contribution** — estimator comparison in a factory hall | 15×15×5 m, 5 machines | 61.4 MHz | 7.3 | 4 users. Mini-slot FR3, 13 GHz. |
+| `estimators_inf_m.json` | Scaling with hall size and device count | 25×25×6 m, 10 machines | 61.4 MHz | 9.2 | 8 users. |
+| `estimators_inf_l.json` | Scaling continued | 40×40×8 m, 20 machines | 61.4 MHz | 12.1 | 16 users. Longest delay spread, most selective. |
+| `estimators_inf_narrowband.json` | **Control** — estimators converge when the channel is flat | 15×15×5 m | 3.8 MHz | 0.45 | FR1. The convergence is the finding, not a failed run. |
+| `estimators_umi.json` | Comparison arm; where the estimation floor lives | — (UMi) | 3.8 MHz | selective | Keeps the existing weekly-report evidence interpretable. |
+| `resource_managers_inf.json` | Resource-management chapter | 25×25×6 m | 61.4 MHz | 9.2 | 8 users, AGV mobility 3 m/s, CSI delay 4 slots, HARQ 3. `static_subset` is the equal-load control; `drl` and `rl` give the imitation-vs-RL ablation. |
+
+Selectivity is signal bandwidth over coherence bandwidth. It rises with hall size
+because a larger hall reverberates longer, so the factory-size sweep is now a
+sweep over a real propagation property rather than over the user count alone.
 
 Because the hall geometry now reaches the propagation model, the S/M/L sweep is
 a genuine factory-size study: room dimensions and machine count set the InF
