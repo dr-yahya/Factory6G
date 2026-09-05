@@ -53,6 +53,44 @@ claims:
 | `num_scheduled_users` | Confirms methods are compared at equal load. |
 | `run_provenance`, `manager_provenance` | Git commit, library versions, and whether each learned policy actually loaded. |
 
+## Bandwidth: can the carrier see the factory channel?
+
+An Indoor Factory hall has a short delay spread — TR 38.901 ties it to the hall's
+volume-to-surface ratio, giving 23.7 ns for the 15×15×5 m hall and 39.4 ns for
+40×40×8 m. Short delay spread means *wide* coherence bandwidth, 5–8 MHz here. A
+carrier narrower than that sees a flat channel, and every frequency-domain
+estimator converges to the same answer no matter how good it is.
+
+The current FR1 numerology is narrower than that. Measured:
+
+| Numerology | Bandwidth | Selectivity ratio | RMS taps | LDPC block | Usable? |
+|---|---|---|---|---|---|
+| fft 128 × 14 sym @ 30 kHz *(current FR1)* | 3.8 MHz | 0.45 | 0.02 | k = 1536 | **flat — estimators cannot differ** |
+| fft 512 × 14 sym @ 30 kHz | 15.4 MHz | 1.82 | 0.39 | k = 6144 | mildly selective |
+| fft 1024 × 14 sym @ 30 kHz | 30.7 MHz | 3.64 | 0.78 | k = 12288 | **exceeds the 5G LDPC limit (8448)** |
+| fft 128 × 4 sym @ 120 kHz *(current FR3)* | 15.4 MHz | 1.82 | 0.39 | k = 256 | mildly selective |
+| fft 512 × 4 sym @ 120 kHz | **61.4 MHz** | **7.27** | **1.75** | k = 1024 | **strongly selective** |
+
+Selectivity ratio is signal bandwidth over coherence bandwidth; below about 1 the
+carrier cannot resolve the delay profile at all. Figures are for the small hall —
+the large hall is roughly 1.7× more selective at any given bandwidth.
+
+Two consequences worth carrying into the write-up:
+
+* **Mini-slots buy bandwidth.** A 4-symbol TTI produces a codeword 3.5× shorter
+  than a 14-symbol slot, so 512 subcarriers fit inside the 5G LDPC maximum where
+  14 symbols would not. The FR3 mini-slot configuration is therefore not only the
+  6G section — it is the only configuration in this project where frequency-domain
+  channel estimation is genuinely exercised in a factory hall.
+* **Wideband FR1 needs code-block segmentation.** Real NR splits a transport block
+  across multiple LDPC code blocks; this simulator maps the whole resource grid to
+  one codeword per user, which caps FR1 at roughly fft 512. Implementing
+  segmentation is the prerequisite for a 100 MHz FR1 study.
+
+Check `frequency_selectivity_report()` on the channel, or the `err_var_calibration`
+and `nmse_db` metrics, before concluding anything about estimator ranking: on a
+flat channel the ranking is not informative.
+
 ## Reliability the budget can reach
 
 Every run prints its evidence ceiling at startup. At 100 batches x 20 x 4 users
@@ -110,6 +148,12 @@ Two results are recorded under `reports/evidence/` and are ready to write up:
 * **LS and LMMSE still understate their error variance** by three to four times.
   Not distorting enough to change the ranking, but it should be stated when the
   calibration table is presented.
+* **The FR1 body cannot exercise frequency-domain estimation.** At 3.8 MHz the
+  factory channel is flat (see the bandwidth section above). Either move to
+  fft 512, lead with the mini-slot configuration, or reframe the estimator
+  contribution around noise averaging rather than frequency interpolation.
+* **No LDPC code-block segmentation.** One codeword per user per grid caps FR1
+  bandwidth at about fft 512, which is what blocks a 100 MHz study.
 * **Importance sampling for the deep tail is not implemented.** The extrapolation
   path with intervals is the honest interim.
 * **All numbers so far were produced under TensorFlow 2.21 / Sionna 1.2.1**, not
