@@ -1,0 +1,492 @@
+{
+  "channel": "rayleigh",
+  "estimator": "ls",
+  "ebno_db": [
+    0.0,
+    2.0,
+    4.0,
+    6.0,
+    8.0,
+    10.0,
+    12.0,
+    14.0,
+    16.0,
+    18.0,
+    20.0
+  ],
+  "batches_per_point": 80,
+  "batch_size": 20,
+  "config": {
+    "num_ut": 4,
+    "num_bs_ant": 8,
+    "num_ut_ant": 1,
+    "fft_size": 128,
+    "num_ofdm_symbols": 14,
+    "subcarrier_spacing": 30000.0,
+    "cyclic_prefix_length": 20,
+    "pilot_ofdm_symbol_indices": [
+      2,
+      11
+    ],
+    "num_bits_per_symbol": 2,
+    "coderate": 0.5,
+    "num_decoding_iter": 20,
+    "channel_model_type": "rayleigh",
+    "scenario": "umi",
+    "direction": "uplink",
+    "o2i_model": "low",
+    "enable_pathloss": false,
+    "enable_shadow_fading": false,
+    "min_ut_velocity": 0.0,
+    "max_ut_velocity": 0.0,
+    "carrier_frequency": 3500000000.0,
+    "tx_pattern": "tr38901",
+    "tx_polarization": "cross",
+    "rx_pattern": "iso",
+    "rx_polarization": "V",
+    "antenna_spacing": 0.5,
+    "graph_mode": true
+  },
+  "results": {
+    "20": {
+      "bit_errors": [
+        83223,
+        6439,
+        903,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400
+      ],
+      "block_errors": [
+        438,
+        31,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400
+      ],
+      "ber": [
+        0.00846588134765625,
+        0.0006550089518229167,
+        9.185791015625e-05,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0684375,
+        0.00484375,
+        0.00109375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.07385436716573249,
+        0.006531591648346371,
+        0.002053406088184644,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303
+      ]
+    },
+    "200": {
+      "bit_errors": [
+        83223,
+        6439,
+        903,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400
+      ],
+      "block_errors": [
+        438,
+        31,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400
+      ],
+      "ber": [
+        0.00846588134765625,
+        0.0006550089518229167,
+        9.185791015625e-05,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0684375,
+        0.00484375,
+        0.00109375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.07385436716573249,
+        0.006531591648346371,
+        0.002053406088184644,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303
+      ]
+    },
+    "none": {
+      "bit_errors": [
+        83223,
+        6439,
+        903,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400,
+        9830400
+      ],
+      "block_errors": [
+        438,
+        31,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400,
+        6400
+      ],
+      "ber": [
+        0.00846588134765625,
+        0.0006550089518229167,
+        9.185791015625e-05,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0684375,
+        0.00484375,
+        0.00109375,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.07385436716573249,
+        0.006531591648346371,
+        0.002053406088184644,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303,
+        0.0004679736339078303
+      ]
+    }
+  },
+  "paired_vs_clip20": {
+    "200": [
+      {
+        "ebno_db": 0.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 2.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 4.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 6.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 8.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 10.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 12.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 14.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 16.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 18.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 20.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      }
+    ],
+    "none": [
+      {
+        "ebno_db": 0.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 2.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 4.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 6.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 8.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 10.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 12.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 14.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 16.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 18.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 20.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      }
+    ]
+  },
+  "elapsed_sec": 1983.748159793
+}

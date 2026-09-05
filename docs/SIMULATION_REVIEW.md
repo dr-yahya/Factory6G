@@ -14,9 +14,11 @@ Two caveats on the verification:
   the project's Docker image (which pins TensorFlow 2.15) -- no Docker daemon
   was available. The code paths are the same, but the reproduction runs should
   be repeated in the container before results are published.
-* The one item that still needs a real experiment rather than a code change is
-  **1.1**: the LLR clip is fixed, but only a full Eb/No sweep will show how much
-  of the reported high-SNR floor it was responsible for.
+* **Item 1.1 has now been tested, and this review got it wrong.** The LLR clip
+  is not the cause of the TR 38.901 floor — channel-estimation error is. The
+  clip change stands as hygiene, but it fixes no published curve. Full evidence
+  in `reports/evidence/llr_clip_floor/`; §1.1 below is annotated with the
+  correction.
 
 One correction to the original review is recorded in section 4.6.
 
@@ -38,7 +40,35 @@ evidence is defended.
 
 ### 1.1 LLR clipping at ±20 manufactures a high-SNR error floor
 
-> **Fixed.** `system.llr_clip` now defaults to 200 (`receiver.py`), and `null` or a non-positive value disables clipping entirely. The magnitude of the floor it was creating still needs one full Eb/No sweep to quantify -- that is the one open experimental item on this document.
+> **Changed, but the diagnosis below is WRONG — see
+> `reports/evidence/llr_clip_floor/`.**
+>
+> `system.llr_clip` now defaults to 200 and can be disabled entirely, which is
+> right on its own terms: clipping legitimately large LLRs was poor practice.
+> But the experiment this section asked for has now been run, and it refutes the
+> hypothesis.
+>
+> With common random numbers across clip settings, 7.4-9.8 million information
+> bits per Eb/No point:
+>
+> * **Rayleigh**: identical to every digit at clip 20 / 200 / none, and zero
+>   errors from 6 dB up. No floor exists to explain.
+> * **TR 38.901 with LS**: a real floor, BER flat at 1-3e-4 across 6-20 dB — and
+>   again **bit-for-bit identical** across all three clip settings.
+> * **TR 38.901 with perfect CSI**: **zero errors at every point**, three orders
+>   of magnitude below the LS floor.
+>
+> The floor is entirely **channel-estimation error**. TR 38.901 UMi is
+> frequency-selective and the configuration interpolates two pilot symbols with
+> nearest neighbour, so interpolation error is set by pilot spacing against
+> coherence bandwidth — a ratio that does not improve with SNR. Rayleigh block
+> fading is flat in frequency, which is why the control arm is clean.
+>
+> This is a better outcome than being right would have been: the floor is a
+> genuine result about LS estimation, it belongs in the thesis as one, and
+> closing it is exactly what the DFT / LMMSE / adaptive estimators are for. The
+> perfect-CSI arm gives the lower bound each of them should be measured against.
+> No published curve changes because of the clip.
 
 
 `src/factory6g/components/receiver.py:331`
@@ -632,9 +662,12 @@ documented but nobody had implemented.
 
 These are finished in code and cannot be signed off from a unit test:
 
-1. **Quantify the LLR-clip floor (§1.1).** One Eb/No sweep at clip 20 / 200 /
-   disabled. If the floor lifts, every BER figure in the thesis needs
-   regenerating -- and the thesis gains a clean methodological finding.
+1. ~~**Quantify the LLR-clip floor (§1.1).**~~ **Done — hypothesis refuted.**
+   The clip is irrelevant to the floor; channel-estimation error causes it in
+   full. See `reports/evidence/llr_clip_floor/`. The follow-up this creates is
+   more valuable than the original question: measure how far each estimator
+   (DFT, LMMSE, adaptive) closes the gap between the LS floor and the
+   perfect-CSI bound, in NMSE as well as BER.
 2. **Regenerate the Rician family (§1.6).** The 2026-05-23 results were produced
    with the scalar-LOS channel and are not trustworthy.
 3. **Re-run the RM comparison (§1.2, §1.4, §1.5).** Receiver masking, per-point
