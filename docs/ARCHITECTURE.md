@@ -78,8 +78,18 @@ Simulation orchestration and result emission.
   - plot generation
 - `results.py`
   - older result helper functions retained in the repo
+- `evidence.py`
+  - Monte Carlo evidence ceiling: what a configuration can actually resolve
+  - log-linear tail extrapolation with a prediction interval
+- `factory_profiles.py`
+  - the single factory size preset table (previously duplicated in `cli/run.py`
+    and `flow.py`)
 - `stages/common.py`
   - shared Monte Carlo bookkeeping and stopping logic
+  - `PointAccumulator`: per-point metric accumulation shared by both stages
+  - reliability statistics: Clopper-Pearson BLER bounds, paired bootstrap CIs,
+    NMSE, Jain's index
+  - derived per-point seeding
 - `stages/estimators.py`
   - estimator benchmark stage
 - `stages/resource_managers.py`
@@ -115,12 +125,17 @@ Signal-processing building blocks.
   - bit source, LDPC encoding, QAM mapping, resource-grid mapping
 - `receiver.py`
   - channel estimation, equalization, demapping, LDPC decoding
+- `inf_channel.py`
+  - TR 38.901 Rel-16 Indoor Factory large-scale model (LOS probability, path
+    loss, shadow fading) which Sionna does not ship
 - `estimators/`
   - custom estimator implementations:
     - `dft_estimator.py`
     - `lmmse_estimator.py`
     - `adaptive_estimator.py`
     - `pso_estimator.py`
+  - `complexity.py`: analytic complex-multiplication counts per estimate, for
+    complexity claims that do not rest on wall-clock timing
 
 ### Support Directories
 
@@ -406,6 +421,35 @@ Current supported policies:
 - `threshold`
   - keeps BER-threshold stopping semantics
 
+### Reliability Statistics
+
+BLER is the headline reliability metric. Codewords are close to independent, so
+its exact Clopper-Pearson bound is statistically defensible; bits within a
+codeword are strongly correlated by the LDPC code, so the bit-level Wilson
+interval retained for BER is far too narrow and should not carry a primary
+claim.
+
+Because every method sees the identical channel, noise and source bits at a
+given (batch, Eb/No), the stages also emit `paired_comparisons`: per-batch BLER
+differences against a reference baseline with a paired bootstrap CI. This is
+common random numbers used properly, and the intervals are much tighter than the
+marginal ones.
+
+### Evidence Ceiling
+
+`sim/evidence.py` reports what a configuration can resolve before the run
+starts. With the shipped config a point sees at most 2,457,600 bits and 1,600
+codewords, so BLER below roughly 1.9e-2 cannot be measured, only bounded. Deep
+tail claims must go through `extrapolate_bler`, which returns a prediction
+interval and flags predictions made outside the fitted range.
+
+### HARQ And Latency
+
+`system.harq_max_rounds` enables Type-I HARQ (retransmission without soft
+combining). `run_batch` returns the 1-based delivery round of every codeword, so
+latency is reported as a distribution — mean, p99 and p99.9 — rather than a
+constant. Host wall-clock never enters a latency KPI; it is `runtime_sec`.
+
 ### Point Status
 
 Current point classification:
@@ -554,11 +598,17 @@ This is a mixed unit/integration test suite. Some tests require a working Sionna
 
 ## Known Constraints And Current Truths
 
+0. `docs/SIMULATION_REVIEW.md` records a review of this codebase against the
+   research objectives and the changes made in response. Read it before
+   interpreting any result family produced before 2026-09-05.
 1. Stage order is fixed.
 2. The runtime is organized around one shared `config/config.json`.
 3. A single config file cannot currently express different Eb/No sweep ranges for different stages without new schema support.
 4. The runtime depends on a correct Sionna/TensorFlow/Dr.Jit environment.
 5. The current plotter is confidence-aware by design; it is intentionally not smoothing BER curves.
+   A method whose BER varies by less than 0.3 of a decade across the whole sweep
+   is omitted from the headline plot as an experimental outlier; it remains in
+   the raw plot and the tables.
 6. Some older documentation in the repo still describes legacy result formats and needs alignment with the current `stage_results_v2` / `summary_v2` flow.
 
 ## Code Flow Diagram

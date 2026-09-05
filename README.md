@@ -29,6 +29,7 @@ plotting environment stays consistent.
 | `src/factory6g/sim/` | Simulation orchestration, config loading, run context creation, stage execution, checkpointing, output writing, and plotting. |
 | `src/factory6g/models/` | PHY model composition plus resource-manager implementations, learned CNN/DRL policy wrappers, and scheduling directives. |
 | `src/factory6g/components/` | Signal-processing building blocks: antenna arrays, channel model, transmitter, receiver, and custom channel estimators. |
+| `src/factory6g/training/` | NeuralChannelEstimator training plus the reinforcement-learning resource-manager trainer (`rl_resource_manager.py`). |
 | `src/factory6g/athirah/` | Python port of the MATLAB polar-coded SCMA-OFDM (JIDD-SCMA) reference. |
 | `scripts/` | Dataset generation, model training, reporting, visualization, and maintenance utilities. Use Docker with a repo bind mount for these scripts. |
 | `data/` | Generated training datasets and dataset documentation. See `data/README.md`. |
@@ -94,10 +95,14 @@ the `simulation` Docker service uses it as its entrypoint).
   unless `--estimators` is also passed.
 - With no method override flags, the run uses estimators from `config/config.json` and
   defaults the resource-manager stage to `max_throughput`.
-- `--channel` accepts `rayleigh`, `rician`, `tr38901`, or `awgn`.
+- `--channel` accepts `rayleigh`, `rician`, `tr38901`, `inf`, or `awgn`.
+  `inf` selects the TR 38.901 Indoor Factory model, where the hall geometry in
+  `factory_scenario` drives LOS probability and path loss.
 - `--modulation` accepts `low` for QPSK, `mid` for 16-QAM, and `high` for
   64-QAM.
-- `--factory-size` accepts `s`, `m`, `l`, and `apple`.
+- `--factory-size` accepts `s`, `m`, `l`, and `apple`. Each preset sets both the
+  user count and the hall geometry; with `--channel inf` the geometry genuinely
+  changes propagation, with the other channel models only the user count matters.
 - `--stage jidd_scma` runs the JIDD-SCMA flow. For standard estimator or
   resource-manager experiments, prefer selecting methods with `--estimators`
   and/or `--resource-managers`.
@@ -161,6 +166,9 @@ Each stage directory, such as `estimators/` or `resource_managers/`, contains:
 
 - `stage_results_v2.json`
 - `stage_results_v2.csv`
+- `bler_vs_ebno.png`
+- `nmse_vs_ebno.png`
+- `latency_p999_vs_ebno.png`
 - `ber_vs_ebno.png`
 - `ber_raw_vs_ebno.png`
 - `latency_vs_ebno.png`
@@ -170,6 +178,23 @@ Each stage directory, such as `estimators/` or `resource_managers/`, contains:
 
 Key metrics:
 
+- `bler`: block error rate, the headline reliability metric. Codewords are close
+  to independent, so this is the quantity whose confidence bound
+  (`bler_upper_confidence`, exact Clopper-Pearson) is statistically defensible.
+  Prefer it over `ber` for reliability claims: bits within a codeword are
+  strongly correlated, so a bit-level interval is far too narrow.
+- `worst_user_bler`: the worst-served user. In factory URLLC the weakest device
+  sets system reliability, and an aggregate hides it.
+- `latency_ms`, `latency_p99_ms`, `latency_p999_ms`: link latency as slot time
+  times the HARQ rounds actually used. Tail percentiles are the URLLC-relevant
+  figures; the mean is not. This is not host runtime — that is `runtime_sec`.
+- `nmse_db`: channel-estimate accuracy, `E|h - h_hat|^2 / E|h|^2` in dB. The
+  primary metric for the estimator benchmark, since it isolates estimator
+  quality from the equalizer and decoder.
+- `jains_index`, `num_scheduled_users`, `radiated_power_w`: fairness, served
+  load and transmit power. `num_scheduled_users` matters when comparing methods:
+  `static` runs at full load while the schedulers run at `num_active_users`, so
+  compare against `static_subset` for an equal-load control.
 - `ber`: measured bit error rate, computed as `bit_errors / total_bits`.
 - `ber_upper_confidence`: conservative upper confidence bound for BER. This is
   important when few or zero bit errors are observed.
@@ -181,8 +206,75 @@ Key metrics:
 - `runtime_sec` and `runtime_totals_sec`: simulation runtime, not link-layer
   latency.
 
-For publication-style reliability comparisons, prefer the confidence-aware BER
-plot and inspect `ber_upper_confidence` alongside raw `ber`.
+For publication-style reliability comparisons, use `bler_vs_ebno.png` and read
+`bler_upper_confidence` alongside it.
+
+### Statistical comparison between methods
+
+Every method sees the identical channel realisation, noise draw and source bits
+at a given (batch, Eb/No) — common random numbers. `stage_results_v2.json`
+therefore carries `paired_comparisons`: per-batch BLER differences against
+`resource_managers.paired_reference` with a paired bootstrap confidence interval
+and a `significant` flag. These intervals are far tighter than comparing the two
+marginal curves, and they let a result be written as "improves BLER by X
+(95% CI [a, b], n = N batches)" rather than "the curve is lower".
+
+### Provenance
+
+Each stage payload records `run_provenance` (git commit, branch, dirty flag and
+library versions) and, for the resource-manager stage, `manager_provenance` —
+whether each learned policy actually loaded, its resolved path and a checkpoint
+SHA-256. Policy loading is strict by default: a checkpoint that fails to load
+raises rather than silently substituting the heuristic actor under a learned
+method's name. Set `resource_managers.strict_policy_loading: false` to opt into
+the fallback deliberately.
+
+### Evidence ceiling
+
+Every run prints what its Monte Carlo budget can actually resolve, for example:
+
+```text
+Evidence ceiling per Eb/No point: 2,457,600 bits / 1,600 codewords.
+Smallest resolvable BER ~1.22e-05, BLER ~1.87e-02.
+```
+
+Reliability below that ceiling cannot be measured, only bounded. Use
+`factory6g.sim.evidence.extrapolate_bler` to project the deep tail with a
+prediction interval, and report it as an extrapolation.
+
+## Training The Learned Resource Managers
+
+Two trainers, and the difference matters for how results are described.
+
+`scripts/tools/train_drl_resource_manager.py` is **supervised imitation** of an
+oracle's scheduling labels. Its checkpoints record
+`checkpoint_type: "offline_behaviour_cloning"`. It is bounded above by the
+candidate search that produced its labels — it cannot beat the heuristics it
+learned from.
+
+`scripts/tools/train_rl_resource_manager.py` is **reinforcement learning**:
+REINFORCE with a learned value baseline, acting in the simulator and rewarded by
+what the physical layer actually delivered. The problem is formulated as a
+contextual bandit (channel realisations are drawn independently, so only the
+fairness debt carries across slots).
+
+```bash
+docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc \
+  "pip install -e . -q && python scripts/tools/train_rl_resource_manager.py \
+     --config config/config.json --iterations 300 \
+     --initial-checkpoint models/drl_resource_manager_policy \
+     --output-dir models/rl_resource_manager_policy"
+```
+
+Warm-starting RL from a behaviour-cloning checkpoint usually beats either alone.
+The trainer evaluates a max-SNR baseline through the identical path before and
+after training, and stores both in the checkpoint metadata, so a claimed gain is
+always reported against a measured baseline.
+
+Reward weights (`--reward-reliability`, `--reward-throughput`,
+`--reward-energy`, `--reward-fairness`) scalarise the objective; each term is
+also reported separately so the trade-off can be shown rather than only the
+scalar.
 
 ## Dataset, Training, And Reports
 
