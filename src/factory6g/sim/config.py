@@ -412,9 +412,15 @@ class SystemConfig:
     # 5G lock made unreachable: it forbade FR3 carriers, mini-slot TTIs and the
     # TR 38.901 Indoor Factory scenarios.
     _PROFILE_NR_5G_FR1 = "nr_5g_fr1"
+    _PROFILE_NR_5G_INF = "nr_5g_inf"
     _PROFILE_6G_FR3 = "6g_fr3"
     _PROFILE_CUSTOM = "custom"
-    _VALID_PROFILES = {_PROFILE_NR_5G_FR1, _PROFILE_6G_FR3, _PROFILE_CUSTOM}
+    _VALID_PROFILES = {
+        _PROFILE_NR_5G_FR1,
+        _PROFILE_NR_5G_INF,
+        _PROFILE_6G_FR3,
+        _PROFILE_CUSTOM,
+    }
 
     # TR 38.901 Indoor Factory scenarios (Rel-16, Table 7.2-4).
     _INF_SCENARIOS = {"inf_sl", "inf_dl", "inf_sh", "inf_dh", "inf_hh"}
@@ -599,6 +605,9 @@ class SystemConfig:
         if self.radio_profile == self._PROFILE_6G_FR3:
             self._validate_6g_fr3_profile()
             return
+        if self.radio_profile == self._PROFILE_NR_5G_INF:
+            self._validate_locked_5g_profile(allow_indoor_factory=True)
+            return
         self._validate_locked_5g_profile()
 
     def _validate_6g_fr3_profile(self) -> None:
@@ -633,13 +642,28 @@ class SystemConfig:
                     f"{self.num_ofdm_symbols}-symbol TTI."
                 )
 
-    def _validate_locked_5g_profile(self) -> None:
+    def _validate_locked_5g_profile(self, *, allow_indoor_factory: bool = False) -> None:
+        """The FR1 numerology lock.
+
+        `allow_indoor_factory` relaxes only the scenario, keeping every
+        numerology value pinned. That combination -- FR1 numerology, TR 38.901
+        Indoor Factory propagation -- is what a smart-factory study on 5G NR
+        actually needs, and the plain lock forbade it by pinning the scenario to
+        urban microcell.
+        """
         self._assert_locked_float("system.carrier_frequency", self.carrier_frequency)
         self._assert_locked_float("system.subcarrier_spacing", self.subcarrier_spacing)
         self._assert_locked_int("system.num_ofdm_symbols", self.num_ofdm_symbols)
         self._assert_locked_int("system.cyclic_prefix_length", self.cyclic_prefix_length)
         self._assert_locked_float("system.coderate", self.coderate)
-        self._assert_locked_str("system.scenario", self.scenario)
+        if allow_indoor_factory:
+            if self.scenario not in self._INF_SCENARIOS:
+                raise ConfigError(
+                    f"'system.scenario' must be one of {sorted(self._INF_SCENARIOS)} "
+                    f"for the nr_5g_inf profile (got '{self.scenario}')."
+                )
+        else:
+            self._assert_locked_str("system.scenario", self.scenario)
         self._assert_locked_str("system.direction", self.direction)
         expected_pilots = self._LOCKED_5G_VALUES["pilot_ofdm_symbol_indices"]
         if list(self.pilot_ofdm_symbol_indices) != list(expected_pilots):

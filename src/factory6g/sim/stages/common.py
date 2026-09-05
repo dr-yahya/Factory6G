@@ -53,6 +53,11 @@ METRIC_KEYS = (
     "num_scheduled_users",
     # Estimator accuracy.
     "nmse_db",
+    # Declared error variance divided by the error actually made. 1.0 is honest;
+    # below 1.0 means the estimator understates its own error, which inflates its
+    # LLRs through the equalizer and flatters its BER relative to more honest
+    # estimators. Reported so that confound can never hide again.
+    "err_var_calibration",
     # Evidence bookkeeping.
     "runtime_sec",
     "bit_errors",
@@ -95,6 +100,10 @@ class PointAccumulator:
         # NMSE accumulators (error power / signal power).
         self.nmse_error_power = 0.0
         self.nmse_signal_power = 0.0
+        self.nmse_elements = 0
+        # Declared-versus-actual estimation error, for the calibration metric.
+        self.declared_err_var_sum = 0.0
+        self.declared_err_var_batches = 0
         # Per-user reliability, for worst-user BLER and fairness.
         self.user_block_errors = np.zeros(max(num_ut, 1), dtype=np.int64)
         self.user_blocks = np.zeros(max(num_ut, 1), dtype=np.int64)
@@ -207,6 +216,12 @@ class PointAccumulator:
             if true_arr.shape == hat_arr.shape:
                 self.nmse_error_power += float(np.sum(np.abs(true_arr - hat_arr) ** 2))
                 self.nmse_signal_power += float(np.sum(np.abs(true_arr) ** 2))
+                self.nmse_elements += int(true_arr.size)
+
+        declared = result.get("declared_err_var")
+        if declared is not None and np.isfinite(declared):
+            self.declared_err_var_sum += float(declared)
+            self.declared_err_var_batches += 1
 
         return stats
 
@@ -258,6 +273,16 @@ class PointAccumulator:
             else float("nan")
         )
 
+        # Calibration: declared error variance against the error actually made,
+        # both averaged per resource element.
+        calibration = float("nan")
+        if self.declared_err_var_batches > 0 and self.nmse_error_power > 0.0:
+            elements = self.nmse_elements or 0
+            if elements > 0:
+                measured_per_element = self.nmse_error_power / elements
+                declared_mean = self.declared_err_var_sum / self.declared_err_var_batches
+                calibration = declared_mean / measured_per_element
+
         return {
             "bler": (self.block_errors / self.blocks) if self.blocks > 0 else 0.0,
             "bler_upper_confidence": bler_upper_confidence_bound(
@@ -276,6 +301,7 @@ class PointAccumulator:
             "jains_index": jains_fairness_index(delivered),
             "num_scheduled_users": self.scheduled_users_sum / safe_batches,
             "nmse_db": nmse,
+            "err_var_calibration": calibration,
             "runtime_sec": float(self.runtime_sec),
             "bit_errors": float(self.errors),
             "total_bits": float(self.bits),

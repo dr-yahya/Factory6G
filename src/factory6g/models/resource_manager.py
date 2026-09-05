@@ -767,6 +767,11 @@ RESOURCE_MANAGER_ALIASES: dict[str, str] = {
     "drl": "drl",
     "ppo": "drl",
     "actor": "drl",
+    # Reinforcement-learning policy, to be compared against the behaviour-cloning
+    # one as an ablation rather than conflated with it.
+    "rl": "rl",
+    "rl_drl": "rl",
+    "reinforce": "rl",
     "reliability_drl": "reliability_drl",
     "reliability-drl": "reliability_drl",
     "reliabilitydrl": "reliability_drl",
@@ -821,6 +826,11 @@ def create_resource_manager(
         return QueueAwareLyapunovResourceManager(num_active=num_active, **kwargs)
     if canonical == "reliability_drl":
         kwargs.setdefault("model_path", "models/reliability_drl_resource_manager_policy")
+        kwargs.setdefault("strict", strict_policy_loading)
+        kwargs.setdefault("model_root", model_root)
+        return DRLResourceManager(num_active=num_active, **kwargs)
+    if canonical == "rl":
+        kwargs.setdefault("model_path", "models/rl_resource_manager_policy")
         kwargs.setdefault("strict", strict_policy_loading)
         kwargs.setdefault("model_root", model_root)
         return DRLResourceManager(num_active=num_active, **kwargs)

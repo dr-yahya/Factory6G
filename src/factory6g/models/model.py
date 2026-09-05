@@ -255,8 +255,8 @@ class Model:
     ) -> dict:
         """One transmission attempt: apply channel, estimate, equalize, decode."""
         if self.graph_mode:
-            h_hat, x_hat, no_eff, bits_hat, decoder_iter = self._compiled_decode()(
-                x_rg, h_freq, noise, noise_variance, active_ut_mask
+            h_hat, x_hat, no_eff, bits_hat, decoder_iter, declared_err_var = (
+                self._compiled_decode()(x_rg, h_freq, noise, noise_variance, active_ut_mask)
             )
             return {
                 "h_hat": h_hat,
@@ -264,6 +264,7 @@ class Model:
                 "no_eff": no_eff,
                 "bits_hat": bits_hat,
                 "decoder_iterations": decoder_iter,
+                "declared_err_var": declared_err_var,
             }
         return self._decode_once_impl_dict(x_rg, h_freq, noise, noise_variance, active_ut_mask)
 
@@ -285,6 +286,7 @@ class Model:
             result["no_eff"],
             result["bits_hat"],
             result["decoder_iterations"],
+            result["declared_err_var"],
         )
 
     def _decode_once_impl_dict(
@@ -317,6 +319,9 @@ class Model:
             "no_eff": no_eff,
             "bits_hat": bits_hat,
             "decoder_iterations": decoder_iter,
+            # Mean declared estimation-error variance, so the pipeline can check
+            # it against the error the estimator actually made.
+            "declared_err_var": tf.reduce_mean(tf.cast(err_var, tf.float32)),
         }
 
     def run_batch(
@@ -433,6 +438,7 @@ class Model:
             "qam_hat": last["x_hat"].numpy(),
             "no_eff": last["no_eff"].numpy(),
             "noise_power": self._noise_power_value(batch_context.noise_variance),
+            "declared_err_var": float(last["declared_err_var"]),
             "slot_duration_sec": slot_duration_sec,
             "latency_sec": mean_latency_sec,
             "latency_per_block_sec": latency_per_block_sec,
