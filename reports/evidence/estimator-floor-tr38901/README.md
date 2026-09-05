@@ -138,6 +138,70 @@ realisations in the main run and zero errors over 96 here. Small samples will
 mislead, which is exactly what the paired-bootstrap machinery in
 `sim/stages/common.py` exists to guard against — use it for these comparisons.
 
+## Resolved: the confound was real, and it does not explain the inversion
+
+DFT's declared error variance now includes its truncation bias
+(`dft_estimator.py`), so the 71x understatement is gone. The comparison was
+re-run at the same 4.9M bits per point.
+
+Calibration after the fix (declared / actual; 1.0 is honest):
+
+| Eb/No | LS | DFT | LMMSE | Adaptive |
+|---|---|---|---|---|
+| 6  | 0.893 | 0.513 | 0.357 | 0.376 |
+| 12 | 0.657 | 0.891 | 0.397 | 1.048 |
+| 20 | 0.246 | **1.128** | 0.260 | 1.334 |
+
+DFT and adaptive are now calibrated at high SNR. LS and LMMSE still understate by
+three to four times — LS because Sionna's error term covers pilot noise but not
+nearest-neighbour interpolation error, LMMSE because its declared value is the
+theoretical MMSE of a correlation model (`r_freq = 0.98`) that does not match the
+channel.
+
+**BER after the fix is essentially unchanged, and the ranking is identical:**
+
+| Eb/No | LS | DFT | LMMSE | Adaptive | Perfect |
+|---|---|---|---|---|---|
+| 6  | 2.364e-04 | **0 err** | 7.202e-05 | 7.446e-05 | 0 err |
+| 10 | 2.651e-04 | **0 err** | 1.154e-04 | **0 err** | 0 err |
+| 14 | 2.879e-04 | 4.069e-07 | 8.199e-05 | 6.104e-07 | 0 err |
+| 20 | 9.318e-05 | **0 err** | 7.060e-05 | **0 err** | 0 err |
+
+This settles the question, and it settles it against the confound hypothesis.
+Note that the optimism has now *reversed*: after the fix LMMSE is the more
+optimistic of the two (0.26 against DFT's 1.13), so it is the one receiving
+inflated LLRs — and it still loses by two orders of magnitude. If `err_var`
+asymmetry were driving the result, correcting and then reversing it would have
+moved the ranking. It did not.
+
+**The finding is therefore real: NMSE does not predict coded BER for these
+estimators.** LMMSE has the best NMSE at every single Eb/No point — 6.4 dB better
+than DFT at 20 dB — and never reaches zero errors, while DFT does so at six of
+eight points. For the thesis this is a result in its own right: MSE-optimal
+channel estimation is not BER-optimal in coded multi-user OFDM, and estimator
+design driven by MSE alone will pick the wrong estimator.
+
+The surviving mechanism is error *structure* rather than error *magnitude*. DFT
+truncation is exact for the delay taps it keeps and loses only out-of-window
+energy; LMMSE's smoother, tuned to a mismatched correlation model, distorts the
+estimate in a way that is correlated across subcarriers and therefore cannot be
+averaged out by the decoder. Confirming that requires the bias/variance
+decomposition listed below, but it is now the only candidate left standing.
+
+### Immediate consequence for the adaptive estimator
+
+Adaptive is worse than DFT at 6-8 dB, and that is a direct result of its branch
+policy: at low SNR it leans on the LMMSE branch, which the BER data shows is the
+weaker choice at *every* SNR. The selection rule was designed on the assumption
+that LMMSE is the better estimator at low SNR — an assumption inherited from MSE
+reasoning that this experiment refutes.
+
+**Retuning the adaptive branch policy against BLER rather than assumed
+MSE-optimality is the cheapest remaining improvement to the lead contribution,**
+and would plausibly make adaptive strictly best at every point. See
+`quality_low` / `quality_high` / `leakage_reference` in
+`components/estimators/adaptive_estimator.py`.
+
 ## Suggested next experiments
 
 1. ~~Compare declared `err_var` against measured squared error.~~ **Done** — see
