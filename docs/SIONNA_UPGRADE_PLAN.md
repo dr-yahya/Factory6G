@@ -4,12 +4,22 @@ Status: **proposal** (2026-09-05). Nothing here is implemented.
 
 ## How this was produced
 
-`nvlabs.github.io` is blocked by this session's egress proxy, so the API surface
-below was read from the **shipped package source**: the `sionna` 1.2.1 and 2.0.1
-wheels, the `sionna-rt` 1.2.1 wheel, and PyPI release metadata. Version claims
-are from PyPI; API claims are from the code in those wheels. Nothing was
-executed — this container has no Docker daemon and no Sionna install — so every
-item below is a code-reading result, not a measurement.
+The documentation site `nvlabs.github.io` is blocked by this session's egress
+proxy — the gateway answers 403 to CONNECT, a policy denial rather than a
+transient failure. Two routes around it were used instead:
+
+* **The doc sources themselves.** `raw.githubusercontent.com` is reachable, and
+  the site is built from `doc/source/*.rst` and `tutorials/**/*.ipynb` in the
+  Sionna repo. Both were read at tag **`v1.2.2`** (the TensorFlow line we are
+  on) and at `main` (the 2.x PyTorch line), so the recipes quoted below are the
+  official ones for our backend.
+* **The shipped package source**: the `sionna` 1.2.1 and 2.0.1 wheels and the
+  `sionna-rt` 1.2.1 wheel, plus PyPI release metadata.
+
+Every API named below was confirmed present in the **1.2.1 wheel we already
+have installed**. Nothing was executed — this container has no Docker daemon and
+no Sionna install — so this is a code- and docs-reading result, not a
+measurement.
 
 Objectives assumed, from `CLAUDE.md`: 6G / B5G in **smart factory**
 environments, **AI/ML** applied to **PHY reliability** and **resource
@@ -89,12 +99,25 @@ Three gaps it closes:
   and closes the loop on HARQ, which `harq_max_rounds` already models.
 
 Shape of the work: a new stage next to `sim/stages/resource_managers.py` that
-holds the topology and channel, computes post-equalisation SINR (Sionna also
-ships `LMMSEPostEqualizationSINR` in `phy.ofdm`), and drives
+holds the topology and channel, computes post-equalisation SINR, and drives
 `PHYAbstraction` + `OuterLoopLinkAdaptation` per slot. The learned policies
 already emit per-user scheduling directives, so they can drive the same loop and
 be compared against `PFSchedulerSUMIMO` on identical slots. Report BLER and
 worst-user BLER exactly as now.
+
+**There is an official blueprint for exactly this, on our backend.** The
+`SYS_Meets_RT` tutorial at tag `v1.2.2` builds the whole loop — ray-traced
+scene, per-slot scheduling, power control, SINR, link adaptation, PHY
+abstraction — in about 120 lines. Its `step()` is one
+`@tf.function(jit_compile=True)`, which also confirms XLA works end to end on
+this line. The full call chain is reproduced in the appendix. Two deltas for
+us: it is downlink, so `downlink_fair_power_control` becomes
+`open_loop_uplink_power_control`; and it derives noise physically from
+`BOLTZMANN_CONSTANT * temperature * subcarrier_spacing` with `scene.bandwidth`
+set, rather than sweeping Eb/No. The second is arguably the more honest system
+model for a factory reliability claim, but it is a reporting change — decide
+deliberately whether the SYS arm keeps the Eb/No x-axis for comparability with
+the link-level families.
 
 Caveat worth stating in the methodology: PHY abstraction inherits 3GPP's
 LDPC/PUSCH tables, so the abstracted arm cannot also carry the custom-estimator
@@ -104,40 +127,68 @@ arms is the standard way to defend the split.
 
 ---
 
-## 2. Feed the ray-traced factory channel into the main loop
+## 2. Feed the ray-traced factory channel into the main loop — and get mobility free
 
 `docs/SIMULATION_REVIEW.md` §3.1 lists RT-based site-specific channels as
 "deliberately not done — a research project rather than a fix". **Most of it is
-already built.**
+already built, and the official recipe is simpler than the one I first
+proposed.**
+
+Already in place:
 
 * `scripts/tools/generate_factory_dataset.py` ray-traces the hall — metal
-  machines, concrete walls, `PathSolver` — and stores `paths_a` / `paths_tau`
-  per RX position.
+  machines, concrete walls, `PathSolver` — and stores `paths_a` / `paths_tau`.
 * `data/factory_dataset_1k.h5` is 51 MB of exactly that.
 * `scripts/tools/train_estimator.py` already converts it with
   `cir_to_ofdm_channel`.
-* `sionna.phy.channel.CIRDataset` turns a `(a, tau)` generator into a
-  `ChannelModel` usable by `OFDMChannel` / `GenerateOFDMChannel`.
 
-The only missing piece is a `channel_model_type: "rt"` branch in
-`components/channel.py` that wraps the H5 in a `CIRDataset` and hands it to the
-existing `GenerateOFDMChannel`, exactly as `rayleigh` and `tr38901` are handled.
-That is a contained change to one file plus config plumbing.
+The missing adapter is **not** `CIRDataset`. `Paths` exposes `cfr()` directly:
 
-Why it matters more than it looks: the InF model answers "is the *statistics* of
-a factory hall represented?" The ray tracer answers "is *this* factory hall
-represented?" — with metal specular reflection, machine shadowing, and per-user
-geometry. For an estimator comparison this is the difference between a synthetic
-exponential PDP and a real multipath structure, and it is the strongest available
-answer to "is this a factory simulation?" in the viva.
+```python
+frequencies = subcarrier_frequencies(num_subcarriers, subcarrier_spacing)  # from sionna.rt
+paths = p_solver(scene, max_depth=8)
+h_freq = paths.cfr(frequencies=frequencies,
+                   sampling_frequency=1/resource_grid.ofdm_symbol_duration,
+                   num_time_steps=resource_grid.num_ofdm_symbols,
+                   out_type="tf")
+```
 
-Two things to size first: the dataset is 1k samples per profile at a single BS
-position, which may not be enough independent realisations for a full sweep
-(regenerating is a script re-run), and the H5 was traced at whatever
-`carrier_frequency` was configured then — an FR3 result family needs a re-trace
-at 13 GHz.
+That returns the channel frequency response in the shape
+`ChannelModel.sample_frequency_response()` already produces, so a
+`channel_model_type: "rt"` branch in `components/channel.py` is a substitution,
+not a new data path. (Confirmed: `Paths.cfr` is in the `sionna-rt` 1.2.1 wheel
+we have, with `out_type="tf"`.) `CIRDataset` remains the right tool if we want a
+*frozen* dataset for reproducibility; `cfr()` is the right tool for live
+generation.
 
----
+**The mobility trick is the part worth stealing.** `SYS_Meets_RT` models moving
+users by adding a receiver at every future position up front, solving paths
+once, then reshaping the result into slots:
+
+```python
+step = (ut_pos_end - ut_pos_start) / (num_slots - 1)
+for slot in range(num_slots):
+    pos = ut_pos_start + slot * step
+    for ut in range(num_ut):
+        scene.add(Receiver(f"ut{ut}_slot{slot}", position=pos[ut, :]))
+# ... one solve ...
+h_freq = tf.reshape(h_freq, [num_slots, num_ut] + h_freq.shape[2:])
+```
+
+This is a direct answer to §3.2. Right now mobility is a first-order Jakes
+coefficient, `rho = J0(2*pi*f_d*tau)`, aging a static channel. With this, an AGV
+traversing the hall produces channel evolution from **actual geometry** —
+shadowing as it passes behind a machine, LOS/NLOS transitions at real
+positions, Doppler from `Paths.cfr`'s own time evolution. "Our learned scheduler
+handles AGV mobility" is a much stronger claim when the mobility is traced
+rather than modelled by a correlation coefficient. It also gives the
+worst-user-BLER metric something physical to be worst about.
+
+Two things to size first: the existing H5 is 1k samples per profile at a single
+BS position, which may not be enough independent realisations for a full sweep;
+and it was traced at whatever `carrier_frequency` was configured then, so an FR3
+family needs a re-trace at 13 GHz. Both are script re-runs, and the re-trace is
+also when to turn diffraction on (§6).
 
 ## 3. A matched LMMSE baseline — the estimator claim currently under-tests itself
 
@@ -243,12 +294,22 @@ and never fully updated:
 
 * **`render_coverage_map()` cannot work.** It calls `scene.coverage_map(...)`;
   `Scene` in `sionna-rt` 1.2.1 has no such method — radio maps moved to
-  `RadioMapSolver` (`rm = RadioMapSolver()(scene, max_depth=..., cell_size=...,
-  diffraction=...)`). The call sits outside the function's internal `try`, so it
+  `RadioMapSolver`. The call sits outside the function's internal `try`, so it
   raises `AttributeError`, and the caller at line 429 catches it and logs
   "Coverage map failed — skipping". **The factory coverage map has silently not
   been produced.** Worth checking whether any figure in the thesis or the weekly
-  reports is captioned as one.
+  reports is captioned as one. The current-API replacement, from `SYS_Meets_RT`:
+
+  ```python
+  rm_solver = RadioMapSolver()
+  rm = rm_solver(scene, max_depth=8, cell_size=(1, 1), samples_per_tx=10_000_000)
+  scene.render(camera=cam, radio_map=rm, rm_metric="sinr", rm_show_color_bar=True)
+  ```
+
+  Note `rm_metric` accepts `"path_gain" | "rss" | "sinr"`. An **SINR** map of the
+  factory floor — showing where in the hall a device cannot meet its target — is
+  a considerably better figure for a reliability thesis than the path-gain
+  heatmap the dead function was trying to produce.
 * **`scene.synthetic_array = True`** (`factory_visualizer.py:158`,
   `generate_factory_dataset.py:420`) sets an attribute `Scene` does not define.
   It is not a property in 1.2.x — `synthetic_array` is a `PathSolver.__call__`
@@ -278,16 +339,87 @@ and never fully updated:
   non-SCMA comparator for it, and IDD is the standard way to buy back the
   reliability that estimation error costs (the measured cause of the TR 38.901
   floor).
-* **RT mobility.** `Transmitter` and `Receiver` take a `velocity` vector, and
-  `Paths.cir(sampling_frequency=..., num_time_steps=...)` synthesises the Doppler
-  time evolution from it. Combined with `Scene.edit()` for repositioning machine
-  objects, this supports a genuinely dynamic factory — AGVs moving *and* moving
-  metal scatterers — which is a stronger version of the §3.2 mobility story than
-  a Jakes coefficient, and directly motivates a learned scheduler.
-* **`Paths.cir(out_type=...)`** accepts `"tf"`, `"numpy"`, `"jax"`, `"torch"`,
-  `"drjit"`. The dataset generator uses `"numpy"` and converts later; `"tf"`
-  avoids a round trip if item 2 is built as a live generator rather than an H5
-  reader.
+* **Moving machines, not just moving users.** §2 covers AGV mobility via
+  multi-position receivers. `Scene.edit()` additionally repositions scene
+  *objects* between solves, so a robot arm or a shuttling AGV can be a moving
+  metal scatterer rather than static clutter. That is a factory-specific
+  propagation effect with no counterpart in UMi, and therefore a defensible
+  novelty claim.
+* **`out_type`** on both `Paths.cir` and `Paths.cfr` accepts `"tf"`, `"numpy"`,
+  `"jax"`, `"torch"`, `"drjit"`. The dataset generator uses `"numpy"` and
+  converts later; `"tf"` avoids the round trip.
+
+---
+
+## 8. Sionna Research Kit — the hardware validation path
+
+Not a code upgrade, but it appears in the docs index at both `v1.2.2` and
+`main` and is directly on-topic for the degree, so it belongs in the plan.
+
+The **Sionna Research Kit** (`NVlabs/sionna-rk`, documented under
+`nvlabs.github.io/sionna/rk/`) is a GPU-accelerated software-defined 5G RAN
+built on OpenAirInterface, with O-RAN-compliant interfaces, for deploying
+**trained AI/ML components into a real radio access network**. The pinned-line
+docs cite the NVIDIA Jetson AGX Thor platform; `main` cites DGX Spark.
+
+Why it matters here: the thesis trains a neural channel estimator and learned
+schedulers and evaluates them only in simulation. The standing weakness of that
+form of contribution is "does it survive contact with a real radio?" SRK is the
+NVIDIA-supported answer, and it is the same team and the same component
+abstractions, so a Sionna-trained block is the intended input.
+
+Realistically this is out of scope for the remaining thesis timeline and needs
+hardware we do not have. But it is the right **future work** paragraph — far
+more concrete than "we plan to validate experimentally" — and if any hardware
+becomes available, the neural estimator is the component to try first, because
+it is a drop-in PHY block rather than a scheduler needing MAC integration.
+
+---
+
+## Appendix: the verified `SYS_Meets_RT` call chain
+
+From tag `v1.2.2` (our TensorFlow line). Every symbol here was confirmed present
+in the 1.2.1 wheels we already have. This is the skeleton for items 1 and 2.
+
+```python
+from sionna.rt import (load_scene, Transmitter, Receiver, PlanarArray,
+                       RadioMapSolver, PathSolver, subcarrier_frequencies)
+from sionna.phy.mimo import StreamManagement
+from sionna.phy.ofdm import (ResourceGrid, RZFPrecodedChannel,
+                             LMMSEPostEqualizationSINR)
+from sionna.phy.constants import BOLTZMANN_CONSTANT
+from sionna.phy.nr.utils import decode_mcs_index
+from sionna.sys import (PHYAbstraction, OuterLoopLinkAdaptation,
+                        PFSchedulerSUMIMO, downlink_fair_power_control)
+from sionna.sys.utils import spread_across_subcarriers
+
+phy_abs   = PHYAbstraction()
+olla      = OuterLoopLinkAdaptation(phy_abs, num_ut=num_ut,
+                                    bler_target=0.1, batch_size=[num_bs])
+scheduler = PFSchedulerSUMIMO(num_ut, num_subcarriers, num_ofdm_symbols,
+                              batch_size=[num_bs],
+                              num_streams_per_ut=num_streams_per_ut, beta=.9)
+
+@tf.function(jit_compile=True)
+def step(h, harq_feedback, sinr_eff_feedback, num_decoded_bits):
+    # scheduling -> power control -> SINR -> link adaptation -> PHY abstraction
+    ...
+```
+
+Per-slot order inside `step()`: `scheduler(...)` returns `is_scheduled` per
+resource element; `num_allocated_re` is reduced from it; power control produces
+per-UT power, spread over subcarriers by `spread_across_subcarriers`; the
+precoded channel gives post-equalisation SINR; OLLA picks the MCS from the last
+effective-SINR feedback and the HARQ ACK/NACK history; `PHYAbstraction` returns
+decoded bits, HARQ feedback, effective SINR and TBLER, which feed the next slot.
+
+The loop over slots stays in Python and only the `step` is compiled — which is
+also the structure `system.graph_mode` already uses, so the two fit together.
+
+For our uplink, swap `downlink_fair_power_control` for
+`open_loop_uplink_power_control`. Note this makes the per-UT power limit the
+physically correct constraint, which is exactly the correction recorded in
+`SIMULATION_REVIEW.md` §4.6.
 
 ---
 
@@ -296,13 +428,18 @@ and never fully updated:
 | # | Item | Why now | Size |
 |---|---|---|---|
 | 0 | `sionna` 1.2.2 + drop the Dockerfile mitsuba override | Do it before regenerating results in the container | Hours |
-| 6 | Fix the RT API drift (coverage map, `synthetic_array`, diffraction) | A figure may be missing; one-line fixes | Hours |
+| 6 | Fix the RT API drift (radio map, `synthetic_array`, diffraction) | A figure is missing; the SINR map is a better one | Hours |
 | 3 | Matched-covariance LMMSE arm | Directly hardens the lead contribution | Days |
-| 2 | RT channel into the main loop via `CIRDataset` | Data and conversion code already exist | Days |
+| 2 | RT channel via `Paths.cfr` + traced AGV mobility | Data and scene code exist; also closes §3.2 properly | Days |
 | 5 | `TBEncoder` / `TBDecoder` | Unblocks the wideband 6G family | Days |
-| 1 | Sionna SYS resource-management arm | Largest gain; reaches the URLLC reliability regime | Weeks |
-| 4 | `InFScenario(SystemLevelScenario)` | Most defensible channel; publishable on its own | Weeks |
+| 1 | Sionna SYS resource-management arm | Largest gain; official blueprint exists for our backend | Weeks |
+| 4 | `InFScenario(SystemLevelScenario)` | Most defensible statistical channel; publishable alone | Weeks |
+| 8 | Sionna Research Kit | Future work; needs hardware | — |
 | — | Sionna 2.x / PyTorch migration | Future work, not this thesis | — |
+
+Items 2 and 1 now share a spine — `SYS_Meets_RT` does both in one loop — so if
+the SYS arm is going to happen, build item 2 in the shape the tutorial uses and
+the SYS arm becomes an extension rather than a rewrite.
 
 None of this is verified by execution. Item 0 and item 6 should be confirmed in
 the Docker image first, since they are the cheapest and they gate the
