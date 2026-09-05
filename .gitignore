@@ -52,13 +52,23 @@ models/saved_model/
 # Large training arrays (manifests may be tracked)
 *.npz
 
-# Full simulation runs (local workspace; see results/README.md)
-results/*
-!results/README.md
-
-# Local regenerable script outputs (see outputs/README.md)
-outputs/*
-!outputs/README.md
+# Full simulation runs and script outputs are TRACKED (see results/README.md
+# and outputs/README.md): raw run files (simulation.log, summary_v2.json/csv,
+# stage_results_v2.json/csv, checkpoint.json) and plots (*.png) are pushed so a
+# run can be reviewed and cited from GitHub. Only bulk binaries that the run
+# itself can regenerate stay local:
+results/**/*.h5
+results/**/*.hdf5
+results/**/*.pkl
+results/**/*.parquet
+results/**/*.zip
+results/**/*.mat
+outputs/**/*.h5
+outputs/**/*.hdf5
+outputs/**/*.pkl
+outputs/**/*.parquet
+outputs/**/*.zip
+outputs/**/*.mp4
 
 # Thesis, drafting history, and reference library (local; keep out of the software repo)
 thesis/

@@ -23,7 +23,7 @@ plotting environment stays consistent.
 | `config/config.json` | Main simulation configuration: Monte Carlo policy, enabled estimators/resource managers, system numerology, factory geometry, and output settings. |
 | `config/factory_size_profiles.json` | Factory size profile definitions (S/M/L) for dataset generation. |
 | `docs/ARCHITECTURE.md` | Main architecture reference for runtime flow, stage data flow, interfaces, and output schema. Start there when reading the implementation deeply. |
-| `docs/CONTEXT.md` | Repo-wide working context and lean-git zone policy. |
+| `docs/CONTEXT.md` | Repo-wide working context and repository zone policy. |
 | `docs/THESIS_RESULTS.md` | Maps each thesis claim to the config and command that produces its evidence, the metrics that carry it, and the gaps that remain. Start here when generating results. |
 | `docs/SIMULATION_REVIEW.md` | Standing review of the simulation code against the research objectives: correctness issues that affect reported results, AI/ML and factory-realism gaps, and a prioritized work order. |
 | `docs/assets/system_design/` | Static system-design images. |
@@ -35,7 +35,7 @@ plotting environment stays consistent.
 | `scripts/` | Dataset generation, model training, reporting, visualization, and maintenance utilities. Use Docker with a repo bind mount for these scripts. |
 | `data/` | Generated training datasets and dataset documentation. See `data/README.md`. |
 | `models/` | Trained channel-estimator and resource-manager artifacts. |
-| `results/` | Local full simulation runs (gitignored). See `results/README.md`. |
+| `results/` | Full simulation runs, tracked and pushed (raw run files and plots). See `results/README.md`. |
 | `reports/` | Progress reports and curated evidence summaries. |
 | `reports/evidence/` | Cross-cutting promoted plots, tables, and stage summaries. |
 | `tests/` | Unit and integration tests for config, CLI flow, estimators, resource managers, plotting, datasets, and DRL policy loading. |

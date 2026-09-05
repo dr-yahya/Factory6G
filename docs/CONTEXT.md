@@ -36,7 +36,7 @@ _Avoid_: Golden results, pinned outputs
 **Evidence promotion**:
 The act of copying or summarizing selected artifacts from a full run into a
 tracked report or evidence folder; only citation- or milestone-relevant material
-is promoted under the lean-git policy.
+is promoted for citation; promotion is curation, not a way into git.
 _Avoid_: Syncing results, archiving runs
 
 **Weekly report package**:
@@ -52,14 +52,15 @@ _Avoid_: Snapshot, export folder
 
 **Full run**:
 A complete timestamped simulation output directory (logs, stage JSON/CSV, plots,
-checkpoints) produced by `src/factory6g/cli/run.py`; treated as local workspace output under a
-lean-git policy.
+checkpoints) produced by `src/factory6g/cli/run.py`; tracked in git and pushed,
+so a claim can be traced to the run that produced it.
 _Avoid_: Raw results, experiment folder
 
-**Results untracking**:
-Removing full runs from git index while keeping them on disk locally; promoted
-curated copies live under `reports/` before untracking.
-_Avoid_: Deleting results, archiving
+**Run pruning**:
+Deleting a superseded or incomplete full run from `results/`; because runs are
+tracked, the deletion is a commit, and anything cited elsewhere is promoted into
+`reports/` first.
+_Avoid_: Untracking results, archiving
 
 **Strict results zone**:
 `results/` contains only timestamped full-run directories and its README;
@@ -67,23 +68,24 @@ archives, loose plots, and non-run folders belong elsewhere or are removed.
 _Avoid_: Mixed output folder, dump directory
 
 **`outputs/`**:
-Local gitignored home for regenerable script-generated artifacts before optional
-promotion into `reports/`.
+Tracked home for regenerable script-generated artifacts before optional
+promotion into `reports/`; pruned rather than accumulated.
 _Avoid_: results/, temp
 
 **Lean git policy**:
-Version control holds the codebase, documentation, curated evidence, and
-lightweight report sources; the thesis workspace, large binaries, and
-regenerable artifacts stay local (gitignored) or use Git LFS only when sharing
-binaries is required.
+Version control holds the codebase, documentation, report sources, and the
+simulation evidence itself — full runs (`results/`) and script outputs
+(`outputs/`) are tracked and pushed as raw files plus plots. What stays out is
+the thesis workspace and bulk binaries (`*.h5`, `*.npz`, `*.pkl`, `*.parquet`,
+`*.zip`), which stay local or use Git LFS when sharing them is required.
 _Avoid_: Thin repo, minimal git
 
 ## Repository zones
 
 **`results/`**:
-Local workspace for full runs only—timestamped simulation output that can be
-regenerated from the codebase and `config/config.json`.
-_Avoid_: Evidence store, archive
+Tracked store for full runs only—timestamped simulation output, pushed as raw
+run files and plots, reproducible from the codebase and `config/config.json`.
+_Avoid_: Local-only workspace, archive
 
 **`reports/`**:
 Stakeholder progress reports and curated research summaries derived from runs.
