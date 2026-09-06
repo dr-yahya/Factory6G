@@ -261,3 +261,69 @@ def test_evaluate_policy_measures_any_callable_through_the_same_path():
     metrics = evaluate_policy(env, always_first_two, num_episodes=3)
     assert set(metrics) >= {"bler", "delivered_bits", "energy_joules", "jains_index"}
     assert all(np.isfinite(v) for v in metrics.values())
+
+
+def test_plackett_luce_score_matches_the_sampler():
+    """The differentiable score must be the sampler's own log-probability.
+
+    REINFORCE is unbiased only when it differentiates the log-probability of the
+    distribution that produced the action. This pins the two together; they were
+    once an exact Gumbel top-k sampler paired with an independent-Bernoulli
+    surrogate in the gradient, which is a different distribution and a biased
+    gradient.
+    """
+    import tensorflow as tf
+
+    from factory6g.training.rl_resource_manager import (
+        gumbel_top_k,
+        plackett_luce_log_prob,
+    )
+
+    rng = np.random.default_rng(7)
+    for _ in range(8):
+        scores = rng.uniform(0.02, 0.98, size=8)
+        logits = np.log(scores) - np.log(1.0 - scores)
+        order, expected = gumbel_top_k(logits, 3, rng)
+        actual = float(
+            plackett_luce_log_prob(
+                tf.constant(scores[None, :], tf.float32),
+                tf.constant(order[None, :], tf.int32),
+            )[0]
+        )
+        assert actual == pytest.approx(expected, abs=1e-4)
+
+
+def test_plackett_luce_log_prob_normalises_over_all_orderings():
+    """Summed over every ordered k-subset, the probabilities make one."""
+    import itertools
+
+    import tensorflow as tf
+
+    from factory6g.training.rl_resource_manager import plackett_luce_log_prob
+
+    num_ut, k = 5, 2
+    scores = np.array([0.1, 0.3, 0.5, 0.7, 0.9])
+    orders = np.array(list(itertools.permutations(range(num_ut), k)), dtype=np.int32)
+    log_probs = plackett_luce_log_prob(
+        tf.constant(np.repeat(scores[None, :], len(orders), axis=0), tf.float32),
+        tf.constant(orders, tf.int32),
+    ).numpy()
+    assert float(np.sum(np.exp(log_probs))) == pytest.approx(1.0, abs=1e-5)
+
+
+def test_plackett_luce_log_prob_is_differentiable_in_the_scores():
+    import tensorflow as tf
+
+    from factory6g.training.rl_resource_manager import plackett_luce_log_prob
+
+    scores = tf.Variable([[0.2, 0.4, 0.6, 0.8]], dtype=tf.float32)
+    order = tf.constant([[3, 1]], tf.int32)
+    with tf.GradientTape() as tape:
+        log_prob = tf.reduce_sum(plackett_luce_log_prob(scores, order))
+    gradient = tape.gradient(log_prob, scores).numpy()[0]
+
+    assert np.all(np.isfinite(gradient))
+    # Raising a selected user's score raises the probability of the draw;
+    # raising an unselected competitor's lowers it.
+    assert gradient[3] > 0.0 and gradient[1] > 0.0
+    assert gradient[0] < 0.0 and gradient[2] < 0.0

@@ -102,6 +102,55 @@ def gumbel_top_k(
     return order.astype(np.int64), log_prob
 
 
+def _score_logits(schedule_scores):
+    """Sigmoid head outputs -> the logits the sampler ranks on."""
+    import tensorflow as tf
+
+    clipped = tf.clip_by_value(schedule_scores, 1e-6, 1.0 - 1e-6)
+    return tf.math.log(clipped) - tf.math.log(1.0 - clipped)
+
+
+def plackett_luce_log_prob(schedule_scores, order):
+    """Differentiable log-probability of the top-k draw the sampler produced.
+
+    REINFORCE is only unbiased when the score function it differentiates is the
+    log-probability of the distribution that actually produced the action. The
+    sampler here is Gumbel top-k, which is sampling without replacement from a
+    softmax, so the log-probability of the ordered draw ``s_1..s_k`` is
+
+        log P = sum_i [ logit_{s_i} - logsumexp(logits still available at i) ].
+
+    An independent-Bernoulli likelihood over the selected subset -- which is
+    what this used to differentiate -- is the score of a different distribution
+    entirely. It pushes down the scores of every unselected user, when the
+    constraint that exactly k are chosen means only the *relative* ordering can
+    move, so the resulting gradient is biased.
+
+    Args:
+        schedule_scores: [batch, num_ut] sigmoid outputs of the schedule head.
+        order: [batch, k] indices in the order they were drawn.
+
+    Returns:
+        [batch] log-probabilities, differentiable in ``schedule_scores``.
+    """
+    import tensorflow as tf
+
+    logits = _score_logits(schedule_scores)  # [B, N]
+    num_ut = tf.shape(logits)[-1]
+
+    chosen = tf.one_hot(order, depth=num_ut, dtype=logits.dtype)  # [B, k, N]
+    # Items removed from the pool *before* step i: an exclusive cumulative sum
+    # along the draw axis.
+    withdrawn = tf.cumsum(chosen, axis=1, exclusive=True)  # [B, k, N]
+    available = 1.0 - withdrawn
+
+    # logsumexp over the pool still available at each step.
+    masked = tf.where(available > 0.0, logits[:, tf.newaxis, :], logits.dtype.min)
+    normalizer = tf.reduce_logsumexp(masked, axis=-1)  # [B, k]
+    picked = tf.reduce_sum(chosen * logits[:, tf.newaxis, :], axis=-1)  # [B, k]
+    return tf.reduce_sum(picked - normalizer, axis=-1)
+
+
 def compute_reward(
     outcome: dict[str, Any],
     *,
@@ -270,7 +319,10 @@ def train_rl_policy(
     }
 
     for iteration in range(config.num_iterations):
-        states, actions, powers, rewards, log_probs, breakdowns = [], [], [], [], [], []
+        states, actions, orders, powers, rewards, breakdowns = [], [], [], [], [], []
+        # Kept only as a consistency check against the differentiable score
+        # below; a mismatch means the two have drifted apart again.
+        behaviour_log_probs: list[float] = []
         outcomes: list[dict[str, Any]] = []
 
         for _ in range(config.episodes_per_iteration):
@@ -288,6 +340,10 @@ def train_rl_policy(
                 ),
                 normalization,
             )
+            # Dropout stays off here *and* in the gradient pass below. REINFORCE
+            # differentiates the log-probability of the policy that actually
+            # acted; scoring under a different dropout mask scores a policy that
+            # never chose anything.
             schedule_scores, power_scores, _ = model(state[None, ...], training=False)
             schedule_np = np.asarray(schedule_scores)[0].astype(np.float64)
             power_np = np.asarray(power_scores)[0].astype(np.float64)
@@ -301,14 +357,15 @@ def train_rl_policy(
             mask = np.zeros(env.num_ut, dtype=np.int64)
             mask[selected] = 1
             noise = rng.normal(0.0, power_std, size=env.num_ut)
-            sampled_power = np.clip(power_np + noise, 0.05, 1.0) * mask
-            # Gaussian log-density of the sampled powers on the scheduled users.
-            power_log_prob = float(
-                -0.5 * np.sum((noise[mask > 0] / power_std) ** 2)
-                - mask.sum() * np.log(power_std * np.sqrt(2 * np.pi))
-            )
+            # The Gaussian draw is the action; the clip into the feasible power
+            # range belongs to the environment. Scoring the clipped value would
+            # be scoring a density that has point masses at the bounds and does
+            # not match what was sampled, so the raw draw is what the gradient
+            # sees and the clipped one is what the radio gets.
+            raw_power = power_np + noise
+            applied_power = np.clip(raw_power, 0.05, 1.0) * mask
 
-            outcome = env.step(observation, mask, sampled_power)
+            outcome = env.step(observation, mask, applied_power)
             reward, terms = compute_reward(
                 outcome,
                 weights=config.reward_weights,
@@ -318,31 +375,29 @@ def train_rl_policy(
 
             states.append(state)
             actions.append(mask)
-            powers.append(sampled_power)
+            orders.append(selected)
+            powers.append(raw_power)
             rewards.append(reward)
-            log_probs.append(schedule_log_prob + power_log_prob)
+            behaviour_log_probs.append(schedule_log_prob)
             breakdowns.append(terms)
             outcomes.append(outcome)
 
         state_batch = tf.constant(np.stack(states), dtype=tf.float32)
         action_batch = tf.constant(np.stack(actions), dtype=tf.float32)
+        order_batch = tf.constant(np.stack(orders), dtype=tf.int32)
         power_batch = tf.constant(np.stack(powers), dtype=tf.float32)
         reward_batch = tf.constant(np.asarray(rewards), dtype=tf.float32)
 
         with tf.GradientTape() as tape:
-            schedule_out, power_out, value_out = model(state_batch, training=True)
+            # training=False to match the behaviour pass: see the note there.
+            schedule_out, power_out, value_out = model(state_batch, training=False)
             baseline = tf.squeeze(value_out, axis=-1)
             advantage = tf.stop_gradient(reward_batch - baseline)
 
-            # Score function for the schedule: Bernoulli log-likelihood of the
-            # sampled subset under the current parameters. Differentiating this
-            # reproduces the REINFORCE gradient of the Plackett-Luce sample.
-            schedule_clipped = tf.clip_by_value(schedule_out, 1e-6, 1.0 - 1e-6)
-            schedule_log_likelihood = tf.reduce_sum(
-                action_batch * tf.math.log(schedule_clipped)
-                + (1.0 - action_batch) * tf.math.log(1.0 - schedule_clipped),
-                axis=-1,
-            )
+            schedule_log_likelihood = plackett_luce_log_prob(schedule_out, order_batch)
+            # Gaussian log-density of the raw power draw. The mask keeps
+            # unscheduled users out of it: their power was never applied, so it
+            # carries no credit for the reward.
             power_log_likelihood = -0.5 * tf.reduce_sum(
                 action_batch * tf.square((power_batch - power_out) / power_std), axis=-1
             )
@@ -350,12 +405,15 @@ def train_rl_policy(
                 advantage * (schedule_log_likelihood + power_log_likelihood)
             )
 
+            # Entropy of the distribution the sampler actually draws from --
+            # the softmax over selection logits -- not of an independent
+            # Bernoulli over users, which is a different family.
+            selection_logits = _score_logits(schedule_out)
+            log_softmax = selection_logits - tf.reduce_logsumexp(
+                selection_logits, axis=-1, keepdims=True
+            )
             entropy = -tf.reduce_mean(
-                tf.reduce_sum(
-                    schedule_clipped * tf.math.log(schedule_clipped)
-                    + (1.0 - schedule_clipped) * tf.math.log(1.0 - schedule_clipped),
-                    axis=-1,
-                )
+                tf.reduce_sum(tf.exp(log_softmax) * log_softmax, axis=-1)
             )
             value_loss = tf.reduce_mean(tf.square(reward_batch - baseline))
             loss = (
@@ -370,6 +428,18 @@ def train_rl_policy(
             config.grad_clip_norm,
         )
         optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        # The differentiable score must agree with the sampler's own
+        # log-probability, or REINFORCE is differentiating the wrong
+        # distribution again. This is cheap and catches that immediately.
+        score_drift = float(
+            np.max(np.abs(np.asarray(behaviour_log_probs) - schedule_log_likelihood.numpy()))
+        )
+        if score_drift > 1e-3:
+            raise RuntimeError(
+                "policy score function has drifted from the sampler: max "
+                f"log-probability difference {score_drift:.3e}"
+            )
 
         record = {
             "reward": float(np.mean(rewards)),
