@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from factory6g.sim.factory_profiles import (
+    FACTORY_SIZE_DISPLAY,
+    FACTORY_SIZE_PRESETS,
+)
+
 import dataclasses
 import json
 import time
@@ -15,37 +20,6 @@ from factory6g.sim.stages.jidd_scma import run_jidd_scma_stage
 from factory6g.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
-_FACTORY_SIZE_DISPLAY = {"s": "Small", "m": "Medium", "l": "Large", "apple": "Apple Factory"}
-_FACTORY_SIZE_PRESETS = {
-    "s": {
-        "room_dimensions": [15.0, 15.0, 5.0],
-        "num_machines": 5,
-        "machine_size_range": [[0.5, 2.0], [0.5, 2.0], [0.5, 1.5]],
-        "num_ut": 4,
-    },
-    "m": {
-        "room_dimensions": [25.0, 25.0, 6.0],
-        "num_machines": 10,
-        "machine_size_range": [[1.0, 3.0], [1.0, 3.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-    "l": {
-        "room_dimensions": [40.0, 40.0, 8.0],
-        "num_machines": 20,
-        "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
-        "num_ut": 16,
-    },
-    "apple": {
-        # Consumer electronics precision assembly hall (iPhone-style)
-        # 60×35m floor, 8m ceiling — rectangular assembly line layout
-        # Dense compact workstations: SMT placers, robotic arms, test stations
-        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
-        "room_dimensions": [60.0, 35.0, 8.0],
-        "num_machines": 22,
-        "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
-        "num_ut": 8,
-    },
-}
 
 
 def _load_completed_stage(stage_dir: Path) -> dict[str, Any] | None:
@@ -142,6 +116,42 @@ def run_jidd_scma_flow(
     }
 
 
+def _report_evidence_ceiling(config) -> None:
+    """Print what this Monte Carlo budget can actually resolve.
+
+    Points that never accumulate enough errors come back labelled
+    `upper_bound_only`, which is easy to read as a detail of one point rather
+    than as a hard limit of the whole run. Stating the ceiling up front makes it
+    explicit before hours of compute are spent.
+    """
+    from factory6g.sim.evidence import check_reliability_target, evidence_ceiling
+
+    system = config.system
+    monte_carlo = config.monte_carlo
+    ceiling = evidence_ceiling(
+        batch_size=monte_carlo.batch_size,
+        max_batches=monte_carlo.max_batches,
+        num_ut=system.num_ut,
+        num_streams_per_ut=system.num_ut_ant,
+        fft_size=system.fft_size,
+        num_ofdm_symbols=system.num_ofdm_symbols,
+        num_pilot_symbols=len(system.pilot_ofdm_symbol_indices),
+        num_bits_per_symbol=system.num_bits_per_symbol,
+        coderate=system.coderate,
+        confidence_level=monte_carlo.confidence_level,
+    )
+    print(ceiling.describe())
+
+    if monte_carlo.target_ber is not None:
+        report = check_reliability_target(
+            monte_carlo.target_ber,
+            ceiling,
+            blocks_per_batch=monte_carlo.batch_size * system.num_ut * system.num_ut_ant,
+        )
+        if not report["reachable"]:
+            print(f"[evidence] {report['message']}")
+
+
 def run_simulation_flow(
     config: Factory6GConfig,
     *,
@@ -191,12 +201,19 @@ def run_simulation_flow(
     multi_ch = len(channels) > 1
 
     mod_display_names = [_MODULATION_DISPLAY.get(bits, f"{bits}bps") for _, bits in modulations]
-    size_display_names = [_FACTORY_SIZE_DISPLAY.get(s, s.upper()) for s in factory_sizes]
+    size_display_names = [FACTORY_SIZE_DISPLAY.get(s, s.upper()) for s in factory_sizes]
 
     print("=" * 70)
     print("  6G Smart Factory Simulation Flow")
     print("=" * 70)
-    print(f"Stages: {' -> '.join(active_stages) if active_stages else '(none)'}")
+    _report_evidence_ceiling(config)
+
+    stage_order_text = " -> ".join(active_stages) if active_stages else "(none)"
+    print(f"Stages: {stage_order_text}")
+    # The flow is fixed and not user-selectable; state it in the log so a run
+    # artifact records the execution order it was produced under.
+    print(f"Stage order: {stage_order_text}")
+    print(f"Starting execution for fixed flow: {stage_order_text}")
     if run_estimators:
         print(f"Estimators: {config.estimators.enabled}")
     if run_rms:
@@ -216,8 +233,8 @@ def run_simulation_flow(
     all_stage_paths: dict[str, dict[str, str]] = {}
 
     for size_label in factory_sizes:
-        preset = _FACTORY_SIZE_PRESETS[size_label]
-        size_display = _FACTORY_SIZE_DISPLAY.get(size_label, size_label.upper())
+        preset = FACTORY_SIZE_PRESETS[size_label]
+        size_display = FACTORY_SIZE_DISPLAY.get(size_label, size_label.upper())
         size_config = dataclasses.replace(
             config,
             system=dataclasses.replace(config.system, num_ut=preset["num_ut"]),

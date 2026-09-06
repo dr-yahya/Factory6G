@@ -1,9 +1,11 @@
 # Core dependencies for Factory6G project
 tensorflow==2.15.0
-sionna==1.2.1
-numpy>=1.21.0,<2.0.0
-scipy>=1.9.0
-matplotlib>=3.5.0
+sionna==1.2.2
+# The <2.0 cap comes from TensorFlow 2.15, not Sionna: 1.2.2 allows numpy>=1.26.
+# Lifting it needs TF >= 2.18, since Sionna forbids 2.16 and 2.17.
+numpy>=1.26,<2.0.0
+scipy>=1.14.1        # sionna 1.2.2 floor
+matplotlib>=3.10     # sionna 1.2.2 floor
 tqdm>=4.62.0
 psutil>=5.9.0
 pandas>=2.0.0

@@ -1,10 +1,18 @@
-# Simulation Results (Local Workspace)
+# Simulation Results (Tracked)
 
-This folder stores **full runs** produced by `main.py`. Under the lean-git
-policy, run directories are **local only** — they are not version-controlled.
+This folder stores **full runs** produced by `main.py`. Run directories are
+**version-controlled and pushed**: the raw run files (`simulation.log`,
+`summary_v2.json` / `.csv`, `stage_results_v2.json` / `.csv`, `checkpoint.json`)
+and the plots (`*.png`) go to GitHub with the code, so every reported number can
+be traced to the run that produced it without asking for a local copy.
+
+Bulk binaries a run can regenerate (`*.h5`, `*.npz`, `*.pkl`, `*.parquet`,
+`*.zip`, `*.mat`) stay local — see `.gitignore`. Trained model artifacts belong
+in `models/`, training datasets in `data/`.
 
 Curated summaries, plots, and tables cited in progress reports or the thesis
-live under `reports/`.
+still live under `reports/`; that promotion is now about curation, not about
+getting artifacts into git.
 
 ## Run directory layout
 
@@ -55,7 +63,29 @@ docker compose run --rm simulation --config config.json \
   --resume /app/results/<run_dir>
 ```
 
+## Committing a run
+
+A finished run is committed as-is:
+
+```bash
+git add results/<run_dir>
+git commit -m "results: <what the run shows>"
+git push -u origin <branch>
+```
+
+Keep commits to one run (or one comparison family) each, and say in the message
+what the run is evidence for. Two things to check before committing:
+
+- **Size.** `du -sh results/<run_dir>` — a run of logs, JSON/CSV and PNGs is
+  normally well under a few MB. GitHub warns above 50 MB per file and rejects
+  above 100 MB; if a run is that large, commit the summaries and plots and leave
+  the bulk artifact local.
+- **Completeness.** Partial or superseded runs are noise in history. Delete them
+  (`scripts/tools/cleanup_results_from_manifest.py`) rather than committing them.
+
 ## Promotion
 
 Before deleting old runs, copy any cited artifacts into `reports/weekly/<date>/`
-or `reports/evidence/` if they are referenced outside this folder.
+or `reports/evidence/` if they are referenced outside this folder. Removing a
+run directory from `results/` is a normal commit now, so the deletion is
+recorded rather than silently local.

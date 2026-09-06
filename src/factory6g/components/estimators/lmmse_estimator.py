@@ -44,8 +44,29 @@ class LMMSEChannelEstimator(Block):
         self._shrinkage_cache: dict[float, tf.Tensor] = {}
 
     def _avg_noise(self, no: tf.Tensor) -> float:
+        """Eager-only scalar noise level, used for the shrinkage cache."""
         avg_no = float(tf.reduce_mean(tf.cast(no, tf.float32)).numpy())
         return max(avg_no, 1e-12)
+
+    def _avg_noise_tensor(self, no: tf.Tensor) -> tf.Tensor:
+        """Traceable mean noise level."""
+        return tf.maximum(tf.reduce_mean(tf.cast(no, tf.float32)), 1e-12)
+
+    def _shrinkage_tensor(self, no: tf.Tensor) -> tf.Tensor:
+        """Shrinkage computed with TF ops only, so the estimator can be traced.
+
+        The cached variant below keys a Python dict by a float noise level, which
+        cannot work under tf.function. Recomputing is an elementwise op over
+        fft_size values -- negligible next to the two N x N matmuls that follow.
+        """
+        noise = self._avg_noise_tensor(no)
+        if self.noise_bin_db > 0.0:
+            # Quantise to the same noise bins the cached path uses, so the two
+            # modes agree.
+            noise_db = 10.0 * (tf.math.log(noise) / tf.math.log(10.0))
+            binned_db = tf.round(noise_db / self.noise_bin_db) * self.noise_bin_db
+            noise = tf.pow(10.0, binned_db / 10.0)
+        return tf.cast(self._eigvals / (self._eigvals + noise), tf.complex64)
 
     def _noise_bin_key(self, noise_linear: float) -> float | None:
         if self.noise_bin_db <= 0.0:
@@ -74,8 +95,10 @@ class LMMSEChannelEstimator(Block):
         err_var_ls: tf.Tensor,
         no: tf.Tensor,
     ) -> Tuple[tf.Tensor, tf.Tensor]:
-        avg_no = self._avg_noise(no)
-        shrinkage = self._shrinkage_for_noise(avg_no)
+        if tf.executing_eagerly():
+            shrinkage = self._shrinkage_for_noise(self._avg_noise(no))
+        else:
+            shrinkage = self._shrinkage_tensor(no)
 
         flat = tf.reshape(tf.cast(h_ls, tf.complex64), [-1, self.fft_size])
         projected = tf.matmul(flat, self._eigvecs)

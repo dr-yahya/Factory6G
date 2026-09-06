@@ -7,13 +7,13 @@ simulation.
 
 Usage:
     python visualize.py                                  # all sizes
-    python visualize.py --factory-size apple
-    python visualize.py --factory-size s,m,l,apple
-    python visualize.py --factory-size apple --num-rx 50 --seed 7
+    python visualize.py --factory-size xl
+    python visualize.py --factory-size s,m,l,xl
+    python visualize.py --factory-size xl --num-rx 50 --seed 7
 
 Docker Compose:
     docker compose run visualize
-    docker compose run visualize --factory-size apple
+    docker compose run visualize --factory-size xl
 """
 from __future__ import annotations
 
@@ -29,14 +29,12 @@ import os
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 os.environ.setdefault("MPLBACKEND", "Agg")
 
+from factory6g.sim.factory_profiles import (  # noqa: E402 — must follow the env setup above
+    FACTORY_SIZE_DESCRIPTIONS,
+    FACTORY_SIZE_PRESETS,
+)
 
-_FACTORY_SIZE_DISPLAY = {
-    "s": "Small (Electronics Workcell)",
-    "m": "Medium (Automotive Assembly)",
-    "l": "Large (Logistics Hall)",
-    "apple": "Apple Factory (Consumer Electronics Assembly)",
-}
-_VALID_SIZES = set(_FACTORY_SIZE_DISPLAY.keys())
+_VALID_SIZES = set(FACTORY_SIZE_PRESETS)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -112,7 +110,6 @@ def main() -> int:
         return 1
 
     # Lazy imports (TF / Sionna) after env vars are set
-    from factory6g.sim.flow import _FACTORY_SIZE_PRESETS
     from factory6g.visualization.factory_visualizer import (
         build_scene,
         render_all,
@@ -125,7 +122,7 @@ def main() -> int:
     print("=" * 70)
     print("  Factory6G — Environment Visualization")
     print("=" * 70)
-    print(f"  Sizes     : {', '.join(_FACTORY_SIZE_DISPLAY.get(s, s) for s in sizes)}")
+    print(f"  Sizes     : {', '.join(FACTORY_SIZE_DESCRIPTIONS.get(s, s) for s in sizes)}")
     print(f"  Output    : {args.output_dir}")
     print(f"  Samples   : {args.samples_per_src} rays/src  |  {args.num_rx} UE positions")
     print("-" * 70)
@@ -133,8 +130,8 @@ def main() -> int:
     all_outputs: dict[str, dict[str, str]] = {}
 
     for size_label in sizes:
-        display = _FACTORY_SIZE_DISPLAY[size_label]
-        preset = _FACTORY_SIZE_PRESETS[size_label]
+        display = FACTORY_SIZE_DESCRIPTIONS[size_label]
+        preset = FACTORY_SIZE_PRESETS[size_label]
 
         print(f"\n{'=' * 70}")
         print(f"  {display}")

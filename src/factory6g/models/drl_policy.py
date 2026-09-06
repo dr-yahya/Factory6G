@@ -12,6 +12,20 @@ import numpy as np
 
 
 POLICY_CHECKPOINT_FORMAT = "factory6g_drl_policy_v1"
+
+# How the fairness input was treated during training.
+#
+# The training path used to call build_policy_training_inputs() without a
+# fairness_debt, so the fairness feature was a constant 1.0 and, after
+# normalisation with mean 1.0 / std 1.0, a constant *zero* input. Inference then
+# fed a live value in [0, 1], arriving as [-1, 0]: the weights on that input had
+# been fitted against a dead channel and were now being driven by a real signal.
+#
+# Checkpoints therefore record which regime they were trained under, and
+# inference matches it instead of guessing.
+FAIRNESS_FEATURE_CONSTANT = "constant"
+FAIRNESS_FEATURE_LIVE = "live"
+FAIRNESS_CONSTANT_VALUE = 1.0
 POLICY_MODEL_FILENAME = "policy.keras"
 POLICY_METADATA_FILENAME = "metadata.json"
 POLICY_NORMALIZATION_FILENAME = "normalization.npz"
@@ -208,6 +222,15 @@ def normalize_policy_state(state: np.ndarray, normalization: PolicyNormalization
     if state_np.ndim != 3:
         raise ValueError(f"Expected policy state rank 2 or 3, got shape {state_np.shape}.")
 
+    channel_width = state_np.shape[-1] - 2
+    expected_width = int(np.asarray(normalization.channel_mean).shape[-1])
+    if channel_width != expected_width:
+        raise ValueError(
+            f"Policy checkpoint expects {expected_width} channel-energy features "
+            f"(fft_size={expected_width}) but the run supplies {channel_width} "
+            f"(fft_size={channel_width}). The checkpoint was trained for a different "
+            "numerology: retrain it, or run with the fft_size it was trained on."
+        )
     channel_part = (state_np[..., :-2] - normalization.channel_mean) / normalization.channel_std
     fairness_part = (state_np[..., -2:-1] - normalization.fairness_mean) / normalization.fairness_std
     ebno_part = (state_np[..., -1:] - normalization.ebno_mean) / normalization.ebno_std
@@ -219,11 +242,32 @@ def build_policy_training_inputs(
     channel_energy: np.ndarray,
     ebno_db: np.ndarray,
     fairness_debt: np.ndarray | None = None,
-) -> tuple[np.ndarray, PolicyNormalization]:
+) -> tuple[np.ndarray, PolicyNormalization, str]:
+    """Build normalized training states.
+
+    Also returns the fairness regime the states were built under, so the
+    checkpoint can record it and inference cannot silently diverge.
+    """
+    regime = FAIRNESS_FEATURE_CONSTANT if fairness_debt is None else FAIRNESS_FEATURE_LIVE
     normalization = compute_policy_normalization(channel_energy, ebno_db, fairness_debt=fairness_debt)
     state = build_policy_state(channel_energy, ebno_db, fairness_debt=fairness_debt)
     normalized_state = normalize_policy_state(state, normalization)
-    return normalized_state.astype(np.float32), normalization
+    return normalized_state.astype(np.float32), normalization, regime
+
+
+def fairness_input_for_inference(
+    fairness_debt: np.ndarray,
+    metadata: dict[str, Any] | None,
+) -> np.ndarray | None:
+    """Return the fairness input that matches how the checkpoint was trained.
+
+    A checkpoint trained with a constant fairness feature gets the same constant
+    back, not a live signal its weights never saw.
+    """
+    regime = (metadata or {}).get("fairness_feature", FAIRNESS_FEATURE_CONSTANT)
+    if regime == FAIRNESS_FEATURE_LIVE:
+        return fairness_debt
+    return np.full_like(np.asarray(fairness_debt, dtype=np.float32), FAIRNESS_CONSTANT_VALUE)
 
 
 def create_policy_model(
@@ -232,13 +276,39 @@ def create_policy_model(
     *,
     hidden_dim: int = 128,
     dropout_rate: float = 0.2,
+    encoder: str = "deepsets",
 ):
+    """Build the scheduling policy network.
+
+    ``encoder`` selects the per-user feature extractor:
+
+    ``deepsets`` (default)
+        Shared per-user MLP. Permutation-equivariant: relabelling the users
+        permutes the outputs identically and changes nothing else, which is the
+        right inductive bias for scheduling a *set* of users.
+    ``conv1d`` (legacy)
+        1-D convolution across the user axis. Retained only so existing
+        checkpoints still load. Users have no meaningful ordering, so a
+        kernel-3 convolution imposes a locality prior between "user 2" and
+        "user 3" that does not exist and makes the policy sensitive to the
+        arbitrary user index.
+    """
     from tensorflow.keras import layers, models
 
     inputs = layers.Input(shape=input_shape, name="policy_state")
     x = layers.LayerNormalization(name="input_norm")(inputs)
-    x = layers.Conv1D(64, 3, padding="same", activation="relu", name="conv_1")(x)
-    x = layers.Conv1D(64, 3, padding="same", activation="relu", name="conv_2")(x)
+    if encoder == "conv1d":
+        x = layers.Conv1D(64, 3, padding="same", activation="relu", name="conv_1")(x)
+        x = layers.Conv1D(64, 3, padding="same", activation="relu", name="conv_2")(x)
+    elif encoder == "deepsets":
+        x = layers.TimeDistributed(
+            layers.Dense(64, activation="relu"), name="user_mlp_1"
+        )(x)
+        x = layers.TimeDistributed(
+            layers.Dense(64, activation="relu"), name="user_mlp_2"
+        )(x)
+    else:
+        raise ValueError(f"Unknown policy encoder '{encoder}'. Use 'deepsets' or 'conv1d'.")
     user_features = layers.Dense(hidden_dim, activation="relu", name="user_dense")(x)
     pooled = layers.GlobalAveragePooling1D(name="global_pool")(user_features)
     context = layers.Dense(hidden_dim, activation="relu", name="context_dense")(pooled)
@@ -303,10 +373,20 @@ def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
             super().__init__(*args, **kwargs)
 
     def _is_keras_module_mismatch_error(exc: Exception) -> bool:
+        """Detect a checkpoint saved by a Keras whose module layout has moved.
+
+        The guard used to require the literal "keras.src.models.", which only
+        covers one vintage. Checkpoints saved by Keras 2.x report
+        "keras.src.engine.functional" instead, so they missed this branch, never
+        reached the weights-archive fallback, and failed to load -- which, before
+        strict loading, meant they silently became heuristic results published
+        under a learned method's name. Matching the "keras.src." prefix covers
+        both layouts.
+        """
         message = str(exc)
         return (
             "Could not deserialize class" in message
-            and "keras.src.models." in message
+            and "keras.src." in message
             and "cannot be imported" in message
         )
 
@@ -334,7 +414,7 @@ def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
                 return parsed
         return None
 
-    def _infer_policy_architecture(path: str) -> tuple[int, int, int, int, float]:
+    def _infer_policy_architecture(path: str) -> tuple[int, int, int, int, float, str]:
         archive_path = Path(path)
         if archive_path.suffix != ".keras":
             raise ValueError(f"Compatibility loader requires a .keras policy archive, got: {path}")
@@ -348,6 +428,13 @@ def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
         layers = config_json.get("config", {}).get("layers", [])
         if not isinstance(layers, list):
             layers = []
+
+        # Detect which encoder the archive was built with so a legacy conv1d
+        # checkpoint still reconstructs correctly.
+        layer_names = {
+            layer.get("name") for layer in layers if isinstance(layer, dict)
+        }
+        encoder = "conv1d" if "conv_1" in layer_names else "deepsets"
 
         input_layer_cfg: dict[str, Any] = {}
         schedule_output_cfg: dict[str, Any] = {}
@@ -409,15 +496,16 @@ def _load_model_compat(model_path: str, metadata: dict[str, Any] | None = None):
                 f"Could not infer policy architecture from checkpoint metadata/config for {path}. "
                 "Expected fields include num_ut, state_dim, and schedule_output target_shape."
             )
-        return num_ut, state_dim, resolved_output_dim, hidden_dim, dropout_rate
+        return num_ut, state_dim, resolved_output_dim, hidden_dim, dropout_rate, encoder
 
     def _load_from_weights_archive(path: str):
-        num_ut, state_dim, output_dim, hidden_dim, dropout_rate = _infer_policy_architecture(path)
+        num_ut, state_dim, output_dim, hidden_dim, dropout_rate, encoder = _infer_policy_architecture(path)
         model = create_policy_model(
             input_shape=(num_ut, state_dim),
             output_dim=output_dim,
             hidden_dim=hidden_dim,
             dropout_rate=dropout_rate,
+            encoder=encoder,
         )
 
         archive_path = Path(path)

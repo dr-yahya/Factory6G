@@ -7,11 +7,7 @@ __all__ = [
     "ResourceManagerFeedback",
     "configure_env",
     "load_config",
-    "load_baseline_results",
-    "run_simulation_loop",
     "run_simulation_flow",
-    "save_results_as_csv",
-    "save_simulation_results",
     "setup_gpu",
 ]
 
@@ -29,14 +25,6 @@ def __getattr__(name: str):
         from .env import configure_env, setup_gpu
 
         return {"configure_env": configure_env, "setup_gpu": setup_gpu}[name]
-    if name in {"load_baseline_results", "save_results_as_csv", "save_simulation_results"}:
-        from .results import load_baseline_results, save_results_as_csv, save_simulation_results
-
-        return {
-            "load_baseline_results": load_baseline_results,
-            "save_results_as_csv": save_results_as_csv,
-            "save_simulation_results": save_simulation_results,
-        }[name]
     if name in {"BatchContext", "ResourceManagerFeedback"}:
         from .types import BatchContext, ResourceManagerFeedback
 
@@ -44,10 +32,6 @@ def __getattr__(name: str):
             "BatchContext": BatchContext,
             "ResourceManagerFeedback": ResourceManagerFeedback,
         }[name]
-    if name == "run_simulation_loop":
-        from .simulation import run_simulation_loop
-
-        return run_simulation_loop
     if name == "run_simulation_flow":
         from .flow import run_simulation_flow
 

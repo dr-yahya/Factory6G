@@ -92,6 +92,7 @@ def _candidate_metrics(
     *,
     confidence_level: float = 0.95,
     ut_mask: list[int] | None = None,
+    throughput_scale: float = 1.0,
 ) -> dict[str, float | int]:
     bits = res["bits"]
     bits_hat = res["bits_hat"]
@@ -102,7 +103,19 @@ def _candidate_metrics(
     throughput_bits = max(0.0, float(total_bits - bit_errors))
     throughput_eff = throughput_bits / max(float(total_bits), 1.0)
     latency_ms = float(res["latency_sec"]) * 1e3
-    utility = throughput_eff - latency_weight * latency_ms
+    # Utility must actually trade throughput against reliability.
+    #
+    # The previous form used `throughput_eff` -- delivered bits divided by
+    # *transmitted* bits -- which is just (1 - BER) and is scale-free in the
+    # number of scheduled users: serving one user scored as well as serving
+    # eight. Combined with a latency term that was then a constant, the whole
+    # objective collapsed to "minimise BER, ignore throughput", and
+    # `--label-active-count` existed only to paper over the resulting degenerate
+    # labels. Using absolute delivered bits restores the trade-off.
+    utility = (
+        throughput_bits / max(float(throughput_scale), 1.0)
+        - latency_weight * latency_ms
+    )
     return {
         "utility": float(utility),
         "avg_ber": float(avg_ber),
@@ -176,26 +189,59 @@ def _evaluate_candidate(
     latency_weight: float,
     confidence_level: float,
     num_ut: int,
+    num_repeats: int = 1,
+    throughput_scale: float = 1.0,
 ) -> CandidateEvaluation:
+    """Score one candidate allocation, averaged over independent noise draws.
+
+    Scoring each candidate on a *single* batch and then taking the argmin-BER
+    winner is selection on noise: at the BERs involved the winner is largely the
+    candidate that drew favourable noise, not the best allocation -- the classic
+    winner's curse, and it puts that noise straight into the imitation labels.
+    Averaging over ``num_repeats`` independent draws (with the channel held
+    fixed, so candidates stay paired) shrinks that bias.
+    """
     normalized = _normalize_directives(directives, num_ut)
-    result = model.run_batch(context, directives=normalized, include_details=True)
-    metrics = _candidate_metrics(
-        result,
-        latency_weight,
-        confidence_level=confidence_level,
-        ut_mask=normalized.active_ut_mask,
-    )
+    repeats = max(1, int(num_repeats))
+
+    totals = {
+        "utility": 0.0,
+        "avg_ber": 0.0,
+        "throughput_eff": 0.0,
+        "throughput_bits": 0.0,
+        "latency_ms": 0.0,
+    }
+    bit_errors = 0
+    total_bits = 0
+    for _ in range(repeats):
+        result = model.run_batch(context, directives=normalized, include_details=True)
+        metrics = _candidate_metrics(
+            result,
+            latency_weight,
+            confidence_level=confidence_level,
+            ut_mask=normalized.active_ut_mask,
+            throughput_scale=throughput_scale,
+        )
+        for key in totals:
+            totals[key] += float(metrics[key])
+        bit_errors += int(metrics["bit_errors"])
+        total_bits += int(metrics["total_bits"])
+
+    averaged = {key: value / repeats for key, value in totals.items()}
     return CandidateEvaluation(
         source=source,
         directives=normalized,
-        utility=float(metrics["utility"]),
-        avg_ber=float(metrics["avg_ber"]),
-        ber_upper_confidence=float(metrics["ber_upper_confidence"]),
-        throughput_eff=float(metrics["throughput_eff"]),
-        throughput_bits=float(metrics["throughput_bits"]),
-        latency_ms=float(metrics["latency_ms"]),
-        bit_errors=int(metrics["bit_errors"]),
-        total_bits=int(metrics["total_bits"]),
+        utility=averaged["utility"],
+        avg_ber=averaged["avg_ber"],
+        # Pooled over all repeats, so the bound reflects the full evidence.
+        ber_upper_confidence=float(
+            ber_upper_confidence_bound(bit_errors, total_bits, confidence_level)
+        ),
+        throughput_eff=averaged["throughput_eff"],
+        throughput_bits=averaged["throughput_bits"],
+        latency_ms=averaged["latency_ms"],
+        bit_errors=int(bit_errors),
+        total_bits=int(total_bits),
     )
 
 
@@ -264,6 +310,7 @@ def generate_dataset(
     ebno_grid: list[float] | None = None,
     ebno_jitter: float = 0.0,
     objective: str = "utility",
+    label_repeats: int = 1,
     candidate_managers: str | None = None,
     confidence_level: float = 0.95,
     random_active_count: int | None = None,
@@ -300,7 +347,15 @@ def generate_dataset(
         for name in manager_names
     }
 
+    # Normaliser that puts absolute delivered bits on a O(1) scale: the total
+    # information bits a fully loaded slot carries. Utility then reads as
+    # "fraction of full-load capacity actually delivered", which trades
+    # throughput against reliability instead of collapsing to (1 - BER).
+    throughput_scale = float(model.get_transmitter().num_info_bits * num_ut)
+
     print(f"Generating {samples} channel realizations with {tries} candidate allocations each...")
+    if label_repeats > 1:
+        print(f"Averaging each candidate over {label_repeats} independent noise draws.")
     print(f"Scenario: {scenario}, channel: {system_config.get('channel_model_type')}")
     if ebno_grid is None:
         print(f"Eb/No sampling: uniform [{min_ebno}, {max_ebno}] dB")
@@ -336,6 +391,8 @@ def generate_dataset(
                 latency_weight=latency_weight,
                 confidence_level=confidence_level,
                 num_ut=num_ut,
+                num_repeats=label_repeats,
+                throughput_scale=throughput_scale,
             )
         ]
 
@@ -351,6 +408,8 @@ def generate_dataset(
                     latency_weight=latency_weight,
                     confidence_level=confidence_level,
                     num_ut=num_ut,
+                    num_repeats=label_repeats,
+                    throughput_scale=throughput_scale,
                 )
             )
 
@@ -376,6 +435,8 @@ def generate_dataset(
                     latency_weight=latency_weight,
                     confidence_level=confidence_level,
                     num_ut=num_ut,
+                    num_repeats=label_repeats,
+                    throughput_scale=throughput_scale,
                 )
             )
 
@@ -505,6 +566,17 @@ def main() -> int:
         help="Maximum active per-UT power for random oracle candidates.",
     )
     parser.add_argument(
+        "--label-repeats",
+        type=int,
+        default=4,
+        help=(
+            "Independent noise draws each candidate is averaged over before the "
+            "oracle picks a winner. Scoring on a single draw makes the label the "
+            "candidate that got lucky (winner's curse), which puts that noise "
+            "straight into the imitation targets."
+        ),
+    )
+    parser.add_argument(
         "--label-active-count",
         type=int,
         default=None,
@@ -531,6 +603,7 @@ def main() -> int:
         ebno_jitter=args.ebno_jitter,
         objective=args.objective,
         candidate_managers=args.candidate_managers,
+        label_repeats=args.label_repeats,
         confidence_level=args.confidence_level,
         random_active_count=args.random_active_count,
         random_power_min=args.random_power_min,

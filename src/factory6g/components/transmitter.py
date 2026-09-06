@@ -65,6 +65,7 @@ References:
     - Proakis & Salehi, "Digital Communications" (Modulation)
 """
 
+import numpy as np
 import tensorflow as tf
 from sionna.phy.mapping import BinarySource, Mapper
 from sionna.phy.fec.ldpc import LDPC5GEncoder
@@ -276,6 +277,8 @@ class Transmitter:
             ut_mask = tf_ops.constant(directives.active_ut_mask, dtype=x_rg.dtype)  # [num_tx]
             ut_mask = tf_ops.reshape(ut_mask, [1, num_tx, 1, 1, 1])
             x_rg = x_rg * ut_mask
+        if directives and getattr(directives, "pilot_reuse_factor", None):
+            x_rg = self._apply_pilot_reuse(x_rg, int(directives.pilot_reuse_factor), num_tx)
         if directives and directives.per_ut_power is not None:
             # Per-UT power scaling: applied in linear scale
             # Power scaling: x_scaled = x * sqrt(P), where P is linear power factor
@@ -286,6 +289,41 @@ class Transmitter:
         
         return x_rg, b, x  # include QAM symbols for diagnostics
     
+    def _apply_pilot_reuse(self, x_rg, reuse_factor: int, num_tx: int):
+        """Share each pilot resource across a group of `reuse_factor` users.
+
+        Pilot reuse trades channel-estimation quality for pilot overhead: users in
+        the same reuse group transmit on the same pilot resources, so their
+        estimates are contaminated by each other. In a dense factory cell that
+        trade-off is a real design question, which is why the scheduler exposes it.
+
+        Implemented as pilot-power sharing within a group -- users in a group of
+        size R each transmit their pilots at 1/R amplitude on the shared resource,
+        which reproduces the contamination penalty without needing a per-group
+        pilot pattern rebuild.
+
+        `reuse_factor <= 1` means orthogonal pilots and is a no-op.
+        """
+        if reuse_factor <= 1:
+            return x_rg
+
+        pilot_indices = self.config.get("pilot_ofdm_symbol_indices", [2, 11])
+        num_ofdm_symbols = int(x_rg.shape[3])
+        symbol_mask = np.zeros(num_ofdm_symbols, dtype=np.float32)
+        for index in pilot_indices:
+            if 0 <= int(index) < num_ofdm_symbols:
+                symbol_mask[int(index)] = 1.0
+
+        group_size = min(int(reuse_factor), max(num_tx, 1))
+        # Users sharing a pilot group each get 1/sqrt(R) of the pilot amplitude.
+        scale = np.ones(num_tx, dtype=np.float32) / np.sqrt(float(group_size))
+
+        pilot_scale = (
+            scale.reshape(1, num_tx, 1, 1, 1) * symbol_mask.reshape(1, 1, 1, num_ofdm_symbols, 1)
+            + (1.0 - symbol_mask).reshape(1, 1, 1, num_ofdm_symbols, 1)
+        )
+        return x_rg * tf_ops.constant(pilot_scale.astype(np.float32), dtype=x_rg.dtype)
+
     def __call__(
         self,
         batch_size: int,

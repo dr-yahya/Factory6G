@@ -21,6 +21,16 @@ services:
               count: 1
               capabilities: [gpu]
 
+  test:                # Run the test suite against the live checkout
+    build: .
+    image: factory6g:latest
+    volumes:
+      - .:/app                        # bind the checkout so tests/ is present
+    environment:
+      CUDA_VISIBLE_DEVICES: "-1"      # the suite is CPU-only and seeds TF itself
+    entrypoint: ["bash", "-lc"]
+    command: ["pip install -e . -q && pytest -q"]
+
   visualize:           # Ray-tracing visualization of factory environments
     build: .
     image: factory6g:latest
@@ -28,7 +38,7 @@ services:
       - ./results:/app/results
       - ./config/config.json:/app/config/config.json:ro
     entrypoint: ["python", "-m", "factory6g.cli.visualize"]
-    command: ["--factory-size", "s,m,l,apple"]
+    command: ["--factory-size", "s,m,l,xl"]
 
   train-estimator:     # Train the NeuralChannelEstimator inside Docker
     build: .

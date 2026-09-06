@@ -1,0 +1,384 @@
+{
+  "channel": "tr38901",
+  "estimator": "perfect",
+  "ebno_db": [
+    6.0,
+    8.0,
+    10.0,
+    12.0,
+    14.0,
+    16.0,
+    18.0,
+    20.0
+  ],
+  "batches_per_point": 60,
+  "batch_size": 20,
+  "config": {
+    "num_ut": 4,
+    "num_bs_ant": 8,
+    "num_ut_ant": 1,
+    "fft_size": 128,
+    "num_ofdm_symbols": 14,
+    "subcarrier_spacing": 30000.0,
+    "cyclic_prefix_length": 20,
+    "pilot_ofdm_symbol_indices": [
+      2,
+      11
+    ],
+    "num_bits_per_symbol": 2,
+    "coderate": 0.5,
+    "num_decoding_iter": 20,
+    "channel_model_type": "tr38901",
+    "scenario": "umi",
+    "direction": "uplink",
+    "o2i_model": "low",
+    "enable_pathloss": false,
+    "enable_shadow_fading": false,
+    "min_ut_velocity": 0.0,
+    "max_ut_velocity": 0.0,
+    "carrier_frequency": 3500000000.0,
+    "tx_pattern": "tr38901",
+    "tx_polarization": "cross",
+    "rx_pattern": "iso",
+    "rx_polarization": "V",
+    "antenna_spacing": 0.5,
+    "graph_mode": true
+  },
+  "results": {
+    "20": {
+      "bit_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800
+      ],
+      "block_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800
+      ],
+      "ber": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134
+      ]
+    },
+    "200": {
+      "bit_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800
+      ],
+      "block_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800
+      ],
+      "ber": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134
+      ]
+    },
+    "none": {
+      "bit_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_bits": [
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800,
+        7372800
+      ],
+      "block_errors": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "total_blocks": [
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800,
+        4800
+      ],
+      "ber": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "bler_upper_confidence": [
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134,
+        0.0006239161736324134
+      ]
+    }
+  },
+  "paired_vs_clip20": {
+    "200": [
+      {
+        "ebno_db": 6.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 8.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 10.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 12.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 14.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 16.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 18.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 20.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      }
+    ],
+    "none": [
+      {
+        "ebno_db": 6.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 8.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 10.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 12.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 14.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 16.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 18.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      },
+      {
+        "ebno_db": 20.0,
+        "mean_ber_delta": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0,
+        "significant": false
+      }
+    ]
+  },
+  "elapsed_sec": 1042.8446573690003
+}

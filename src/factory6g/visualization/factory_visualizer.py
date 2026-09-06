@@ -4,7 +4,7 @@ Builds a factory scene from the simulation config (room geometry, machines,
 materials) and produces four output images:
 
   1. 3D scene render with traced ray paths  (Sionna RT renderer)
-  2. Signal coverage map heatmap            (Sionna RT coverage_map)
+  2. SINR radio map of the factory floor    (Sionna RT RadioMapSolver)
   3. 2D top-down floor plan                 (matplotlib)
   4. 3D perspective layout                  (matplotlib)
 """
@@ -155,7 +155,10 @@ def build_scene(
 
         # --- frequency ---
         scene.frequency = float(flat_config.get("carrier_frequency", 3.5e9))
-        scene.synthetic_array = True
+        # `synthetic_array` is a PathSolver/RadioMapSolver argument, not a Scene
+        # attribute. Assigning it here merely created an unused attribute (Scene
+        # defines no __slots__); the behaviour happened to be right only because
+        # the solver default is True. It is passed at the solver call instead.
 
         # --- TX array ---
         antenna_spacing = float(flat_config.get("antenna_spacing", 0.5))
@@ -210,57 +213,122 @@ def solve_paths(
 
     solver = PathSolver()
     max_depth = int(flat_config.get("max_depth", 5))
-    logger.info("Solving ray paths (max_depth=%d, samples=%d) …", max_depth, samples_per_src)
-    return solver(scene, max_depth=max_depth, samples_per_src=samples_per_src)
+    # Diffraction was added to the solver in Sionna RT 1.2 and defaults to off.
+    # In a hall full of metal boxes, diffraction around machine edges is the
+    # mechanism that fills the shadow regions behind them -- which is exactly
+    # where the worst-user reliability lives.
+    diffraction = bool(flat_config.get("enable_diffraction", True))
+    edge_diffraction = bool(flat_config.get("enable_edge_diffraction", True))
+    logger.info(
+        "Solving ray paths (max_depth=%d, samples=%d, diffraction=%s) …",
+        max_depth,
+        samples_per_src,
+        diffraction,
+    )
+    return solver(
+        scene,
+        max_depth=max_depth,
+        samples_per_src=samples_per_src,
+        synthetic_array=True,
+        diffraction=diffraction,
+        edge_diffraction=edge_diffraction,
+    )
 
 
 # ---------------------------------------------------------------------------
 # Individual render functions
 # ---------------------------------------------------------------------------
 
-def render_3d_scene(scene: Any, paths: Any, output_path: Path) -> None:
-    """Save a Sionna RT 3D render of the scene with traced ray paths."""
+def _overhead_camera(flat_config: dict[str, Any]) -> Any:
+    """A camera looking straight down at the hall, framed to the room."""
+    from sionna.rt import Camera
+
+    room = list(flat_config.get("room_dimensions", [15.0, 15.0, 5.0]))
+    height = max(float(room[0]), float(room[1])) * 1.6 + float(room[2])
+    return Camera(position=[0.0, 0.0, height], look_at=[0.0, 0.0, 0.0])
+
+
+def _perspective_camera(flat_config: dict[str, Any]) -> Any:
+    """An angled camera that shows the machines in relief."""
+    from sionna.rt import Camera
+
+    room = list(flat_config.get("room_dimensions", [15.0, 15.0, 5.0]))
+    span = max(float(room[0]), float(room[1]))
+    return Camera(
+        position=[span * 0.9, -span * 0.9, float(room[2]) * 1.8],
+        look_at=[0.0, 0.0, float(room[2]) * 0.4],
+    )
+
+
+def render_3d_scene(scene: Any, paths: Any, output_path: Path, flat_config: dict[str, Any]) -> None:
+    """Save a Sionna RT 3D render of the scene with traced ray paths.
+
+    Written against the pre-1.0 RT API and broken ever since: `Scene.render` has
+    no `filename` parameter (saving is `render_to_file`), no `show_paths`
+    parameter, and `camera` is required with no default. Every call raised and
+    the caller logged "3D render failed -- skipping", which is why the repository
+    contains no ray-tracing renders at all.
+    """
     logger.info("Rendering 3D scene → %s", output_path)
-    scene.render(
+    scene.render_to_file(
+        camera=_perspective_camera(flat_config),
+        filename=str(output_path),
         paths=paths,
-        show_paths=True,
         show_devices=True,
         resolution=[1280, 720],
         num_samples=512,
+    )
+
+
+def render_radio_map(
+    scene: Any,
+    flat_config: dict[str, Any],
+    output_path: Path,
+    *,
+    metric: str = "sinr",
+) -> None:
+    """Compute and save a radio map of the factory floor.
+
+    This used to call `scene.coverage_map(...)`, which was removed when Sionna RT
+    was rewritten for 1.0 -- radio maps moved to `RadioMapSolver`. The call raised
+    `AttributeError` on every invocation and the caller logged "Coverage map
+    failed -- skipping", so no map was ever produced.
+
+    The default metric is **SINR** rather than path gain. Where on the factory
+    floor a device fails to meet its target is the question a reliability thesis
+    is asking; raw path gain does not answer it. SINR needs the scene's noise
+    floor, so `scene.bandwidth` and `scene.temperature` are set before solving.
+    """
+    from sionna.rt import RadioMapSolver
+
+    logger.info("Computing %s radio map → %s", metric, output_path)
+
+    # Thermal noise power comes from bandwidth and temperature, so both must be
+    # set for the SINR metric to mean anything.
+    scene.bandwidth = float(flat_config.get("fft_size", 128)) * float(
+        flat_config.get("subcarrier_spacing", 30e3)
+    )
+    scene.temperature = float(flat_config.get("scene_temperature_k", 294.0))
+
+    rm_solver = RadioMapSolver()
+    radio_map = rm_solver(
+        scene,
+        max_depth=int(flat_config.get("max_depth", 5)),
+        cell_size=(
+            float(flat_config.get("radio_map_cell_size_m", 0.5)),
+            float(flat_config.get("radio_map_cell_size_m", 0.5)),
+        ),
+        samples_per_tx=int(flat_config.get("radio_map_samples_per_tx", 1_000_000)),
+        diffraction=bool(flat_config.get("enable_diffraction", True)),
+        edge_diffraction=bool(flat_config.get("enable_edge_diffraction", True)),
+    )
+    scene.render_to_file(
+        camera=_overhead_camera(flat_config),
         filename=str(output_path),
+        radio_map=radio_map,
+        rm_metric=metric,
+        resolution=[1280, 720],
     )
-
-
-def render_coverage_map(scene: Any, flat_config: dict[str, Any], output_path: Path) -> None:
-    """Compute and save a signal coverage heatmap."""
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    logger.info("Computing coverage map → %s", output_path)
-    max_depth = int(flat_config.get("max_depth", 3))
-    cm = scene.coverage_map(
-        max_depth=max_depth,
-        num_samples=2 ** 16,
-        los=True,
-        reflection=True,
-        diffraction=False,
-    )
-    try:
-        fig = cm.show(show=False)
-        fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
-        plt.close(fig)
-    except Exception:
-        # Fallback: get the tensor and plot manually
-        cm_db = 10.0 * np.log10(np.maximum(cm.as_tensor().numpy().squeeze(), 1e-12))
-        fig, ax = plt.subplots(figsize=(10, 7))
-        img = ax.imshow(cm_db, origin="lower", cmap="viridis", aspect="auto")
-        plt.colorbar(img, ax=ax, label="Path gain (dB)")
-        ax.set_title("Signal Coverage Map")
-        ax.set_xlabel("X cells")
-        ax.set_ylabel("Y cells")
-        fig.savefig(str(output_path), dpi=150, bbox_inches="tight")
-        plt.close(fig)
 
 
 def render_layout_2d(
@@ -416,21 +484,31 @@ def render_all(
     output_dir.mkdir(parents=True, exist_ok=True)
     outputs: dict[str, str] = {}
 
+    # The two Sionna RT renders below were silently broken for a long time behind
+    # `except Exception -> warning`, so a permanent API breakage looked like an
+    # optional step being skipped. They are still guarded, because ray tracing can
+    # legitimately run out of memory on a large hall and the matplotlib renders
+    # below are worth producing anyway -- but the failure is now logged at ERROR
+    # with a traceback, and `render_all` reports what did not render.
+    failures: list[str] = []
+
     # 1. Sionna RT 3D render with ray paths
     p = output_dir / "3d_render.png"
     try:
-        render_3d_scene(scene, paths, p)
+        render_3d_scene(scene, paths, p, flat_config)
         outputs["3d_render"] = str(p)
-    except Exception as exc:
-        logger.warning("3D render failed (%s) — skipping.", exc)
+    except Exception:
+        logger.error("3D render failed — see traceback.", exc_info=True)
+        failures.append("3d_render")
 
-    # 2. Coverage map
-    p = output_dir / "coverage_map.png"
+    # 2. SINR radio map of the factory floor
+    p = output_dir / "radio_map_sinr.png"
     try:
-        render_coverage_map(scene, flat_config, p)
-        outputs["coverage_map"] = str(p)
-    except Exception as exc:
-        logger.warning("Coverage map failed (%s) — skipping.", exc)
+        render_radio_map(scene, flat_config, p, metric="sinr")
+        outputs["radio_map_sinr"] = str(p)
+    except Exception:
+        logger.error("Radio map failed — see traceback.", exc_info=True)
+        failures.append("radio_map_sinr")
 
     # 3. 2D floor plan (always works — pure matplotlib)
     p = output_dir / "layout_2d.png"
@@ -441,5 +519,12 @@ def render_all(
     p = output_dir / "layout_3d.png"
     render_layout_3d(room_dims, machine_layout, tx_position, rx_positions, p, label)
     outputs["layout_3d"] = str(p)
+
+    if failures:
+        logger.error(
+            "%d of 4 renders failed and produced no file: %s",
+            len(failures),
+            ", ".join(failures),
+        )
 
     return outputs

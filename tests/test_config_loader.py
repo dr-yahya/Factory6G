@@ -49,8 +49,89 @@ def test_simulation_targets_are_rejected(tmp_path):
 
 
 def test_non_5g_radio_preset_values_are_rejected(tmp_path):
+    # The 5G lock guards the numerology, not the fading model: `rayleigh` is a
+    # supported and documented channel choice (`--channel rayleigh`).
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["carrier_frequency"] = 28.0e9
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_rayleigh_channel_model_is_accepted_under_the_5g_profile(tmp_path):
     config_data = make_tiny_config(str(tmp_path / "results"))
     config_data["system"]["channel_model_type"] = "rayleigh"
+    config_path = write_config(tmp_path, config_data)
+    assert load_config(config_path).system.channel_model_type == "rayleigh"
+
+
+def test_unknown_channel_model_is_rejected(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["channel_model_type"] = "not_a_model"
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_default_profile_still_locks_the_5g_numerology(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["num_ofdm_symbols"] = 7
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_6g_profile_allows_fr3_carrier_and_mini_slots(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update(
+        {
+            "radio_profile": "6g_fr3",
+            "carrier_frequency": 13.0e9,
+            "subcarrier_spacing": 120000.0,
+            "num_ofdm_symbols": 4,
+            "pilot_ofdm_symbol_indices": [0, 2],
+        }
+    )
+    config_path = write_config(tmp_path, config_data)
+    system = load_config(config_path).system
+    assert system.radio_profile == "6g_fr3"
+    assert system.num_ofdm_symbols == 4
+
+
+def test_6g_profile_rejects_out_of_band_carrier(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update({"radio_profile": "6g_fr3", "carrier_frequency": 3.5e9})
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_6g_profile_rejects_pilots_outside_the_mini_slot(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update(
+        {
+            "radio_profile": "6g_fr3",
+            "carrier_frequency": 13.0e9,
+            "subcarrier_spacing": 120000.0,
+            "num_ofdm_symbols": 4,
+            "pilot_ofdm_symbol_indices": [2, 11],
+        }
+    )
+    config_path = write_config(tmp_path, config_data)
+    with pytest.raises(ConfigError):
+        load_config(config_path)
+
+
+def test_indoor_factory_scenarios_are_accepted(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"].update({"radio_profile": "custom", "scenario": "inf_dh"})
+    config_path = write_config(tmp_path, config_data)
+    assert load_config(config_path).system.scenario == "inf_dh"
+
+
+def test_harq_rounds_must_be_at_least_one(tmp_path):
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["system"]["harq_max_rounds"] = 0
     config_path = write_config(tmp_path, config_data)
     with pytest.raises(ConfigError):
         load_config(config_path)
@@ -95,3 +176,30 @@ def test_threshold_stop_policy_with_target_ber_parses(tmp_path):
     config = load_config(config_path)
     assert config.monte_carlo.stop_policy == "threshold"
     assert config.monte_carlo.target_ber == 1e-5
+
+
+def test_estimators_paired_reference_defaults_to_the_first_method(tmp_path):
+    """Unset, the reference is the first enabled estimator, as it always was."""
+    from factory6g.sim.config import EstimatorsConfig
+
+    config = EstimatorsConfig.from_dict({"enabled": ["LS", "DFT"]})
+    assert config.paired_reference is None
+    assert config.enabled == ["ls", "dft"]
+
+
+def test_estimators_paired_reference_is_lowercased_and_validated():
+    """A comparison against a method that is not running is a silent wrong answer.
+
+    "Beats LS" says nothing about beating fixed DFT, so the reference has to be
+    nameable -- and naming one that was never run must fail loudly rather than
+    fall back to the default.
+    """
+    from factory6g.sim.config import ConfigError, EstimatorsConfig
+
+    config = EstimatorsConfig.from_dict(
+        {"enabled": ["ls", "dft", "adaptive_window"], "paired_reference": "DFT"}
+    )
+    assert config.paired_reference == "dft"
+
+    with pytest.raises(ConfigError, match="paired_reference"):
+        EstimatorsConfig.from_dict({"enabled": ["ls", "dft"], "paired_reference": "lmmse"})

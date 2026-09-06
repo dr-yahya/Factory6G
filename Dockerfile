@@ -13,10 +13,10 @@ ENV MPLBACKEND=Agg
 RUN pip install --no-cache-dir uv
 
 COPY requirements.txt .
-# Use uv --override to force mitsuba==3.8.0 (only arm64 wheel available;
-# sionna-rt==1.2.1 pins 3.7.1 which has no arm64 build)
-RUN printf "mitsuba==3.8.0\ndrjit==1.3.1\n" > /tmp/overrides.txt && \
-    uv pip install --system --no-cache -r requirements.txt --override /tmp/overrides.txt
+# sionna-rt==1.2.2 pins mitsuba==3.8.0 and drjit==1.3.1 itself, which are the
+# versions this image used to force with `uv --override` because sionna-rt==1.2.1
+# pinned mitsuba 3.7.1 with no arm64 wheel. The override is no longer needed.
+RUN uv pip install --system --no-cache -r requirements.txt
 
 COPY pyproject.toml .
 COPY src/       src/

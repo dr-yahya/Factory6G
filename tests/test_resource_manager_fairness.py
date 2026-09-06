@@ -5,9 +5,9 @@ import pytest
 
 from factory6g.models.model import Model
 from factory6g.models.resource_manager import StaticResourceManager
-from factory6g.sim import simulation as simulation_module
+from factory6g.models.model import Model
 from factory6g.sim.config import load_config
-from factory6g.sim.simulation import run_simulation_loop
+from factory6g.sim.flow import run_simulation_flow
 
 from .conftest import make_tiny_config, write_config
 
@@ -24,8 +24,8 @@ def test_rm_loop_prepares_one_shared_context_per_point(monkeypatch, tmp_path):
     context_noise_ids: list[int] = []
     feedback_ids: list[int] = []
 
-    original_prepare = simulation_module.Model.prepare_batch_context
-    original_run_batch = simulation_module.Model.run_batch
+    original_prepare = Model.prepare_batch_context
+    original_run_batch = Model.run_batch
 
     def counted_prepare(self, *args, **kwargs):
         nonlocal prepare_calls
@@ -43,10 +43,10 @@ def test_rm_loop_prepares_one_shared_context_per_point(monkeypatch, tmp_path):
             feedback_ids.append(id(batch_context.feedback.h_hat))
         return original_run_batch(self, batch_context, *args, **kwargs)
 
-    monkeypatch.setattr(simulation_module.Model, "prepare_batch_context", counted_prepare)
-    monkeypatch.setattr(simulation_module.Model, "run_batch", recording_run_batch)
+    monkeypatch.setattr(Model, "prepare_batch_context", counted_prepare)
+    monkeypatch.setattr(Model, "run_batch", recording_run_batch)
 
-    run_simulation_loop(config)
+    run_simulation_flow(config)
 
     assert prepare_calls == 1
     assert len(set(context_h_ids)) == 1

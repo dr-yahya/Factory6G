@@ -1,21 +1,24 @@
 # Python
+# Packaging directories are anchored to the repository root: unanchored they
+# match at any depth, and names like `lib/`, `var/` or `build/` are plausible
+# source directories. See the note on `/thesis/` below for what that costs.
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -51,17 +54,37 @@ models/saved_model/
 
 # Large training arrays (manifests may be tracked)
 *.npz
+# ...but a policy's normalization statistics are part of the artifact: without
+# them `PolicyNormalization.from_npz` silently falls back to None and the policy
+# runs unnormalized. These must never be dropped by the blanket rule above.
+!models/**/*.npz
 
-# Full simulation runs (local workspace; see results/README.md)
-results/*
-!results/README.md
-
-# Local regenerable script outputs (see outputs/README.md)
-outputs/*
-!outputs/README.md
+# Full simulation runs and script outputs are TRACKED (see results/README.md
+# and outputs/README.md): raw run files (simulation.log, summary_v2.json/csv,
+# stage_results_v2.json/csv, checkpoint.json) and plots (*.png) are pushed so a
+# run can be reviewed and cited from GitHub. Only bulk binaries that the run
+# itself can regenerate stay local:
+results/**/*.h5
+results/**/*.hdf5
+results/**/*.pkl
+results/**/*.parquet
+results/**/*.zip
+results/**/*.mat
+outputs/**/*.h5
+outputs/**/*.hdf5
+outputs/**/*.pkl
+outputs/**/*.parquet
+outputs/**/*.zip
+outputs/**/*.mp4
 
 # Thesis, drafting history, and reference library (local; keep out of the software repo)
-thesis/
-thesis_writing/
-archive/
-research/literature/
+#
+# Anchored with a leading slash so they match only at the repository root. As
+# bare `thesis/` this rule matched a directory of that name at ANY depth, which
+# silently swallowed `config/thesis/` -- the canonical result-family configs that
+# `docs/THESIS_RESULTS.md` tells people to run. They were never committed, and
+# survived only as stray copies inside `reports/evidence/`.
+/thesis/
+/thesis_writing/
+/archive/
+/research/literature/

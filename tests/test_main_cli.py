@@ -89,5 +89,17 @@ def test_main_cli_generates_required_stage_plots(tmp_path):
         "power_vs_ebno.png",
         "runtime_by_method.png",
     ]
+    # Plots are written twice on purpose: once inside each stage directory and
+    # once under `overview/<stage>/`. Scope the check to the stage directories
+    # so adding an overview view does not look like a duplicate.
+    stage_dirs = [
+        path
+        for path in output_dir.rglob("stage_results_v2.json")
+    ]
+    assert len(stage_dirs) == 2, "Expected two stage directories."
     for filename in required:
-        assert len(list(output_dir.rglob(filename))) == 2, f"Expected two stage plots for {filename}."
+        stage_plots = [path.parent / filename for path in stage_dirs]
+        for plot_path in stage_plots:
+            assert plot_path.exists(), f"Missing stage plot {plot_path}."
+        overview_plots = list((output_dir.rglob(f"overview/*/{filename}")))
+        assert overview_plots, f"Expected overview plots for {filename}."

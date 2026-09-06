@@ -1,0 +1,143 @@
+{
+  "rows": [
+    {
+      "ebno_db": 0.0,
+      "quality": 0.7362007409334183,
+      "leakage": 0.4690908208489418,
+      "dft_bler": 0.568125,
+      "dft_bler_ub": 0.5887016646331733,
+      "lmmse_bler": 0.564375,
+      "lmmse_bler_ub": 0.5849773567976863,
+      "oracle": "lmmse",
+      "oracle_bler": 0.564375,
+      "decisive": false
+    },
+    {
+      "ebno_db": 2.0,
+      "quality": 1.003178632259369,
+      "leakage": 0.4178834021091461,
+      "dft_bler": 0.485,
+      "dft_bler_ub": 0.5058720130376781,
+      "lmmse_bler": 0.49375,
+      "lmmse_bler_ub": 0.5146177490835591,
+      "oracle": "dft",
+      "oracle_bler": 0.485,
+      "decisive": false
+    },
+    {
+      "ebno_db": 4.0,
+      "quality": 1.465123724937439,
+      "leakage": 0.34944157749414445,
+      "dft_bler": 0.35625,
+      "dft_bler_ub": 0.37643957531927474,
+      "lmmse_bler": 0.383125,
+      "lmmse_bler_ub": 0.40357602741948406,
+      "oracle": "dft",
+      "oracle_bler": 0.35625,
+      "decisive": true
+    },
+    {
+      "ebno_db": 6.0,
+      "quality": 2.1716922402381895,
+      "leakage": 0.277947635948658,
+      "dft_bler": 0.223125,
+      "dft_bler_ub": 0.24092820338542542,
+      "lmmse_bler": 0.261875,
+      "lmmse_bler_ub": 0.28058229596142736,
+      "oracle": "dft",
+      "oracle_bler": 0.223125,
+      "decisive": true
+    },
+    {
+      "ebno_db": 8.0,
+      "quality": 3.2616188645362856,
+      "leakage": 0.2076871797442436,
+      "dft_bler": 0.121875,
+      "dft_bler_ub": 0.13615707506622327,
+      "lmmse_bler": 0.159375,
+      "lmmse_bler_ub": 0.1752005891677048,
+      "oracle": "dft",
+      "oracle_bler": 0.121875,
+      "decisive": true
+    },
+    {
+      "ebno_db": 10.0,
+      "quality": 5.0378947973251345,
+      "leakage": 0.1538524493575096,
+      "dft_bler": 0.05875,
+      "dft_bler_ub": 0.06935031421252817,
+      "lmmse_bler": 0.09625,
+      "lmmse_bler_ub": 0.10924687696499125,
+      "oracle": "dft",
+      "oracle_bler": 0.05875,
+      "decisive": true
+    },
+    {
+      "ebno_db": 12.0,
+      "quality": 7.889001560211182,
+      "leakage": 0.11789053678512573,
+      "dft_bler": 0.033125,
+      "dft_bler_ub": 0.04146450739587232,
+      "lmmse_bler": 0.053125,
+      "lmmse_bler_ub": 0.06328824437698383,
+      "oracle": "dft",
+      "oracle_bler": 0.033125,
+      "decisive": true
+    },
+    {
+      "ebno_db": 14.0,
+      "quality": 12.273093891143798,
+      "leakage": 0.08434218317270278,
+      "dft_bler": 0.011875,
+      "dft_bler_ub": 0.017376132093144817,
+      "lmmse_bler": 0.028125,
+      "lmmse_bler_ub": 0.03591567233133838,
+      "oracle": "dft",
+      "oracle_bler": 0.011875,
+      "decisive": true
+    },
+    {
+      "ebno_db": 16.0,
+      "quality": 18.801867389678954,
+      "leakage": 0.06345972865819931,
+      "dft_bler": 0.001875,
+      "dft_bler_ub": 0.00483884068427464,
+      "lmmse_bler": 0.01875,
+      "lmmse_bler_ub": 0.025346419451851517,
+      "oracle": "dft",
+      "oracle_bler": 0.001875,
+      "decisive": true
+    },
+    {
+      "ebno_db": 18.0,
+      "quality": 30.763322830200195,
+      "leakage": 0.03941371468827128,
+      "dft_bler": 0.000625,
+      "dft_bler_ub": 0.002961448757587909,
+      "lmmse_bler": 0.003125,
+      "lmmse_bler_ub": 0.006559331974379757,
+      "oracle": "dft",
+      "oracle_bler": 0.000625,
+      "decisive": false
+    },
+    {
+      "ebno_db": 20.0,
+      "quality": 47.84111995697022,
+      "leakage": 0.02686778106726706,
+      "dft_bler": 0.000625,
+      "dft_bler_ub": 0.002961448757587909,
+      "lmmse_bler": 0.00125,
+      "lmmse_bler_ub": 0.00392959203422446,
+      "oracle": "dft",
+      "oracle_bler": 0.000625,
+      "decisive": false
+    }
+  ],
+  "config": "/tmp/cal/config.json",
+  "fit": {
+    "verdict": "dft_only",
+    "note": "The oracle never prefers LMMSE. Disable the LMMSE branch (quality_low = quality_high = 0) rather than tuning a crossover that does not exist.",
+    "quality_low": 0.0,
+    "quality_high": 0.0
+  }
+}

@@ -299,17 +299,30 @@ class MonteCarloConfig:
 class EstimatorsConfig:
     enabled: list[str]
     kwargs: dict[str, dict[str, Any]]
+    paired_reference: str | None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "EstimatorsConfig":
-        allowed = {"enabled", "kwargs"}
+        allowed = {"enabled", "kwargs", "paired_reference"}
         required = {"enabled"}
         _validate_keys("estimators", raw, allowed)
         _require_keys("estimators", raw, required)
         enabled = [item.lower() for item in _ensure_string_list(raw["enabled"], "estimators.enabled")]
+        # Which method the per-batch paired comparison is taken against. Defaults
+        # to the first enabled one, which was the only behaviour before this
+        # existed. A claim about one estimator beating another has to be paired
+        # against *that* one -- "beats LS" says nothing about beating fixed DFT.
+        reference = raw.get("paired_reference")
+        if reference is not None:
+            reference = str(reference).lower()
+            if reference not in enabled:
+                raise ConfigError(
+                    f"estimators.paired_reference '{reference}' is not in estimators.enabled"
+                )
         return cls(
             enabled=enabled,
             kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "estimators.kwargs"),
+            paired_reference=reference,
         )
 
 
@@ -319,11 +332,23 @@ class ResourceManagersConfig:
     cnn_model_path: str | None
     drl_model_path: str | None
     num_active_users: int
+    strict_policy_loading: bool
+    paired_reference: str
+    model_root: str | None
     kwargs: dict[str, dict[str, Any]]
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "ResourceManagersConfig":
-        allowed = {"enabled", "cnn_model_path", "drl_model_path", "num_active_users", "kwargs"}
+        allowed = {
+            "enabled",
+            "cnn_model_path",
+            "drl_model_path",
+            "num_active_users",
+            "kwargs",
+            "strict_policy_loading",
+            "paired_reference",
+            "model_root",
+        }
         required = {"enabled", "num_active_users"}
         _validate_keys("resource_managers", raw, allowed)
         _require_keys("resource_managers", raw, required)
@@ -342,6 +367,14 @@ class ResourceManagersConfig:
             cnn_model_path=model_path,
             drl_model_path=drl_model_path,
             num_active_users=num_active_users,
+            strict_policy_loading=_ensure_bool(
+                raw.get("strict_policy_loading", True),
+                "resource_managers.strict_policy_loading",
+            ),
+            paired_reference=str(raw.get("paired_reference", "static")),
+            model_root=(
+                None if raw.get("model_root") is None else str(raw.get("model_root"))
+            ),
             kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "resource_managers.kwargs"),
         )
 
@@ -369,6 +402,51 @@ class SystemConfig:
     enable_shadow_fading: bool
     min_ut_velocity: float
     max_ut_velocity: float
+    radio_profile: str
+    llr_clip: float | None
+    harq_max_rounds: int
+    csi_feedback_delay_slots: int
+    ut_max_tx_power_w: float
+    pa_efficiency: float
+    circuit_power_ut_w: float
+    circuit_power_bs_w: float
+    decode_energy_per_iter_j: float
+    inf_clutter_density: float
+    inf_clutter_height_m: float
+    # Optional overrides for the InF hall geometry that sets the delay spread.
+    # `None` (the default, and the right answer for every result family) means
+    # the channel derives volume and surface from `factory_scenario.room_dimensions`
+    # via `hall_volume_and_surface()`, so a factory-size sweep genuinely varies
+    # the delay spread. Set them only to model a hall whose shape is not the
+    # configured box. They used to be plain floats defaulting to the small hall,
+    # which silently pinned every hall size to one delay spread -- see
+    # `_validate_hall_overrides` for why that is now rejected rather than
+    # defaulted.
+    inf_hall_volume_m3: float | None
+    inf_hall_surface_m2: float | None
+    graph_mode: bool
+
+    # Radio profiles.
+    #
+    # `nr_5g_fr1` keeps the original hard lock on the 5G numerology so existing
+    # result families stay reproducible and cannot drift by accident. The other
+    # profiles exist because the research objective is 6G in a factory, which the
+    # 5G lock made unreachable: it forbade FR3 carriers, mini-slot TTIs and the
+    # TR 38.901 Indoor Factory scenarios.
+    _PROFILE_NR_5G_FR1 = "nr_5g_fr1"
+    _PROFILE_NR_5G_INF = "nr_5g_inf"
+    _PROFILE_6G_FR3 = "6g_fr3"
+    _PROFILE_CUSTOM = "custom"
+    _VALID_PROFILES = {
+        _PROFILE_NR_5G_FR1,
+        _PROFILE_NR_5G_INF,
+        _PROFILE_6G_FR3,
+        _PROFILE_CUSTOM,
+    }
+
+    # TR 38.901 Indoor Factory scenarios (Rel-16, Table 7.2-4).
+    _INF_SCENARIOS = {"inf_sl", "inf_dl", "inf_sh", "inf_dh", "inf_hh"}
+    _VALID_SCENARIOS = {"umi", "uma", "rma"} | _INF_SCENARIOS
 
     _LOCKED_5G_VALUES = {
         "carrier_frequency": 3.5e9,
@@ -383,7 +461,7 @@ class SystemConfig:
 
     _VALID_MODULATIONS = {1, 2, 4, 6}
 
-    _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn"}
+    _VALID_CHANNEL_MODELS = {"tr38901", "rayleigh", "rician", "awgn", "inf"}
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "SystemConfig":
@@ -409,6 +487,20 @@ class SystemConfig:
             "enable_shadow_fading",
             "min_ut_velocity",
             "max_ut_velocity",
+            "radio_profile",
+            "llr_clip",
+            "harq_max_rounds",
+            "csi_feedback_delay_slots",
+            "ut_max_tx_power_w",
+            "pa_efficiency",
+            "circuit_power_ut_w",
+            "circuit_power_bs_w",
+            "decode_energy_per_iter_j",
+            "inf_clutter_density",
+            "inf_clutter_height_m",
+            "inf_hall_volume_m3",
+            "inf_hall_surface_m2",
+            "graph_mode",
         }
         required = {
             "carrier_frequency",
@@ -463,6 +555,39 @@ class SystemConfig:
             ),
             min_ut_velocity=_ensure_float(raw["min_ut_velocity"], "system.min_ut_velocity"),
             max_ut_velocity=_ensure_float(raw["max_ut_velocity"], "system.max_ut_velocity"),
+            radio_profile=str(raw.get("radio_profile", cls._PROFILE_NR_5G_FR1)).lower(),
+            llr_clip=_ensure_optional_float(raw.get("llr_clip", 200.0), "system.llr_clip"),
+            harq_max_rounds=_ensure_int(raw.get("harq_max_rounds", 1), "system.harq_max_rounds"),
+            csi_feedback_delay_slots=_ensure_int(
+                raw.get("csi_feedback_delay_slots", 0),
+                "system.csi_feedback_delay_slots",
+            ),
+            ut_max_tx_power_w=_ensure_float(
+                raw.get("ut_max_tx_power_w", 0.2), "system.ut_max_tx_power_w"
+            ),
+            pa_efficiency=_ensure_float(raw.get("pa_efficiency", 0.35), "system.pa_efficiency"),
+            circuit_power_ut_w=_ensure_float(
+                raw.get("circuit_power_ut_w", 0.1), "system.circuit_power_ut_w"
+            ),
+            circuit_power_bs_w=_ensure_float(
+                raw.get("circuit_power_bs_w", 1.0), "system.circuit_power_bs_w"
+            ),
+            decode_energy_per_iter_j=_ensure_float(
+                raw.get("decode_energy_per_iter_j", 1e-6), "system.decode_energy_per_iter_j"
+            ),
+            inf_clutter_density=_ensure_float(
+                raw.get("inf_clutter_density", 0.6), "system.inf_clutter_density"
+            ),
+            inf_clutter_height_m=_ensure_float(
+                raw.get("inf_clutter_height_m", 2.0), "system.inf_clutter_height_m"
+            ),
+            inf_hall_volume_m3=_ensure_optional_float(
+                raw.get("inf_hall_volume_m3"), "system.inf_hall_volume_m3"
+            ),
+            inf_hall_surface_m2=_ensure_optional_float(
+                raw.get("inf_hall_surface_m2"), "system.inf_hall_surface_m2"
+            ),
+            graph_mode=_ensure_bool(raw.get("graph_mode", False), "system.graph_mode"),
         )
         channel_model_type = str(raw["channel_model_type"]).lower()
         if channel_model_type not in cls._VALID_CHANNEL_MODELS:
@@ -475,16 +600,113 @@ class SystemConfig:
                 f"'system.num_bits_per_symbol' must be one of {sorted(cls._VALID_MODULATIONS)} "
                 f"(got {parsed.num_bits_per_symbol})."
             )
-        parsed._validate_locked_5g_profile()
+        if parsed.radio_profile not in cls._VALID_PROFILES:
+            raise ConfigError(
+                f"'system.radio_profile' must be one of {sorted(cls._VALID_PROFILES)} "
+                f"(got '{parsed.radio_profile}')."
+            )
+        if parsed.scenario not in cls._VALID_SCENARIOS:
+            raise ConfigError(
+                f"'system.scenario' must be one of {sorted(cls._VALID_SCENARIOS)} "
+                f"(got '{parsed.scenario}')."
+            )
+        if parsed.harq_max_rounds < 1:
+            raise ConfigError("'system.harq_max_rounds' must be >= 1.")
+        if parsed.csi_feedback_delay_slots < 0:
+            raise ConfigError("'system.csi_feedback_delay_slots' must be >= 0.")
+        if not 0.0 < parsed.pa_efficiency <= 1.0:
+            raise ConfigError("'system.pa_efficiency' must lie in (0, 1].")
+        parsed._validate_radio_profile()
+        parsed._validate_hall_overrides()
         return parsed
 
-    def _validate_locked_5g_profile(self) -> None:
+    def _validate_hall_overrides(self) -> None:
+        """Both hall overrides must be given together, or neither.
+
+        Supplying one and letting the other fall back to the room geometry
+        produces a volume-to-surface ratio that describes no actual hall, and
+        the InF delay spread is a function of exactly that ratio.
+        """
+        volume, surface = self.inf_hall_volume_m3, self.inf_hall_surface_m2
+        if (volume is None) != (surface is None):
+            raise ConfigError(
+                "'system.inf_hall_volume_m3' and 'system.inf_hall_surface_m2' must be "
+                "set together or both omitted; the delay spread depends on their ratio. "
+                "Omit both to derive them from 'factory_scenario.room_dimensions'."
+            )
+        for name, value in (
+            ("inf_hall_volume_m3", volume),
+            ("inf_hall_surface_m2", surface),
+        ):
+            if value is not None and value <= 0.0:
+                raise ConfigError(f"'system.{name}' must be > 0 when set (got {value}).")
+
+    def _validate_radio_profile(self) -> None:
+        """Apply the constraints of the selected radio profile."""
+        if self.radio_profile == self._PROFILE_CUSTOM:
+            return
+        if self.radio_profile == self._PROFILE_6G_FR3:
+            self._validate_6g_fr3_profile()
+            return
+        if self.radio_profile == self._PROFILE_NR_5G_INF:
+            self._validate_locked_5g_profile(allow_indoor_factory=True)
+            return
+        self._validate_locked_5g_profile()
+
+    def _validate_6g_fr3_profile(self) -> None:
+        """Guard rails for the 6G profile: FR3 carrier, NR-compatible numerology.
+
+        Deliberately looser than the 5G lock -- it permits the FR3 band, the
+        60/120 kHz subcarrier spacings and the mini-slot TTIs that sub-millisecond
+        factory URLLC needs, while still rejecting values that are not physically
+        coherent.
+        """
+        if not 7.0e9 <= self.carrier_frequency <= 24.0e9:
+            raise ConfigError(
+                "'system.carrier_frequency' must lie in the FR3 range 7-24 GHz for "
+                f"the 6g_fr3 profile (got {self.carrier_frequency})."
+            )
+        valid_scs = {15e3, 30e3, 60e3, 120e3, 480e3, 960e3}
+        if not any(np.isclose(self.subcarrier_spacing, scs) for scs in valid_scs):
+            raise ConfigError(
+                f"'system.subcarrier_spacing' must be one of {sorted(valid_scs)} "
+                f"for the 6g_fr3 profile (got {self.subcarrier_spacing})."
+            )
+        # Mini-slots: 2-7 symbols; 14 is a full slot.
+        if not 2 <= self.num_ofdm_symbols <= 14:
+            raise ConfigError(
+                "'system.num_ofdm_symbols' must lie in 2..14 for the 6g_fr3 profile "
+                f"(got {self.num_ofdm_symbols})."
+            )
+        for index in self.pilot_ofdm_symbol_indices:
+            if not 0 <= index < self.num_ofdm_symbols:
+                raise ConfigError(
+                    f"'system.pilot_ofdm_symbol_indices' entry {index} is outside the "
+                    f"{self.num_ofdm_symbols}-symbol TTI."
+                )
+
+    def _validate_locked_5g_profile(self, *, allow_indoor_factory: bool = False) -> None:
+        """The FR1 numerology lock.
+
+        `allow_indoor_factory` relaxes only the scenario, keeping every
+        numerology value pinned. That combination -- FR1 numerology, TR 38.901
+        Indoor Factory propagation -- is what a smart-factory study on 5G NR
+        actually needs, and the plain lock forbade it by pinning the scenario to
+        urban microcell.
+        """
         self._assert_locked_float("system.carrier_frequency", self.carrier_frequency)
         self._assert_locked_float("system.subcarrier_spacing", self.subcarrier_spacing)
         self._assert_locked_int("system.num_ofdm_symbols", self.num_ofdm_symbols)
         self._assert_locked_int("system.cyclic_prefix_length", self.cyclic_prefix_length)
         self._assert_locked_float("system.coderate", self.coderate)
-        self._assert_locked_str("system.scenario", self.scenario)
+        if allow_indoor_factory:
+            if self.scenario not in self._INF_SCENARIOS:
+                raise ConfigError(
+                    f"'system.scenario' must be one of {sorted(self._INF_SCENARIOS)} "
+                    f"for the nr_5g_inf profile (got '{self.scenario}')."
+                )
+        else:
+            self._assert_locked_str("system.scenario", self.scenario)
         self._assert_locked_str("system.direction", self.direction)
         expected_pilots = self._LOCKED_5G_VALUES["pilot_ofdm_symbol_indices"]
         if list(self.pilot_ofdm_symbol_indices) != list(expected_pilots):
@@ -689,16 +911,43 @@ class Factory6GConfig:
     def system_runtime_config(self) -> dict[str, Any]:
         runtime = asdict(self.system)
         runtime.update(asdict(self.transceiver))
+        # Factory geometry has to reach the channel model, otherwise the hall
+        # dimensions and machine count in `factory_scenario` never influence
+        # propagation and a "factory size" sweep is only a user-count sweep.
+        runtime["room_dimensions"] = list(self.factory_scenario.room_dimensions)
+        runtime["num_machines"] = int(self.factory_scenario.num_machines)
+        runtime["machine_size_range"] = [
+            list(row) for row in self.factory_scenario.machine_size_range
+        ]
+        runtime["seed"] = int(self.simulation.seed)
+        # Drop the hall overrides when unset. `asdict` would otherwise put a
+        # `None` (previously: a hard-coded small-hall constant) under these keys,
+        # and `ChannelModel._apply_inf_large_scale` reads them with
+        # `config.get(key, <geometry-derived value>)` -- a key that is always
+        # present makes that fallback unreachable and pins every hall size to one
+        # delay spread.
+        for key in ("inf_hall_volume_m3", "inf_hall_surface_m2"):
+            if runtime.get(key) is None:
+                runtime.pop(key, None)
         return runtime
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-def load_config(config_path: str | Path = "config/config.json") -> Factory6GConfig:
+def load_raw_config(config_path: str | Path = "config/config.json") -> dict[str, Any]:
+    """Parse a config file to a plain dict, comments stripped.
+
+    Callers that need sections `Factory6GConfig` does not model -- `jidd_scma`
+    most of all -- must go through this rather than `json.load`, which chokes on
+    the `//` comments this project's configs are allowed to carry.
+    """
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
-        raw_config = json.loads(_strip_json_comments(handle.read()))
-    return Factory6GConfig.from_dict(_ensure_dict(raw_config, "root"))
+        return _ensure_dict(json.loads(_strip_json_comments(handle.read())), "root")
+
+
+def load_config(config_path: str | Path = "config/config.json") -> Factory6GConfig:
+    return Factory6GConfig.from_dict(load_raw_config(config_path))
