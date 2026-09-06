@@ -176,3 +176,30 @@ def test_threshold_stop_policy_with_target_ber_parses(tmp_path):
     config = load_config(config_path)
     assert config.monte_carlo.stop_policy == "threshold"
     assert config.monte_carlo.target_ber == 1e-5
+
+
+def test_estimators_paired_reference_defaults_to_the_first_method(tmp_path):
+    """Unset, the reference is the first enabled estimator, as it always was."""
+    from factory6g.sim.config import EstimatorsConfig
+
+    config = EstimatorsConfig.from_dict({"enabled": ["LS", "DFT"]})
+    assert config.paired_reference is None
+    assert config.enabled == ["ls", "dft"]
+
+
+def test_estimators_paired_reference_is_lowercased_and_validated():
+    """A comparison against a method that is not running is a silent wrong answer.
+
+    "Beats LS" says nothing about beating fixed DFT, so the reference has to be
+    nameable -- and naming one that was never run must fail loudly rather than
+    fall back to the default.
+    """
+    from factory6g.sim.config import ConfigError, EstimatorsConfig
+
+    config = EstimatorsConfig.from_dict(
+        {"enabled": ["ls", "dft", "adaptive_window"], "paired_reference": "DFT"}
+    )
+    assert config.paired_reference == "dft"
+
+    with pytest.raises(ConfigError, match="paired_reference"):
+        EstimatorsConfig.from_dict({"enabled": ["ls", "dft"], "paired_reference": "lmmse"})

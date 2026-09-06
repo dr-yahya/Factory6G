@@ -299,17 +299,30 @@ class MonteCarloConfig:
 class EstimatorsConfig:
     enabled: list[str]
     kwargs: dict[str, dict[str, Any]]
+    paired_reference: str | None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "EstimatorsConfig":
-        allowed = {"enabled", "kwargs"}
+        allowed = {"enabled", "kwargs", "paired_reference"}
         required = {"enabled"}
         _validate_keys("estimators", raw, allowed)
         _require_keys("estimators", raw, required)
         enabled = [item.lower() for item in _ensure_string_list(raw["enabled"], "estimators.enabled")]
+        # Which method the per-batch paired comparison is taken against. Defaults
+        # to the first enabled one, which was the only behaviour before this
+        # existed. A claim about one estimator beating another has to be paired
+        # against *that* one -- "beats LS" says nothing about beating fixed DFT.
+        reference = raw.get("paired_reference")
+        if reference is not None:
+            reference = str(reference).lower()
+            if reference not in enabled:
+                raise ConfigError(
+                    f"estimators.paired_reference '{reference}' is not in estimators.enabled"
+                )
         return cls(
             enabled=enabled,
             kwargs=_ensure_dict_of_dicts(raw.get("kwargs", {}), "estimators.kwargs"),
+            paired_reference=reference,
         )
 
 

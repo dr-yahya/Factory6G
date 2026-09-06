@@ -34,6 +34,8 @@ def run_estimator_stage(
     base_seed = int(config.simulation.seed)
     max_harq_rounds = int(system_config.get("harq_max_rounds", 1))
 
+    paired_reference = config.estimators.paired_reference or (methods[0] if methods else "")
+
     aggregated = initialize_stage_metrics(methods)
     runtime_totals_sec = {method: 0.0 for method in methods}
     shared_context_model = Model(
@@ -182,9 +184,24 @@ def run_estimator_stage(
         "ebno_db_range": ebno_db_range,
         "methods": aggregated,
         "runtime_totals_sec": runtime_totals_sec,
+        "paired_reference": paired_reference,
+        # The per-batch samples the paired analysis is built from. Kept in the
+        # results so a different reference can be compared later without
+        # re-running the sweep -- the checkpoint that also holds them is deleted
+        # on completion, and these runs cost about an hour each.
+        "paired_samples": {
+            method: [
+                {
+                    "batch_block_errors": point.get("batch_block_errors", []),
+                    "batch_blocks": point.get("batch_blocks", []),
+                }
+                for point in points
+            ]
+            for method, points in finalized.items()
+        },
         "paired_comparisons": compare_methods_paired(
             finalized,
-            reference=methods[0] if methods else "",
+            reference=paired_reference,
             confidence_level=config.monte_carlo.confidence_level,
         ),
     }
