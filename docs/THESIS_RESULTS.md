@@ -70,6 +70,26 @@ volume-to-surface ratio, giving 23.7 ns for the 15×15×5 m hall and 39.4 ns for
 carrier narrower than that sees a flat channel, and every frequency-domain
 estimator converges to the same answer no matter how good it is.
 
+> **Correction (2026-09-06): the table below describes the channel, but until now
+> the code did not build it.** `system.inf_hall_volume_m3` and
+> `system.inf_hall_surface_m2` were plain floats defaulting to the *small* hall,
+> and `asdict()` always materialised them, so the geometry fallback in
+> `ChannelModel._apply_inf_large_scale` was unreachable — every hall size
+> simulated a single delay spread. `frequency_selectivity_report()` meanwhile
+> derived its numbers from the room dimensions, which is where the varying
+> figures quoted here came from. Reported and simulated disagreed.
+>
+> `config/config.json` also carried a hand-entered `inf_hall_surface_m2: 900.0`
+> against the 750 m² its own room dimensions imply, making the simulated delay
+> spread 20.8 ns rather than 23.7 ns — 12% short.
+>
+> Both keys are now optional overrides defaulting to `None`, derived from
+> `factory_scenario.room_dimensions` when unset, and the channel and the
+> selectivity report share one resolution path. The numbers in this document were
+> always correct as a description of intent; the simulation now matches them.
+> **Every InF result produced before this fix used the wrong delay spread and
+> must be regenerated.**
+
 The current FR1 numerology is narrower than that. Measured:
 
 | Numerology | Bandwidth | Selectivity ratio | RMS taps | LDPC block | Usable? |

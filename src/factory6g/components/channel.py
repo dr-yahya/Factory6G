@@ -234,10 +234,25 @@ class ChannelModel:
         response = response.reshape(*link_shape, 1, num_sc)
         return np.broadcast_to(response, (*link_shape, num_sym, num_sc))
 
-    def frequency_selectivity_report(self) -> dict[str, float]:
-        """Is the configured carrier wide enough to see the hall's delay spread?"""
+    def _resolve_hall_geometry(self) -> tuple[float, float]:
+        """Hall volume and surface that set the InF delay spread.
+
+        Derived from the configured room dimensions unless both explicit
+        overrides are present. This is the single source of truth: the channel
+        and `frequency_selectivity_report()` must agree, or the selectivity we
+        report describes a different hall from the one we simulate.
+        """
         room_dimensions = list(self.config.get("room_dimensions", [15.0, 15.0, 5.0]))
         volume, surface = hall_volume_and_surface(room_dimensions)
+        override_volume = self.config.get("inf_hall_volume_m3")
+        override_surface = self.config.get("inf_hall_surface_m2")
+        if override_volume is not None and override_surface is not None:
+            return float(override_volume), float(override_surface)
+        return volume, surface
+
+    def frequency_selectivity_report(self) -> dict[str, float]:
+        """Is the configured carrier wide enough to see the hall's delay spread?"""
+        volume, surface = self._resolve_hall_geometry()
         delay_spread = float(inf_delay_spread_seconds(volume, surface)[0])
         bandwidth = float(self.resource_grid.fft_size) * float(
             self.config.get("subcarrier_spacing", 30e3)
@@ -285,10 +300,10 @@ class ChannelModel:
             enable_shadow_fading=bool(self.config.get("enable_shadow_fading", True)),
             rng=self._rng,
         )
-        volume, surface = hall_volume_and_surface(room_dimensions)
+        volume, surface = self._resolve_hall_geometry()
         delay_spread = inf_delay_spread_seconds(
-            float(self.config.get("inf_hall_volume_m3", volume)),
-            float(self.config.get("inf_hall_surface_m2", surface)),
+            volume,
+            surface,
             rng=self._rng,
             num_links=batch * num_rx * num_tx,
         )

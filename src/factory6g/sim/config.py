@@ -413,8 +413,17 @@ class SystemConfig:
     decode_energy_per_iter_j: float
     inf_clutter_density: float
     inf_clutter_height_m: float
-    inf_hall_volume_m3: float
-    inf_hall_surface_m2: float
+    # Optional overrides for the InF hall geometry that sets the delay spread.
+    # `None` (the default, and the right answer for every result family) means
+    # the channel derives volume and surface from `factory_scenario.room_dimensions`
+    # via `hall_volume_and_surface()`, so a factory-size sweep genuinely varies
+    # the delay spread. Set them only to model a hall whose shape is not the
+    # configured box. They used to be plain floats defaulting to the small hall,
+    # which silently pinned every hall size to one delay spread -- see
+    # `_validate_hall_overrides` for why that is now rejected rather than
+    # defaulted.
+    inf_hall_volume_m3: float | None
+    inf_hall_surface_m2: float | None
     graph_mode: bool
 
     # Radio profiles.
@@ -572,12 +581,11 @@ class SystemConfig:
             inf_clutter_height_m=_ensure_float(
                 raw.get("inf_clutter_height_m", 2.0), "system.inf_clutter_height_m"
             ),
-            inf_hall_volume_m3=_ensure_float(
-                raw.get("inf_hall_volume_m3", 15.0 * 15.0 * 5.0), "system.inf_hall_volume_m3"
+            inf_hall_volume_m3=_ensure_optional_float(
+                raw.get("inf_hall_volume_m3"), "system.inf_hall_volume_m3"
             ),
-            inf_hall_surface_m2=_ensure_float(
-                raw.get("inf_hall_surface_m2", 2 * (15 * 15 + 15 * 5 + 15 * 5)),
-                "system.inf_hall_surface_m2",
+            inf_hall_surface_m2=_ensure_optional_float(
+                raw.get("inf_hall_surface_m2"), "system.inf_hall_surface_m2"
             ),
             graph_mode=_ensure_bool(raw.get("graph_mode", False), "system.graph_mode"),
         )
@@ -609,7 +617,29 @@ class SystemConfig:
         if not 0.0 < parsed.pa_efficiency <= 1.0:
             raise ConfigError("'system.pa_efficiency' must lie in (0, 1].")
         parsed._validate_radio_profile()
+        parsed._validate_hall_overrides()
         return parsed
+
+    def _validate_hall_overrides(self) -> None:
+        """Both hall overrides must be given together, or neither.
+
+        Supplying one and letting the other fall back to the room geometry
+        produces a volume-to-surface ratio that describes no actual hall, and
+        the InF delay spread is a function of exactly that ratio.
+        """
+        volume, surface = self.inf_hall_volume_m3, self.inf_hall_surface_m2
+        if (volume is None) != (surface is None):
+            raise ConfigError(
+                "'system.inf_hall_volume_m3' and 'system.inf_hall_surface_m2' must be "
+                "set together or both omitted; the delay spread depends on their ratio. "
+                "Omit both to derive them from 'factory_scenario.room_dimensions'."
+            )
+        for name, value in (
+            ("inf_hall_volume_m3", volume),
+            ("inf_hall_surface_m2", surface),
+        ):
+            if value is not None and value <= 0.0:
+                raise ConfigError(f"'system.{name}' must be > 0 when set (got {value}).")
 
     def _validate_radio_profile(self) -> None:
         """Apply the constraints of the selected radio profile."""
@@ -890,6 +920,15 @@ class Factory6GConfig:
             list(row) for row in self.factory_scenario.machine_size_range
         ]
         runtime["seed"] = int(self.simulation.seed)
+        # Drop the hall overrides when unset. `asdict` would otherwise put a
+        # `None` (previously: a hard-coded small-hall constant) under these keys,
+        # and `ChannelModel._apply_inf_large_scale` reads them with
+        # `config.get(key, <geometry-derived value>)` -- a key that is always
+        # present makes that fallback unreachable and pins every hall size to one
+        # delay spread.
+        for key in ("inf_hall_volume_m3", "inf_hall_surface_m2"):
+            if runtime.get(key) is None:
+                runtime.pop(key, None)
         return runtime
 
     def to_dict(self) -> dict[str, Any]:
