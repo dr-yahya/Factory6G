@@ -157,6 +157,38 @@ DFT/LMMSE hybrid 1.633e-1, fixed DFT 1.270e-1, **adaptive window 1.123e-1**,
 perfect CSI 8.488e-2. Both LMMSE and the hybrid are worse than plain DFT; only
 the window improves on it. The branch was the wrong thing to adapt.
 
+### The narrowband control, at BLER
+
+Same run configuration, 8000 codewords per point, on the 3.8 MHz FR1 control
+where the factory channel is flat.
+
+| Eb/No | BLER dft | BLER adaptive | perfect CSI | gap closed | relative |
+|---|---|---|---|---|---|
+| 0 dB | 5.427e-1 | 3.997e-1 | 3.830e-1 | 89.5% | −26% |
+| 4 dB | 3.055e-1 | 1.750e-1 | 1.643e-1 | 92.4% | −43% |
+| 8 dB | 1.148e-1 | 5.187e-2 | 4.675e-2 | 92.5% | −55% |
+| 12 dB | 2.513e-2 | 9.250e-3 | 7.875e-3 | 92.0% | −63% |
+| 16 dB | 4.500e-3 | 1.500e-3 | 1.125e-3 | 88.9% | −67% |
+| 18 dB | 1.250e-3 | 3.750e-4 | 1.250e-4 | 77.8% | −70% |
+
+Significant at every point from 0 to 18 dB, and around **90% of the gap to
+perfect CSI closed** throughout -- against 28-43% on the small hall. At 8 dB the
+ordering is LS 1.739e-1, fixed DFT 1.148e-1, LMMSE 1.050e-1, hybrid 1.016e-1,
+**adaptive window 5.187e-2**, perfect CSI 4.675e-2: the window sits within 11%
+of perfect CSI while every other estimator is at more than double it.
+
+The calibration is the cleanest in the project. The adaptive window declares
+1.04-2.06 of its true error -- conservative, converging on 1.00 as SNR rises --
+against fixed DFT's flat 0.35. The estimator that tells the equalizer the truth
+wins by more than half a decade of BLER.
+
+Two things follow for the thesis. This configuration was filed as a control
+expected to show estimators converging on a flat channel; it shows the reverse,
+and belongs in the chapter as a result. And unlike the factory halls, where the
+gain fades into the noise above 14 dB, here it runs all the way into the URLLC
+tail at 18 dB -- which is the regime the reliability claim is actually written
+about.
+
 ## Caveats
 
 * **The deep tail is not resolved.** Above 14 dB the intervals include zero
