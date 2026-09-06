@@ -90,6 +90,12 @@ class Model:
             from ..components.estimators import LMMSEChannelEstimator
 
             return LMMSEChannelEstimator(self._rg, config=self.config, **self.estimator_kwargs)
+        if estimator_type in {"lmmse_genie", "genie_lmmse", "lmmse_matched"}:
+            from ..components.estimators import LMMSEGenieChannelEstimator
+
+            return LMMSEGenieChannelEstimator(
+                self._rg, config=self.config, **self.estimator_kwargs
+            )
         if estimator_type in {"adaptive_window", "awin", "adaptive_dft"}:
             from ..components.estimators import AdaptiveWindowChannelEstimator
 

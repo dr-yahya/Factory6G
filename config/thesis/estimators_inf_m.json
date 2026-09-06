@@ -26,6 +26,7 @@
       "dft",
       "lmmse",
       "adaptive",
+      "adaptive_window",
       "perfect"
     ],
     "kwargs": {
