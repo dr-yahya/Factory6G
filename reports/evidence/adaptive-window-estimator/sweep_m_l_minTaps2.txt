@@ -1,0 +1,23 @@
+# Medium and large hall, measured with the earlier min_taps=2 floor.
+# The floor never binds on these configs (windows are 7-20 taps), so the
+# numbers carry over unchanged to the shipped min_taps=1 default.
+
+estimators_inf_m.json  N=512 CP=20 D=8 eps=0.05
+ EbNo   oracle  fixedDFT  adaptive    gain   taps  errcal_a  errcal_d
+    0   -14.22    -11.29    -14.31   +3.02    7.3     0.338     0.142
+    4   -17.22    -15.29    -17.30   +2.01    9.5     0.321     0.154
+    8   -20.64    -19.14    -20.75   +1.61   11.0     0.379     0.213
+   12   -23.98    -23.24    -24.04   +0.81   13.8     0.558     0.376
+   16   -27.27    -26.99    -27.30   +0.30   16.6     1.210     1.048
+   20   -30.95    -30.78    -30.78   +0.00   20.0     2.339     2.339
+
+estimators_inf_l.json  N=512 CP=20 D=16 eps=0.05
+ EbNo   oracle  fixedDFT  adaptive    gain   taps  errcal_a  errcal_d
+    0   -14.23    -12.34    -14.29   +1.95    7.3     0.310     0.126
+    4   -17.62    -16.35    -17.67   +1.32    9.0     0.454     0.236
+    8   -20.83    -20.11    -20.85   +0.74   10.8     0.935     0.657
+   12   -24.10    -23.79    -24.08   +0.29   13.5     2.091     1.835
+   16   -27.00    -26.91    -26.93   +0.02   19.1     4.585     4.543
+   20   -29.45    -29.43    -29.43   +0.00   20.0     7.885     7.885
+
+estimators_inf_narrowband.json  N=128 CP=20 D=4 eps=0.05

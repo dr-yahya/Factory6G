@@ -74,6 +74,17 @@ beyond the cyclic prefix, constrained non-negative. Against an exhaustive search
 over window length, that cost lands within 0.1 dB of the best achievable window
 at every Eb/No from 0 to 20 dB, on both a small and a large factory hall.
 
+Where the method applies
+------------------------
+The fit reads the noise off the delay taps beyond the cyclic prefix, so it
+assumes the channel has no usable energy there. That is the design assumption of
+OFDM itself and it holds by construction in the factory: on the mini-slot
+numerology the measured energy past the cyclic prefix is 0.000% in both the
+small and the large hall. It does not hold for TR 38.901 UMi at this numerology,
+where 3.4% of the channel energy overruns the prefix, contaminates the fit, and
+makes the window over-tighten at high SNR. UMi is the comparison arm rather than
+a factory claim, but the limit is a real one and belongs with the result.
+
 Everything is TensorFlow, so the estimator stays graph-traceable.
 """
 
@@ -99,15 +110,18 @@ class AdaptiveWindowChannelEstimator(Block):
         self,
         resource_grid: ResourceGrid,
         config: dict | None = None,
-        min_taps: int = 2,
+        min_taps: int = 1,
         max_taps: int | None = None,
         pilot_decimation: int | None = None,
         noise_margin: float = 1.0,
+        min_relative_gain: float = 0.05,
     ) -> None:
         """
         Args:
-            min_taps: floor on the window, so a degenerate profile estimate
-                cannot collapse it to nothing.
+            min_taps: floor on the window. One by default, because a single
+                tap is the right answer on a channel flat across the signal
+                bandwidth -- the narrowband control is exactly that, and a floor
+                of two costs 3 dB there.
             max_taps: ceiling on the window. Defaults to the cyclic prefix
                 length, which is the principled bound: energy arriving later
                 than the CP causes inter-symbol interference and is not
@@ -123,6 +137,14 @@ class AdaptiveWindowChannelEstimator(Block):
             noise_margin: multiplier on the fitted noise level. One is the
                 unbiased rule and the default; above one biases the window
                 tighter, below one looser.
+            min_relative_gain: how much better than the full ``max_taps`` window
+                the chosen one must be predicted to be, as a fraction of the
+                full window's cost, before the estimator will tighten. The cost
+                is an estimate, so where its minimum is shallow the ranking it
+                gives is inside its own error and the fixed window is the safer
+                bet. Five percent is the smallest margin that removes the
+                high-SNR losses on a large hall -- 0.24 dB at 20 dB Eb/No with
+                no margin -- while leaving the low-SNR gains untouched.
         """
         super().__init__()
         self._rg = resource_grid
@@ -135,6 +157,7 @@ class AdaptiveWindowChannelEstimator(Block):
             pilot_decimation = int(resource_grid.num_tx) * int(resource_grid.num_streams_per_tx)
         self.pilot_decimation = max(int(pilot_decimation), 1)
         self.noise_margin = float(noise_margin)
+        self.min_relative_gain = max(float(min_relative_gain), 0.0)
 
         self._noise_shape = tf.constant(self._dirichlet_shape(), tf.float32)  # [N]
         # Diagnostic: mean window length chosen on the most recent call.
@@ -216,8 +239,17 @@ class AdaptiveWindowChannelEstimator(Block):
             tf.range(self.fft_size) >= self.min_taps,
             tf.range(self.fft_size) <= self.max_taps,
         )
-        cost = tf.where(admissible[tf.newaxis, :], cost, tf.fill(tf.shape(cost), cost.dtype.max))
-        window = tf.argmin(cost, axis=-1, output_type=tf.int32)  # [num_tx]
+        masked = tf.where(admissible[tf.newaxis, :], cost, tf.fill(tf.shape(cost), cost.dtype.max))
+        window = tf.argmin(masked, axis=-1, output_type=tf.int32)  # [num_tx]
+
+        # Tighten only on a clear margin. Where the cost curve is shallow near
+        # the full window, the ordering it reports is inside the fit's own
+        # error, and the incumbent is the safer choice.
+        best = tf.reduce_min(masked, axis=-1)
+        full = cost[:, self.max_taps]
+        window = tf.where(
+            best < (1.0 - self.min_relative_gain) * full, window, self.max_taps
+        )
 
         index = tf.range(self.fft_size)
         return tf.cast(index[tf.newaxis, :] < window[:, tf.newaxis], tf.float32)
