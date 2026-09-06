@@ -417,7 +417,8 @@ def _generate_profile_samples(
 
         frequency_hz = float(system_params.get("carrier_frequency", 3.5e9))
         scene.frequency = frequency_hz
-        scene.synthetic_array = True
+        # `synthetic_array` belongs on the solver call, not the Scene: assigning
+        # it here only created an unused attribute. Passed to PathSolver below.
 
         room_height = float(room_dims[2])
         tx_height_offset = float(transceiver_params.get("tx_height_offset", 1.0))
@@ -479,7 +480,17 @@ def _generate_profile_samples(
                 rx_height,
             ]
             rx.position = rx_pos
-            paths = solver(scene, max_depth=max_depth, samples_per_src=samples_per_src)
+            paths = solver(
+                scene,
+                max_depth=max_depth,
+                samples_per_src=samples_per_src,
+                synthetic_array=True,
+                # Diffraction around metal machine edges fills the shadow
+                # regions that set worst-user reliability. Added in RT 1.2,
+                # off by default.
+                diffraction=bool(rt_params.get("enable_diffraction", True)),
+                edge_diffraction=bool(rt_params.get("enable_edge_diffraction", True)),
+            )
             a_val, tau_val = paths.cir(out_type="numpy")
             a_std, tau_std = _standardize_paths(a_val, tau_val, max_paths=max_paths)
 
