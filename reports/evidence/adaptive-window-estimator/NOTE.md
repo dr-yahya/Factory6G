@@ -112,17 +112,6 @@ precondition is stated rather than detected.
 
 ## The gain survives the decoder
 
-> **SUPERSEDED — the BLER table below is on the wrong channel.** It was produced
-> before `config/thesis/estimators_inf_s.json` had its hall overrides removed.
-> The run carried `inf_hall_surface_m2: 900`, while the 15x15x5 m room implies
-> 750, so it simulated a 20.7 ns delay spread and selectivity 6.4 instead of the
-> documented 23.6 ns and 7.3. The paired comparison is internally valid -- both
-> estimators saw the identical channel -- but it is not the documented small
-> hall, and a shorter delay spread leaves the fixed 20-tap window *more* slack to
-> give up, so these numbers most likely overstate the gain. Being replaced by a
-> rerun on the corrected geometry; treat the numbers as indicative only.
-
-
 NMSE does not predict coded BER in this project (`../estimator-floor-tr38901/`),
 so the accuracy result above settles nothing on its own. It was a live
 possibility that the whole gain would vanish at BLER: it is concentrated at low
@@ -134,14 +123,14 @@ paired per batch against fixed DFT.
 
 | Eb/No | BLER dft | BLER adaptive | delta (95% CI) | gap to perfect CSI closed |
 |---|---|---|---|---|
-| 0 dB | 5.864e-1 | 5.531e-1 | −3.33e-2 [−3.76e-2, −2.91e-2] | **45%** |
-| 2 dB | 4.606e-1 | 4.304e-1 | −3.02e-2 [−3.36e-2, −2.68e-2] | 40% |
-| 4 dB | 3.367e-1 | 3.031e-1 | −3.36e-2 [−3.79e-2, −2.97e-2] | **45%** |
-| 6 dB | 2.251e-1 | 2.042e-1 | −2.09e-2 [−2.41e-2, −1.77e-2] | 37% |
-| 8 dB | 1.271e-1 | 1.111e-1 | −1.60e-2 [−1.89e-2, −1.31e-2] | 40% |
-| 10 dB | 6.74e-2 | 5.80e-2 | −9.37e-3 [−1.16e-2, −7.25e-3] | 37% |
-| 12 dB | 2.81e-2 | 2.43e-2 | −3.87e-3 [−5.25e-3, −2.62e-3] | 32% |
-| 14 dB | 1.30e-2 | 1.16e-2 | −1.38e-3 [−2.38e-3, −5.00e-4] | 22% |
+| 0 dB | 5.879e-1 | 5.560e-1 | −3.19e-2 [−3.60e-2, −2.79e-2] | **43%** |
+| 2 dB | 4.622e-1 | 4.330e-1 | −2.92e-2 [−3.25e-2, −2.60e-2] | 38% |
+| 4 dB | 3.380e-1 | 3.078e-1 | −3.02e-2 [−3.44e-2, −2.66e-2] | **40%** |
+| 6 dB | 2.260e-1 | 2.070e-1 | −1.90e-2 [−2.20e-2, −1.60e-2] | 32% |
+| 8 dB | 1.270e-1 | 1.123e-1 | −1.48e-2 [−1.74e-2, −1.21e-2] | 35% |
+| 10 dB | 6.71e-2 | 5.89e-2 | −8.25e-3 [−1.05e-2, −6.13e-3] | 32% |
+| 12 dB | 2.79e-2 | 2.45e-2 | −3.38e-3 [−4.87e-3, −2.00e-3] | 28% |
+| 14 dB | 1.28e-2 | 1.19e-2 | −8.75e-4 [−1.63e-3, −2.50e-4] | 14% |
 | 16-20 dB | | | interval includes zero | — |
 
 Every point from 0 to 14 dB is significant. Three things make this more than a
@@ -149,10 +138,10 @@ lower curve.
 
 **The denominator is the perfect-CSI bound.** `../llr_clip_floor/` established
 that the TR 38.901 floor is estimation error, so perfect CSI is the reachable
-limit. The adaptive window closes **32-45%** of the distance from fixed DFT to
+limit. The adaptive window closes **28-43%** of the distance from fixed DFT to
 that limit across the whole significant range.
 
-**Worst-user BLER improves with it** — 1.360e-1 to 1.150e-1 at 8 dB, a 15%
+**Worst-user BLER improves with it** — 1.370e-1 to 1.195e-1 at 8 dB, a 13%
 reduction. That is the URLLC metric, where the weakest device sets the system
 guarantee, and a mean-BLER gain that came at the expense of the worst user would
 be worth nothing for a factory claim.
@@ -160,11 +149,13 @@ be worth nothing for a factory claim.
 **It is not the over-confidence artifact.** This project has already caught one
 estimator winning on BER by declaring an optimistic error variance to the
 equalizer. Here the winner is the *better-calibrated* estimator: the adaptive
-window declares 0.44-0.69 of its true error against fixed DFT's 0.28-0.62, at
+window declares 0.42-0.77 of its true error against fixed DFT's 0.28-0.76, at
 every point. The comparison runs the right way.
 
-For contrast, the DFT/LMMSE hybrid reaches 1.648e-1 at 8 dB — worse than plain
-DFT, and far worse than the window. The branch was the wrong thing to adapt.
+The 8 dB row is the whole argument in one line: LS 2.695e-1, LMMSE 1.676e-1,
+DFT/LMMSE hybrid 1.633e-1, fixed DFT 1.270e-1, **adaptive window 1.123e-1**,
+perfect CSI 8.488e-2. Both LMMSE and the hybrid are worse than plain DFT; only
+the window improves on it. The branch was the wrong thing to adapt.
 
 ## Caveats
 
@@ -172,13 +163,16 @@ DFT, and far worse than the window. The branch was the wrong thing to adapt.
   because 8000 codewords give three block errors at 20 dB, not because the
   effect is absent. Importance sampling for the URLLC tail remains unimplemented
   and is the honest limit on any 1e-5 claim.
-* **Only the small hall has run at BLER so far**, and on the wrong geometry --
-  see the note above. Medium, large, narrowband and UMi are queued behind the
-  rerun.
-* **The NMSE table has the same defect.** It was measured on the same
-  pre-correction configs, so the accuracy numbers are indicative rather than
-  final for the same reason. Their ordering is unlikely to move -- the mechanism
-  does not depend on the exact delay spread -- but the magnitudes will.
+* **Only the small hall has run at BLER so far.** Narrowband, medium, large and
+  UMi are queued.
+* **The NMSE table above predates the hall-geometry fix.** It was measured with
+  `inf_hall_surface_m2: 900` against the 750 the room implies, so it ran at a
+  20.7 ns delay spread and selectivity 6.4 rather than 23.6 ns and 7.3. The
+  effect is visible and small: the small hall's 0 dB gain reads +3.26 dB there
+  against +2.74 dB on the corrected channel, because a shorter delay spread
+  leaves the fixed window more slack to give up. The ordering is unaffected --
+  the mechanism does not depend on the exact spread -- but the magnitudes are
+  each a few tenths of a dB optimistic and the table is due a rerun.
 * **Declared error variance is imperfect for both estimators.** On the small
   hall the adaptive window declares 0.45–0.69 of its true error and fixed DFT
   0.28–0.61; on the large hall at high SNR both over-declare by four to eight

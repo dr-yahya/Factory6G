@@ -170,16 +170,21 @@ Two results are recorded under `reports/evidence/` and are ready to write up:
 3. **The truncation window, not the smoother, is the quantity worth adapting**
    (`adaptive-window-estimator/`). A clairvoyant DFT-versus-LMMSE branch
    selector beats plain DFT by 0.2% on a factory channel; sizing the window to
-   the measured delay profile instead gains 3.3 dB of NMSE at 0 dB Eb/No on the
-   small hall and 11.5 dB on the narrowband control, and lands within 0.1 dB of
-   an exhaustive search over window length on every factory point. **NMSE only
-   so far** — finding 2 is the reason that is not yet a thesis claim.
+   the measured delay profile instead lands within 0.1 dB of an exhaustive
+   search over window length on every factory point. Unlike finding 2, this one
+   reaches the decoder: on the small hall it cuts BLER significantly at every
+   Eb/No from 0 to 14 dB, closing **28-43%** of the gap between fixed DFT and
+   the perfect-CSI bound of finding 1, and improving worst-user BLER with it.
+   The winner is also the better-calibrated estimator, so it is not the
+   over-confidence artifact finding 2 had to be cleared of.
 
 ## Known gaps
 
-* **The adaptive window has not been evaluated at BLER.** Finding 3 is an NMSE
-  result and finding 2 says that does not settle it. The run is in flight; until
-  it lands, the estimator contribution rests on accuracy, not reliability.
+* **Only the small hall has run at BLER.** Narrowband, medium, large and UMi are
+  queued behind it; finding 3's cross-family claim is not yet evidenced.
+* **The adaptive window's NMSE-versus-oracle table predates the hall-geometry
+  fix** and reads a few tenths of a dB optimistic as a result. The BLER table
+  does not — it was rerun on the corrected channel.
 * **The adaptive window's precondition fails on UMi.** Its noise fit assumes no
   channel energy past the cyclic prefix — 0.000% in both halls, 3.4% on UMi at
   this numerology — so UMi loses up to 1.1 dB at high SNR. Stated rather than
