@@ -823,7 +823,7 @@ def build_factory_topology() -> str:
         "s: 15×15 m · 5 mach · 4 UT<br>"
         "m: 25×25 m · 10 · 8 UT<br>"
         "l: 40×40 m · 20 · 16 UT<br>"
-        "apple: 60×35 m · 22 · 8 UT",
+        "xl: 60×35 m · 22 · 8 UT",
         "neutral",
         fixed_width=True,
     )

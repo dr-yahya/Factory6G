@@ -38,7 +38,7 @@ services:
       - ./results:/app/results
       - ./config/config.json:/app/config/config.json:ro
     entrypoint: ["python", "-m", "factory6g.cli.visualize"]
-    command: ["--factory-size", "s,m,l,apple"]
+    command: ["--factory-size", "s,m,l,xl"]
 
   train-estimator:     # Train the NeuralChannelEstimator inside Docker
     build: .

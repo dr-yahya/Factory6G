@@ -144,3 +144,26 @@ def test_no_config_carries_a_hall_override():
         if "inf_hall_volume_m3" in system or "inf_hall_surface_m2" in system:
             offenders.append(path.name)
     assert not offenders, f"hall overrides should be derived from geometry: {offenders}"
+
+
+def test_factory_size_tables_stay_in_sync():
+    """One preset table, not three.
+
+    The presets, the short display names and the long descriptions used to live
+    in three places -- `sim/factory_profiles.py`, private aliases in `sim/flow.py`,
+    and a separate hard-coded dict in `cli/visualize.py` that had drifted to
+    different strings. They are now one module, and must agree.
+    """
+    from factory6g.sim.factory_profiles import (
+        FACTORY_SIZE_DESCRIPTIONS,
+        FACTORY_SIZE_DISPLAY,
+        FACTORY_SIZE_PRESETS,
+    )
+
+    assert set(FACTORY_SIZE_PRESETS) == set(FACTORY_SIZE_DISPLAY)
+    assert set(FACTORY_SIZE_PRESETS) == set(FACTORY_SIZE_DESCRIPTIONS)
+    for key, preset in FACTORY_SIZE_PRESETS.items():
+        assert len(preset["room_dimensions"]) == 3, key
+        assert preset["num_ut"] > 0, key
+        # Kronecker pilots require the FFT size to divide by the user count.
+        assert 128 % preset["num_ut"] == 0, key

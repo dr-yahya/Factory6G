@@ -20,8 +20,6 @@ from factory6g.sim.stages.jidd_scma import run_jidd_scma_stage
 from factory6g.sim.stages.resource_managers import run_resource_manager_stage
 
 _MODULATION_DISPLAY = {2: "QPSK", 4: "16-QAM", 6: "64-QAM", 1: "BPSK"}
-_FACTORY_SIZE_DISPLAY = FACTORY_SIZE_DISPLAY
-_FACTORY_SIZE_PRESETS = FACTORY_SIZE_PRESETS
 
 
 def _load_completed_stage(stage_dir: Path) -> dict[str, Any] | None:
@@ -203,7 +201,7 @@ def run_simulation_flow(
     multi_ch = len(channels) > 1
 
     mod_display_names = [_MODULATION_DISPLAY.get(bits, f"{bits}bps") for _, bits in modulations]
-    size_display_names = [_FACTORY_SIZE_DISPLAY.get(s, s.upper()) for s in factory_sizes]
+    size_display_names = [FACTORY_SIZE_DISPLAY.get(s, s.upper()) for s in factory_sizes]
 
     print("=" * 70)
     print("  6G Smart Factory Simulation Flow")
@@ -235,8 +233,8 @@ def run_simulation_flow(
     all_stage_paths: dict[str, dict[str, str]] = {}
 
     for size_label in factory_sizes:
-        preset = _FACTORY_SIZE_PRESETS[size_label]
-        size_display = _FACTORY_SIZE_DISPLAY.get(size_label, size_label.upper())
+        preset = FACTORY_SIZE_PRESETS[size_label]
+        size_display = FACTORY_SIZE_DISPLAY.get(size_label, size_label.upper())
         size_config = dataclasses.replace(
             config,
             system=dataclasses.replace(config.system, num_ut=preset["num_ut"]),

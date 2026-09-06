@@ -101,7 +101,7 @@ the `simulation` Docker service uses it as its entrypoint).
   `factory_scenario` drives LOS probability and path loss.
 - `--modulation` accepts `low` for QPSK, `mid` for 16-QAM, and `high` for
   64-QAM.
-- `--factory-size` accepts `s`, `m`, `l`, and `apple`. Each preset sets both the
+- `--factory-size` accepts `s`, `m`, `l`, and `xl`. Each preset sets both the
   user count and the hall geometry; with `--channel inf` the geometry genuinely
   changes propagation, with the other channel models only the user count matters.
 - `--stage jidd_scma` runs the JIDD-SCMA flow. For standard estimator or

@@ -32,11 +32,12 @@ FACTORY_SIZE_PRESETS: dict[str, dict[str, Any]] = {
         "machine_size_range": [[1.5, 4.0], [1.5, 4.0], [1.0, 3.0]],
         "num_ut": 16,
     },
-    "apple": {
-        # Consumer electronics precision assembly hall (iPhone-style)
-        # 60x35m floor, 8m ceiling - rectangular assembly line layout
-        # Dense compact workstations: SMT placers, robotic arms, test stations
-        # num_ut=8: fft_size(128) must be divisible by num_ut for Kronecker pilots
+    "xl": {
+        # Consumer-electronics precision assembly hall: 60x35 m floor, 8 m
+        # ceiling, a rectangular assembly-line layout of dense compact
+        # workstations (SMT placers, robotic arms, test stations).
+        # num_ut=8 because fft_size must be divisible by num_ut for Kronecker
+        # pilots, and 128 is the narrowband numerology's FFT size.
         "room_dimensions": [60.0, 35.0, 8.0],
         "num_machines": 22,
         "machine_size_range": [[0.8, 2.5], [0.8, 2.0], [1.0, 2.5]],
@@ -48,5 +49,14 @@ FACTORY_SIZE_DISPLAY: dict[str, str] = {
     "s": "Small",
     "m": "Medium",
     "l": "Large",
-    "apple": "Apple Factory",
+    "xl": "Extra Large",
+}
+
+# Long forms for user-facing listings. These used to be a third copy of the
+# table, hard-coded in `cli/visualize.py` with different strings again.
+FACTORY_SIZE_DESCRIPTIONS: dict[str, str] = {
+    "s": "Small (Electronics Workcell)",
+    "m": "Medium (Automotive Assembly)",
+    "l": "Large (Logistics Hall)",
+    "xl": "Extra Large (Consumer Electronics Assembly)",
 }

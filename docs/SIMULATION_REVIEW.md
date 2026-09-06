@@ -403,7 +403,7 @@ benchmark stages is `RayleighBlockFading` or TR 38.901 **UMi**, with UT position
 drawn by `gen_single_sector_topology(..., "umi")` (`channel.py:81`) — an outdoor
 urban-micro sector hundreds of metres across, unrelated to a 15×15 m hall.
 
-And `--factory-size s|m|l|apple` only changes `num_ut` (4 / 8 / 16 / 8) —
+And `--factory-size s|m|l|xl` only changes `num_ut` (4 / 8 / 16 / 8) —
 `flow.py:19-49` and the duplicate table in `cli/run.py:91-129`. Room dimensions
 and machine counts pass through to a config field nobody reads on the simulation
 path.
