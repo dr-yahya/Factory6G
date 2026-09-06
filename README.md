@@ -324,6 +324,19 @@ editable install so the `factory6g` package resolves):
 docker compose run --rm --entrypoint bash -v "$PWD:/app" simulation -lc "pip install -e . -q && python -m factory6g.cli.run --help"
 ```
 
+Run the whole test suite inside Docker with the dedicated `test` service, which
+bind-mounts the checkout and does the editable install for you:
+
+```bash
+docker compose run --rm test
+```
+
+Pass pytest arguments by overriding the command:
+
+```bash
+docker compose run --rm test "pip install -e . -q && pytest tests/test_thesis_configs.py -q"
+```
+
 Run a lightweight test subset inside Docker:
 
 ```bash
