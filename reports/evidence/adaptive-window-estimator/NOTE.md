@@ -110,12 +110,59 @@ spuriously on the large hall (ratio 2.4 at 8 dB against a true overrun of zero),
 because the flat term is not flat enough for the extrapolation to hold. The
 precondition is stated rather than detected.
 
+## The gain survives the decoder
+
+NMSE does not predict coded BER in this project (`../estimator-floor-tr38901/`),
+so the accuracy result above settles nothing on its own. It was a live
+possibility that the whole gain would vanish at BLER: it is concentrated at low
+SNR, where BLER is already near a half and a better channel estimate has least
+room to change a decode outcome.
+
+It did not vanish. 100 batches of 20, 8000 codewords per point, InF small hall,
+paired per batch against fixed DFT.
+
+| Eb/No | BLER dft | BLER adaptive | delta (95% CI) | gap to perfect CSI closed |
+|---|---|---|---|---|
+| 0 dB | 5.864e-1 | 5.531e-1 | −3.33e-2 [−3.76e-2, −2.91e-2] | **45%** |
+| 2 dB | 4.606e-1 | 4.304e-1 | −3.02e-2 [−3.36e-2, −2.68e-2] | 40% |
+| 4 dB | 3.367e-1 | 3.031e-1 | −3.36e-2 [−3.79e-2, −2.97e-2] | **45%** |
+| 6 dB | 2.251e-1 | 2.042e-1 | −2.09e-2 [−2.41e-2, −1.77e-2] | 37% |
+| 8 dB | 1.271e-1 | 1.111e-1 | −1.60e-2 [−1.89e-2, −1.31e-2] | 40% |
+| 10 dB | 6.74e-2 | 5.80e-2 | −9.37e-3 [−1.16e-2, −7.25e-3] | 37% |
+| 12 dB | 2.81e-2 | 2.43e-2 | −3.87e-3 [−5.25e-3, −2.62e-3] | 32% |
+| 14 dB | 1.30e-2 | 1.16e-2 | −1.38e-3 [−2.38e-3, −5.00e-4] | 22% |
+| 16-20 dB | | | interval includes zero | — |
+
+Every point from 0 to 14 dB is significant. Three things make this more than a
+lower curve.
+
+**The denominator is the perfect-CSI bound.** `../llr_clip_floor/` established
+that the TR 38.901 floor is estimation error, so perfect CSI is the reachable
+limit. The adaptive window closes **32-45%** of the distance from fixed DFT to
+that limit across the whole significant range.
+
+**Worst-user BLER improves with it** — 1.360e-1 to 1.150e-1 at 8 dB, a 15%
+reduction. That is the URLLC metric, where the weakest device sets the system
+guarantee, and a mean-BLER gain that came at the expense of the worst user would
+be worth nothing for a factory claim.
+
+**It is not the over-confidence artifact.** This project has already caught one
+estimator winning on BER by declaring an optimistic error variance to the
+equalizer. Here the winner is the *better-calibrated* estimator: the adaptive
+window declares 0.44-0.69 of its true error against fixed DFT's 0.28-0.62, at
+every point. The comparison runs the right way.
+
+For contrast, the DFT/LMMSE hybrid reaches 1.648e-1 at 8 dB — worse than plain
+DFT, and far worse than the window. The branch was the wrong thing to adapt.
+
 ## Caveats
 
-* **This is NMSE, not BLER.** Earlier work in this project established that NMSE
-  does not predict coded BER (`../estimator-floor-tr38901/`). The estimator's
-  thesis claim needs a BLER-level run across the factory sweep; that is next and
-  is not yet done.
+* **The deep tail is not resolved.** Above 14 dB the intervals include zero
+  because 8000 codewords give three block errors at 20 dB, not because the
+  effect is absent. Importance sampling for the URLLC tail remains unimplemented
+  and is the honest limit on any 1e-5 claim.
+* **Only the small hall has run at BLER so far.** Medium, large, narrowband and
+  UMi are queued; the NMSE table above says what to expect from each.
 * **Declared error variance is imperfect for both estimators.** On the small
   hall the adaptive window declares 0.45–0.69 of its true error and fixed DFT
   0.28–0.61; on the large hall at high SNR both over-declare by four to eight
@@ -126,5 +173,15 @@ precondition is stated rather than detected.
 ## Reproducing
 
 ```bash
+# NMSE against the exhaustive oracle
 python scripts/experiments/adaptive_window_sweep.py config/thesis/estimators_inf_s.json
+
+# BLER with the paired interval, from a full run
+python -m factory6g.cli.run --config config/thesis/estimators_inf_s.json
+python scripts/experiments/report_adaptive_window_bler.py results/<run_id>
 ```
+
+`bler_inf_small.txt` and `stage_results_inf_small.json` in this bundle are the
+run the table above is taken from. The stage results have their per-batch
+`paired_samples` stripped for size; the summary retains everything the table
+needs.
