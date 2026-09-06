@@ -167,3 +167,25 @@ def test_factory_size_tables_stay_in_sync():
         assert preset["num_ut"] > 0, key
         # Kronecker pilots require the FFT size to divide by the user count.
         assert 128 % preset["num_ut"] == 0, key
+
+
+def test_raw_config_loader_handles_comments(tmp_path):
+    """Configs may carry `//` comments, and the raw loader must survive them.
+
+    `cli.run` used to read the file a second time with a plain `json.load`
+    wrapped in `except Exception: raw_config = {}`. A commented config parsed
+    fine through `load_config` and then silently produced an empty raw config,
+    dropping every section `Factory6GConfig` does not model -- the whole
+    `jidd_scma` block among them.
+    """
+    from factory6g.sim.config import load_raw_config
+
+    config_data = make_tiny_config(str(tmp_path / "results"))
+    config_data["jidd_scma"] = {"polar_N": 256}
+    config_path = write_config(tmp_path, config_data)
+    commented = "// leading comment\n" + config_path.read_text(encoding="utf-8")
+    config_path.write_text(commented, encoding="utf-8")
+
+    raw = load_raw_config(config_path)
+    assert raw["jidd_scma"]["polar_N"] == 256
+    load_config(config_path)

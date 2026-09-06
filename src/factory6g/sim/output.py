@@ -674,8 +674,8 @@ def _is_numeric_series(values: Any) -> bool:
         return False
     try:
         arr = np.asarray(values)
-    except Exception:
-        return False
+    except (TypeError, ValueError):
+        return False  # ragged or non-numeric content is simply not a series
     return bool(np.issubdtype(arr.dtype, np.number))
 
 

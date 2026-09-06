@@ -17,7 +17,7 @@ import warnings
 from pathlib import Path
 from typing import TextIO
 
-from factory6g.sim.config import ConfigError, load_config
+from factory6g.sim.config import ConfigError, load_config, load_raw_config
 from factory6g.sim.env import configure_env, setup_gpu
 from factory6g.sim.run_context import create_run_context
 
@@ -93,7 +93,6 @@ def _configure_root_logging(level: int, console_stream: TextIO, log_path: Path) 
 _MODULATION_MAP = {"low": 2, "mid": 4, "high": 6}
 _MODULATION_LABEL_MAP = {2: "qpsk", 4: "16qam", 6: "64qam", 1: "bpsk"}
 _VALID_CHANNELS = {"tr38901", "rayleigh", "rician", "awgn", "inf"}
-_FACTORY_SIZE_PRESETS = FACTORY_SIZE_PRESETS
 
 
 def _parse_modulation_list(raw: str) -> list[tuple[str, int]]:
@@ -134,9 +133,9 @@ def _parse_factory_size_list(raw: str) -> list[str]:
         token = token.strip().lower()
         if not token:
             continue
-        if token not in _FACTORY_SIZE_PRESETS:
+        if token not in FACTORY_SIZE_PRESETS:
             raise ValueError(
-                f"Unknown factory size '{token}'. Choose from: {', '.join(sorted(_FACTORY_SIZE_PRESETS))}."
+                f"Unknown factory size '{token}'. Choose from: {', '.join(sorted(FACTORY_SIZE_PRESETS))}."
             )
         result.append(token)
     if not result:
@@ -240,13 +239,15 @@ def main() -> int:
         print(f"Error loading configuration: {exc}")
         return 1
 
-    # Load raw config dict (for sections not modelled by Factory6GConfig, e.g. jidd_scma)
-    import json as _json
-    try:
-        with open(args.config, encoding="utf-8") as _fh:
-            raw_config: dict = _json.load(_fh)
-    except Exception:
-        raw_config = {}
+    # Raw config dict, for sections Factory6GConfig does not model (jidd_scma).
+    #
+    # This used to be a plain `json.load` wrapped in `except Exception:
+    # raw_config = {}`. Configs are allowed to carry `//` comments -- load_config
+    # strips them -- so any commented config parsed fine above and then silently
+    # produced an empty raw_config here, dropping the whole jidd_scma section.
+    # Same parser as load_config now, and no fallback: the file has already
+    # parsed once, so a failure here is a real problem worth surfacing.
+    raw_config: dict = load_raw_config(args.config)
 
     # CLI method overrides: --estimators / --resource-managers filter which methods run.
     # If only one flag is given, the other stage is skipped (enabled=[]).
@@ -371,8 +372,8 @@ def main() -> int:
         try:
             sys.stdout.flush()
             sys.stderr.flush()
-        except Exception:
-            pass
+        except (OSError, ValueError):
+            pass  # the streams may already be closed; nothing to salvage
         sys.stdout = original_stdout
         sys.stderr = original_stderr
         if log_handle is not None:

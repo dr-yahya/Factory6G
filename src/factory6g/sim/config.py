@@ -935,10 +935,19 @@ class Factory6GConfig:
         return asdict(self)
 
 
-def load_config(config_path: str | Path = "config/config.json") -> Factory6GConfig:
+def load_raw_config(config_path: str | Path = "config/config.json") -> dict[str, Any]:
+    """Parse a config file to a plain dict, comments stripped.
+
+    Callers that need sections `Factory6GConfig` does not model -- `jidd_scma`
+    most of all -- must go through this rather than `json.load`, which chokes on
+    the `//` comments this project's configs are allowed to carry.
+    """
     path = Path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
     with path.open("r", encoding="utf-8") as handle:
-        raw_config = json.loads(_strip_json_comments(handle.read()))
-    return Factory6GConfig.from_dict(_ensure_dict(raw_config, "root"))
+        return _ensure_dict(json.loads(_strip_json_comments(handle.read())), "root")
+
+
+def load_config(config_path: str | Path = "config/config.json") -> Factory6GConfig:
+    return Factory6GConfig.from_dict(load_raw_config(config_path))
