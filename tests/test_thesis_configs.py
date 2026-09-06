@@ -63,11 +63,20 @@ def test_every_thesis_config_loads(config_path):
 def test_every_config_path_named_in_docs_exists():
     """Reproduction commands in the docs must point at files that are here."""
     pattern = re.compile(r"config/[A-Za-z0-9_/]+\.json")
+    # Only paths actually passed to --config are run configs. The docs also name
+    # data files that live under config/ -- factory_size_profiles.json is a table
+    # of scenario presets, not something load_config can read -- so requiring
+    # every mentioned path to parse as a config fails on files that were never
+    # meant to.
+    runnable = re.compile(r"--config[= ]+(config/[A-Za-z0-9_/]+\.json)")
     referenced: dict[str, set[str]] = {}
+    loadable: set[str] = set()
     doc_files = list((REPO_ROOT / "docs").glob("*.md")) + [REPO_ROOT / "README.md"]
     for doc in doc_files:
-        for match in pattern.findall(doc.read_text(encoding="utf-8")):
+        text = doc.read_text(encoding="utf-8")
+        for match in pattern.findall(text):
             referenced.setdefault(match, set()).add(doc.name)
+        loadable.update(runnable.findall(text))
 
     missing = {
         path: sorted(sources)
@@ -76,7 +85,14 @@ def test_every_config_path_named_in_docs_exists():
     }
     assert not missing, f"documented config paths that do not exist: {missing}"
 
-    for path in referenced:
+    # Every family config must parse, however the docs happen to spell its path
+    # -- THESIS_RESULTS.md writes the reproduction command with a `<family>`
+    # placeholder, so matching on --config alone would check almost nothing.
+    family_configs = sorted((REPO_ROOT / "config" / "thesis").glob("*.json"))
+    assert family_configs, "config/thesis/ is empty -- the documented families are gone"
+    for path in family_configs:
+        load_config(path)
+    for path in sorted(loadable):
         load_config(REPO_ROOT / path)
 
 

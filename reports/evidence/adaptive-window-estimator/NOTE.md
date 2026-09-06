@@ -112,6 +112,17 @@ precondition is stated rather than detected.
 
 ## The gain survives the decoder
 
+> **SUPERSEDED — the BLER table below is on the wrong channel.** It was produced
+> before `config/thesis/estimators_inf_s.json` had its hall overrides removed.
+> The run carried `inf_hall_surface_m2: 900`, while the 15x15x5 m room implies
+> 750, so it simulated a 20.7 ns delay spread and selectivity 6.4 instead of the
+> documented 23.6 ns and 7.3. The paired comparison is internally valid -- both
+> estimators saw the identical channel -- but it is not the documented small
+> hall, and a shorter delay spread leaves the fixed 20-tap window *more* slack to
+> give up, so these numbers most likely overstate the gain. Being replaced by a
+> rerun on the corrected geometry; treat the numbers as indicative only.
+
+
 NMSE does not predict coded BER in this project (`../estimator-floor-tr38901/`),
 so the accuracy result above settles nothing on its own. It was a live
 possibility that the whole gain would vanish at BLER: it is concentrated at low
@@ -161,8 +172,13 @@ DFT, and far worse than the window. The branch was the wrong thing to adapt.
   because 8000 codewords give three block errors at 20 dB, not because the
   effect is absent. Importance sampling for the URLLC tail remains unimplemented
   and is the honest limit on any 1e-5 claim.
-* **Only the small hall has run at BLER so far.** Medium, large, narrowband and
-  UMi are queued; the NMSE table above says what to expect from each.
+* **Only the small hall has run at BLER so far**, and on the wrong geometry --
+  see the note above. Medium, large, narrowband and UMi are queued behind the
+  rerun.
+* **The NMSE table has the same defect.** It was measured on the same
+  pre-correction configs, so the accuracy numbers are indicative rather than
+  final for the same reason. Their ordering is unlikely to move -- the mechanism
+  does not depend on the exact delay spread -- but the magnitudes will.
 * **Declared error variance is imperfect for both estimators.** On the small
   hall the adaptive window declares 0.45–0.69 of its true error and fixed DFT
   0.28–0.61; on the large hall at high SNR both over-declare by four to eight

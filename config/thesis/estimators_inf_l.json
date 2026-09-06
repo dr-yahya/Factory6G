@@ -56,7 +56,8 @@
         "model_path": "models/neural_estimator.keras",
         "nn_err_var_scale": 0.5
       }
-    }
+    },
+    "paired_reference": "dft"
   },
   "resource_managers": {
     "enabled": [],
