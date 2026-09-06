@@ -33,7 +33,7 @@ affordable.
 | `estimators_inf_s.json` | **Lead contribution** — estimator comparison in a factory hall | 15×15×5 m, 5 machines | 61.4 MHz | 7.3 | 4 users. Mini-slot FR3, 13 GHz. |
 | `estimators_inf_m.json` | Scaling with hall size and device count | 25×25×6 m, 10 machines | 61.4 MHz | 9.2 | 8 users. |
 | `estimators_inf_l.json` | Scaling continued | 40×40×8 m, 20 machines | 61.4 MHz | 12.1 | 16 users. Longest delay spread, most selective. |
-| `estimators_inf_narrowband.json` | **Control** — estimators converge when the channel is flat | 15×15×5 m | 3.8 MHz | 0.45 | FR1. The convergence is the finding, not a failed run. |
+| `estimators_inf_narrowband.json` | **Control** — a CP-length window is furthest from optimal when the channel is flat | 15×15×5 m | 3.8 MHz | 0.45 | FR1. Reinterpreted 2026-09-06: this is where the adaptive window gains most (+11.5 dB NMSE), not least. |
 | `estimators_umi.json` | Comparison arm; where the estimation floor lives | — (UMi) | 3.8 MHz | selective | Keeps the existing weekly-report evidence interpretable. |
 | `resource_managers_inf.json` | Resource-management chapter | 25×25×6 m | 61.4 MHz | 9.2 | 8 users, AGV mobility 3 m/s, CSI delay 4 slots, HARQ 3. `static_subset` is the equal-load control; `drl` and `rl` give the imitation-vs-RL ablation. |
 
@@ -147,13 +147,27 @@ Two results are recorded under `reports/evidence/` and are ready to write up:
    the best NMSE at every Eb/No point and the worse BER; DFT and the adaptive
    hybrid close about 2.5 orders of magnitude of the floor. Verified to survive
    correcting — and then reversing — the error-variance confound.
+3. **The truncation window, not the smoother, is the quantity worth adapting**
+   (`adaptive-window-estimator/`). A clairvoyant DFT-versus-LMMSE branch
+   selector beats plain DFT by 0.2% on a factory channel; sizing the window to
+   the measured delay profile instead gains 3.3 dB of NMSE at 0 dB Eb/No on the
+   small hall and 11.5 dB on the narrowband control, and lands within 0.1 dB of
+   an exhaustive search over window length on every factory point. **NMSE only
+   so far** — finding 2 is the reason that is not yet a thesis claim.
 
 ## Known gaps
 
+* **The adaptive window has not been evaluated at BLER.** Finding 3 is an NMSE
+  result and finding 2 says that does not settle it. The run is in flight; until
+  it lands, the estimator contribution rests on accuracy, not reliability.
+* **The adaptive window's precondition fails on UMi.** Its noise fit assumes no
+  channel energy past the cyclic prefix — 0.000% in both halls, 3.4% on UMi at
+  this numerology — so UMi loses up to 1.1 dB at high SNR. Stated rather than
+  detected; an overrun detector was tried and fires spuriously on the large hall.
 * **The adaptive branch policy is tuned on the wrong objective.** It prefers
   LMMSE at low SNR, which finding 2 shows is the weaker choice at every SNR.
-  Retuning `quality_low` / `quality_high` / `leakage_reference` against BLER is
-  the cheapest available improvement to the lead contribution.
+  Given finding 3, the branch selector is probably not worth retuning at all —
+  the clairvoyant version of it is worth 0.2%.
 * **LS and LMMSE still understate their error variance** by three to four times.
   Not distorting enough to change the ranking, but it should be stated when the
   calibration table is presented.

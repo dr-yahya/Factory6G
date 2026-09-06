@@ -358,6 +358,10 @@ to defend in the thesis.
 ### 2.5 The adaptive estimator is SNR-switched, not channel-adaptive
 
 > **Fixed.** The default `per_user` mode decides the DFT/LMMSE blend per user from two statistics the channel actually varies -- per-user LS SNR and the fraction of delay-domain energy outside the cyclic prefix -- so different users can take different branches in the same slot. The legacy `scalar` mode is retained for reproducing earlier results.
+>
+> **Superseded, 2026-09-06 — the branch was the wrong thing to adapt.** Making the DFT/LMMSE choice per-user fixed the mechanism but not the premise. A clairvoyant selector, given the true NMSE of both branches and allowed to pick the winner per user per slot, beats plain DFT by **0.2%** on a factory channel (`reports/evidence/adaptive-branch-calibration/`). That is the ceiling on this whole line of work, so no branch policy, learned or hand-tuned, can be a contribution.
+>
+> What the same measurements did show is that the delay spread against the truncation window separates the channels completely. `AdaptiveWindowChannelEstimator` therefore adapts the **window**, sizing it per user per slot by minimising the estimated post-truncation MSE. It gains 3.3 dB of NMSE at 0 dB Eb/No on the small hall and 11.5 dB on the narrowband control, and comes within 0.1 dB of an exhaustive search over window length on every factory point (`reports/evidence/adaptive-window-estimator/`). Still NMSE only -- see §1.1 on why that does not settle it.
 
 
 `components/estimators/adaptive_estimator.py:54-58`:
