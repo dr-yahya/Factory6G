@@ -648,7 +648,9 @@ batch count for the paired analysis, or truncate to the shared prefix.
 - `config.json` sets `stop_policy: "threshold"` while `README.md` and
   `docs/ARCHITECTURE.md` describe `sweep` as the policy for Eb/No sweeps.
 - `_FACTORY_SIZE_PRESETS` is duplicated verbatim in `cli/run.py:91` and
-  `flow.py:19`.
+  `flow.py:19`. *(Consolidated into `sim/factory_profiles.py`. A third copy
+  with different strings was later found in `cli/visualize.py` and folded in
+  too; a test now asserts the preset, display and description tables agree.)*
 - `sim/results.py` and `sim/simulation.py` are legacy shims reachable only via
   lazy imports in `sim/__init__.py` and one test. *(Both removed; the one test
   now calls `run_simulation_flow` directly.)*
